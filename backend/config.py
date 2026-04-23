@@ -7,6 +7,10 @@ and database paths. Uses environment variables with sensible defaults.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # ──────────────────────────────────────────────
 # Project Paths
@@ -29,8 +33,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 # Automatically fallback to "mock" if no valid API key is present
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini" if GEMINI_API_KEY else "mock")
 
-# Gemini model to use
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+# Gemini model to use (1.5-flash has broader free-tier availability than 2.0)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 # ──────────────────────────────────────────────
 # Embedding Configuration
