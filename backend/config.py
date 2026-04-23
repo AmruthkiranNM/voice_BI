@@ -24,8 +24,10 @@ DATABASE_PATH = str(DATA_DIR / "business.db")
 # LLM Configuration
 # ──────────────────────────────────────────────
 # Supports: "gemini" (Google Generative AI) or "mock" (no API key needed)
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+
+# Automatically fallback to "mock" if no valid API key is present
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini" if GEMINI_API_KEY else "mock")
 
 # Gemini model to use
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")

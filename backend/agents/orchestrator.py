@@ -15,6 +15,7 @@ from typing import Any
 
 from agents import planner, rag_agent, sql_agent, validator, execution, insight
 from agents.validator import ValidationError
+from config import LLM_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,7 @@ def process_query(query: str) -> dict[str, Any]:
                 "row_count": exec_result["row_count"],
             },
             "insight": insight_text,
+            "llm_mode": LLM_PROVIDER,
             "metadata": {
                 "pipeline_time_seconds": pipeline_time,
                 "execution_time_ms": exec_result["execution_time_ms"],
@@ -219,6 +221,7 @@ def _error_response(
         },
         "insight": None,
         "error": error,
+        "llm_mode": LLM_PROVIDER,
         "metadata": {
             "pipeline_time_seconds": round(pipeline_time, 3),
         },

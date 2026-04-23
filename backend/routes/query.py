@@ -37,6 +37,7 @@ class QueryResponse(BaseModel):
     result: dict = {}
     insight: str | None = None
     error: str | None = None
+    llm_mode: str
     metadata: dict = {}
     agent_logs: list = []
 

@@ -8,6 +8,8 @@ Supports Google Gemini API and a mock fallback for development.
 import logging
 import json
 import re
+import time
+from typing import Any
 
 from config import LLM_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL
 
@@ -52,22 +54,38 @@ def call_llm(prompt: str, expect_json: bool = False) -> str:
 
 
 def _call_gemini(prompt: str, expect_json: bool = False) -> str:
-    """Call Google Gemini API."""
+    """Call Google Gemini API with automatic retry on 429 errors."""
     model = _get_gemini_model()
+    max_retries = 3
+    retry_delay = 5  # Seconds to wait between retries
 
-    try:
-        response = model.generate_content(prompt)
-        text = response.text.strip()
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(prompt)
+            text = response.text.strip()
 
-        if expect_json:
-            text = _clean_json_response(text)
+            if expect_json:
+                text = _clean_json_response(text)
 
-        logger.debug("Gemini response (first 200 chars): %s", text[:200])
-        return text
+            logger.debug("Gemini response (first 200 chars): %s", text[:200])
+            return text
 
-    except Exception as e:
-        logger.error("Gemini API call failed: %s", str(e))
-        raise RuntimeError(f"LLM call failed: {str(e)}") from e
+        except Exception as e:
+            error_str = str(e)
+            if "429" in error_str or "quota" in error_str.lower():
+                if attempt < max_retries - 1:
+                    logger.warning(
+                        "[LLM Service] Rate limit hit. Retrying in %d seconds... (Attempt %d/%d)",
+                        retry_delay, attempt + 1, max_retries
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+            
+            logger.error("Gemini API call failed: %s", error_str)
+            raise RuntimeError(f"LLM call failed: {error_str}") from e
+    
+    raise RuntimeError("LLM call failed after multiple retries due to rate limits.")
 
 
 def _clean_json_response(text: str) -> str:
@@ -103,23 +121,23 @@ def _mock_llm(prompt: str) -> str:
     prompt_lower = prompt.lower()
 
     # Mock planner response
-    if "break down" in prompt_lower or "plan" in prompt_lower:
+    if "query planner agent" in prompt_lower:
         return json.dumps({
             "steps": [
                 "Identify the relevant tables and columns",
                 "Construct SQL query to fetch the requested data",
-                "Execute and return results",
+                "Run query and return results",
             ],
             "requires_aggregation": True,
             "requires_comparison": False,
         })
 
     # Mock SQL generation
-    if "generate sql" in prompt_lower or "sql query" in prompt_lower:
+    if "sql generator agent" in prompt_lower:
         return "SELECT SUM(total_price) as total_sales FROM sales WHERE sale_date >= date('now', '-1 month');"
 
     # Mock insight generation
-    if "insight" in prompt_lower or "analyze" in prompt_lower:
+    if "insight agent" in prompt_lower:
         return "Based on the query results, the data shows significant patterns in the requested metrics. The values indicate a positive trend compared to previous periods."
 
     return "Mock LLM response for: " + prompt[:100]
