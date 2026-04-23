@@ -1,5 +1,6 @@
 # Python
 venv/
+backend/venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -9,6 +10,9 @@ __pycache__/
 
 # Node (if you have frontend)
 node_modules/
+
+# Vector DB / ML data (IMPORTANT)
+backend/vector_store/
 
 # OS files
 .DS_Store
