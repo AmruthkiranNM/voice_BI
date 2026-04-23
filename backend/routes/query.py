@@ -27,6 +27,10 @@ class QueryRequest(BaseModel):
         description="Natural language business question",
         examples=["Show total sales last month", "Top 5 customers by revenue"],
     )
+    llm_mode: str | None = Field(
+        default=None,
+        description="Optional LLM provider override: 'mock' or 'gemini'",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -60,7 +64,7 @@ async def handle_query(request: QueryRequest):
     logger.info("Received query: %s", request.query)
 
     try:
-        result = process_query(request.query)
+        result = process_query(request.query, llm_mode=request.llm_mode)
         return QueryResponse(**result)
 
     except Exception as e:

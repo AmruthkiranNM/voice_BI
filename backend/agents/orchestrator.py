@@ -15,7 +15,6 @@ from typing import Any
 
 from agents import planner, rag_agent, sql_agent, validator, execution, insight
 from agents.validator import ValidationError
-from config import LLM_PROVIDER
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ logger = logging.getLogger(__name__)
 MAX_SQL_RETRIES = 3
 
 
-def process_query(query: str) -> dict[str, Any]:
+def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
     """
     Process a natural language query through the full agent pipeline.
 
@@ -37,10 +36,29 @@ def process_query(query: str) -> dict[str, Any]:
 
     Args:
         query: Natural language business question.
+        llm_mode: Optional LLM provider override ('mock' or 'gemini').
 
     Returns:
         Complete response with SQL, results, insights, and agent logs.
     """
+    # Allow per-request LLM mode override
+    import config
+    original_provider = config.LLM_PROVIDER
+
+    # Validate Gemini mode — check if API key is available
+    effective_mode = llm_mode
+    if llm_mode == "gemini" and not config.GEMINI_API_KEY:
+        logger.warning(
+            "[Orchestrator] Gemini mode requested but GEMINI_API_KEY is not set. "
+            "Falling back to mock mode."
+        )
+        effective_mode = "mock"
+
+    if effective_mode and effective_mode in ("mock", "gemini"):
+        config.LLM_PROVIDER = effective_mode
+        import services.llm_service as llm_svc
+        llm_svc.LLM_PROVIDER = effective_mode
+
     pipeline_start = time.time()
 
     # Agent step logs for transparency
@@ -67,6 +85,12 @@ def process_query(query: str) -> dict[str, Any]:
             "metrics": plan.get("metrics"),
         })
 
+        # DEBUG: Log planner output
+        logger.info("[DEBUG] Query: %s", query)
+        logger.info("[DEBUG] Plan intent: %s | metrics: %s | grouping: %s",
+                    plan.get('intent'), plan.get('metrics'), plan.get('grouping'))
+        logger.info("[DEBUG] Plan steps: %s", plan.get('steps'))
+
         # ════════════════════════════════════════════
         # STEP 2: RAG Retriever Agent
         # ════════════════════════════════════════════
@@ -75,6 +99,9 @@ def process_query(query: str) -> dict[str, Any]:
             "tables_retrieved": rag_context.get("retrieved_tables"),
             "similarity_scores": rag_context.get("similarity_scores"),
         })
+
+        # DEBUG: Log retrieved schema
+        logger.info("[DEBUG] RAG tables: %s", rag_context.get('retrieved_tables'))
 
         # ════════════════════════════════════════════
         # STEP 3 & 4: SQL Generation + Validation (with retry loop)
@@ -94,6 +121,9 @@ def process_query(query: str) -> dict[str, Any]:
             log_step("SQL Generator Agent", f"attempt_{attempt}", {
                 "sql": sql,
             })
+
+            # DEBUG: Log generated SQL
+            logger.info("[DEBUG] Generated SQL: %s", sql)
 
             # Validate SQL
             try:
@@ -172,7 +202,7 @@ def process_query(query: str) -> dict[str, Any]:
                 "row_count": exec_result["row_count"],
             },
             "insight": insight_text,
-            "llm_mode": LLM_PROVIDER,
+            "llm_mode": config.LLM_PROVIDER,
             "metadata": {
                 "pipeline_time_seconds": pipeline_time,
                 "execution_time_ms": exec_result["execution_time_ms"],
@@ -200,6 +230,12 @@ def process_query(query: str) -> dict[str, Any]:
             agent_logs=agent_logs,
             pipeline_time=time.time() - pipeline_start,
         )
+    finally:
+        # Restore original LLM provider after request
+        config.LLM_PROVIDER = original_provider
+        if llm_mode and llm_mode in ("mock", "gemini"):
+            import services.llm_service as llm_svc
+            llm_svc.LLM_PROVIDER = original_provider
 
 
 def _error_response(
@@ -221,7 +257,7 @@ def _error_response(
         },
         "insight": None,
         "error": error,
-        "llm_mode": LLM_PROVIDER,
+        "llm_mode": "mock",
         "metadata": {
             "pipeline_time_seconds": round(pipeline_time, 3),
         },
