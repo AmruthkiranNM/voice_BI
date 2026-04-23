@@ -1,24 +1,15 @@
-/**
- * InsightPanel — AI-generated business insight
- */
 export default function InsightPanel({ insight }) {
   if (!insight) return null;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 fade-up-2
-                    hover:border-border-hover transition-colors duration-200">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-5">
-        <span className="text-lg">💡</span>
-        <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">
-          AI Insight
-        </h3>
+    <div className="panel-card w-full bg-gradient-to-br from-gray-900 to-indigo-950/20 border-indigo-500/20">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400">💡</div>
+        <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">AI Business Insight</h3>
       </div>
 
-      {/* Insight content */}
-      <div className="p-5 rounded-xl bg-gradient-to-br from-amber/5 to-indigo/5
-                      border border-amber/10">
-        <p className="text-sm text-text-primary leading-7">
+      <div className="p-1">
+        <p className="text-base text-gray-300 leading-relaxed font-medium">
           {highlightNumbers(insight)}
         </p>
       </div>
@@ -26,12 +17,11 @@ export default function InsightPanel({ insight }) {
   );
 }
 
-/** Highlight numbers in text with amber color */
 function highlightNumbers(text) {
   const parts = text.split(/(\$?[\d,]+\.?\d*%?)/g);
   return parts.map((part, i) =>
     /^\$?[\d,]+\.?\d*%?$/.test(part)
-      ? <span key={i} className="font-bold text-amber">{part}</span>
+      ? <span key={i} className="font-bold text-amber-400 bg-amber-500/10 px-1 rounded mx-0.5">{part}</span>
       : part
   );
 }

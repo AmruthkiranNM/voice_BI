@@ -1,75 +1,42 @@
-/**
- * ResultTable — Data table with CSV export
- */
 export default function ResultTable({ result }) {
   if (!result?.columns?.length || !result?.rows?.length) return null;
 
   const { columns, rows, row_count } = result;
 
-  const exportCSV = () => {
-    const header = columns.join(',');
-    const body = rows.map(r =>
-      columns.map(c => {
-        const v = r[c];
-        return typeof v === 'string' && v.includes(',') ? `"${v}"` : v ?? '';
-      }).join(',')
-    ).join('\n');
-    const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'results.csv';
-    a.click();
-  };
-
   const fmt = (v) => {
-    if (v == null) return '—';
+    if (v == null) return '-';
     if (typeof v === 'number') return v.toLocaleString();
     return String(v);
   };
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 fade-up-3
-                    hover:border-border-hover transition-colors duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+    <div className="panel-card w-full">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <span className="text-lg">📊</span>
-          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">
-            Query Results
-          </h3>
-          <span className="px-2.5 py-0.5 rounded-md bg-green/10 text-green text-[11px] font-bold">
-            {row_count} rows
-          </span>
+          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">📊</div>
+          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Database Results</h3>
         </div>
-        <button
-          onClick={exportCSV}
-          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold
-                     bg-bg border border-border text-text-muted
-                     hover:text-green hover:border-green/30 transition-all duration-200"
-        >
-          ↓ Export CSV
-        </button>
+        <span className="px-3 py-1 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-bold">
+          {row_count} ROWS RETURNED
+        </span>
       </div>
 
-      {/* Table */}
-      <div className="overflow-auto rounded-xl border border-border max-h-[320px]">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-elevated">
+      <div className="overflow-x-auto overflow-y-auto max-h-[400px] border border-gray-800 rounded-xl w-full bg-gray-900/30">
+        <table className="w-full text-sm text-left">
+          <thead className="text-xs text-gray-400 uppercase bg-gray-800/80 sticky top-0 z-10 backdrop-blur-sm">
             <tr>
               {columns.map(c => (
-                <th key={c} className="px-4 py-3 text-left text-[11px] font-bold text-text-muted
-                                     uppercase tracking-wider border-b border-border whitespace-nowrap">
-                  {c}
+                <th key={c} className="px-6 py-4 font-bold border-b border-gray-700 whitespace-nowrap">
+                  {c.replace(/_/g, ' ')}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-gray-800/50">
             {rows.map((row, i) => (
-              <tr key={i} className="border-b border-border/40 hover:bg-card-hover transition-colors">
+              <tr key={i} className="hover:bg-gray-800/40 transition-colors">
                 {columns.map(c => (
-                  <td key={c} className="px-4 py-3 text-text-primary whitespace-nowrap
-                                       font-mono text-[13px]">
+                  <td key={c} className="px-6 py-3.5 whitespace-nowrap text-gray-200 font-mono text-[13px]">
                     {fmt(row[c])}
                   </td>
                 ))}

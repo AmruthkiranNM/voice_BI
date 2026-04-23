@@ -1,10 +1,3 @@
-/**
- * App.jsx — Main Dashboard
- * 
- * Agentic AI-Based Business Intelligence System
- * Layout: Header → Query → 2-column grid → Timeline
- */
-
 import { useState, useCallback } from 'react';
 import { submitQuery } from './services/api';
 
@@ -41,7 +34,6 @@ export default function App() {
     }
   }, [llmMode]);
 
-  // Extract data
   const plan = response?.metadata?.plan || null;
   const metadata = response?.metadata || null;
   const sql = response?.sql || null;
@@ -51,130 +43,104 @@ export default function App() {
   const pipelineTime = metadata?.pipeline_time_seconds || 0;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
+  const actualMode = response?.llm_mode || llmMode;
   const hasData = response && (sql || result?.row_count > 0 || insight);
 
   return (
-    <div className="min-h-screen bg-bg-primary">
-      {/* ── Header ── */}
+    <div className="min-h-screen bg-[#0B1120] text-[#E5E7EB] font-sans selection:bg-indigo-500/30">
       <Header llmMode={llmMode} onModeChange={setLlmMode} isProcessing={isLoading} />
 
-      {/* ── Content ── */}
-      <main className="max-w-[1440px] mx-auto px-6 py-5 space-y-5">
+      <main className="max-w-[1400px] mx-auto px-6 py-10 flex flex-col gap-10">
         
-        {/* Welcome state */}
+        {/* Hero / Welcome */}
         {!response && !isLoading && !error && (
-          <div className="text-center py-16 anim-fade">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 mb-5">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span className="text-[11px] font-medium text-accent">System Ready</span>
+          <div className="py-24 text-center max-w-3xl mx-auto flex flex-col items-center gap-6">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-3xl mb-4">
+              ✨
             </div>
-            <h2 className="text-2xl font-bold text-text mb-2">Ask Your Business Data Anything</h2>
-            <p className="text-sm text-text-muted max-w-md mx-auto">
-              Natural language queries processed through a multi-agent AI pipeline with RAG-augmented schema retrieval.
+            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+              Agentic Business Intelligence
+            </h2>
+            <p className="text-lg text-gray-400 leading-relaxed">
+              Ask natural language questions about your business data. Our multi-agent AI pipeline will retrieve schema, generate SQL, and visualize the results instantly.
             </p>
-
-            {/* Mini architecture */}
-            <div className="flex items-center justify-center gap-2 mt-8">
-              {['Query', 'Planner', 'RAG', 'SQL', 'Validator', 'Execute', 'Insight'].map((s, i, a) => (
-                <div key={s} className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-md bg-bg-card border border-border text-[10px] font-medium text-text-dim">{s}</span>
-                  {i < a.length - 1 && <span className="text-border text-xs">→</span>}
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
-        {/* Query Input */}
-        <QueryInput onSubmit={handleSubmit} isLoading={isLoading} />
+        {/* Search Bar */}
+        <div className="max-w-4xl mx-auto w-full z-10 relative">
+          <QueryInput onSubmit={handleSubmit} isLoading={isLoading} />
+        </div>
 
-        {/* Error */}
-        {error && <ErrorPanel error={error} />}
+        {error && (
+          <div className="max-w-4xl mx-auto w-full">
+            <ErrorPanel error={error} />
+          </div>
+        )}
 
-        {/* Loading skeleton */}
+        {/* Loading State */}
         {isLoading && (
-          <div className="space-y-4 anim-fade">
-            <div className="card p-4">
-              <div className="h-3 w-24 rounded shimmer-bg mb-3" />
-              <div className="grid grid-cols-6 gap-3">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="flex flex-col items-center gap-2 py-3">
-                    <div className="w-9 h-9 rounded-full shimmer-bg" />
-                    <div className="h-2 w-10 rounded shimmer-bg" />
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-5 gap-4">
-              <div className="col-span-3 space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="card p-4">
-                    <div className="h-3 w-28 rounded shimmer-bg mb-3" />
-                    <div className="space-y-2">
-                      <div className="h-6 rounded shimmer-bg" />
-                      <div className="h-6 rounded shimmer-bg" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="col-span-2 space-y-4">
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} className="card p-4">
-                    <div className="h-3 w-20 rounded shimmer-bg mb-3" />
-                    <div className="h-24 rounded shimmer-bg" />
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="w-full max-w-5xl mx-auto flex flex-col gap-6 items-center py-20">
+            <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-indigo-400 font-medium animate-pulse">Running Agentic Pipeline...</p>
           </div>
         )}
 
-        {/* ── Results Dashboard ── */}
+        {/* Dashboard Results */}
         {hasData && !isLoading && (
-          <div className="space-y-5">
-            {/* Pipeline Timeline — full width */}
-            <Timeline agentLogs={agentLogs} isLoading={false} pipelineTime={pipelineTime} />
+          <div className="flex flex-col gap-8 w-full animate-in fade-in duration-500">
+            
+            {/* VERY CLEAR API MODE INDICATOR */}
+            <div className={`w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg
+              ${actualMode === 'gemini' 
+                ? 'bg-indigo-950/40 border-indigo-500/30 shadow-indigo-500/10' 
+                : 'bg-amber-950/30 border-amber-500/30 shadow-amber-500/5'}`}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
+                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : 'bg-amber-500/20'}`}>
+                {actualMode === 'gemini' ? '🧠' : '🤖'}
+              </div>
+              <div className="flex-1">
+                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : 'text-amber-400'}`}>
+                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : 'Running in Mock Mode (Rule-Based)'}
+                </h3>
+                <p className="text-sm text-gray-400">
+                  {actualMode === 'gemini' 
+                    ? 'The query planner, SQL generator, and insight agents are using real LLM calls.' 
+                    : 'No API key detected. The system is using the fallback mock engine to demonstrate the pipeline.'}
+                </p>
+              </div>
+              <div className="hidden md:flex flex-col items-end gap-1 text-xs text-gray-500 font-mono">
+                <div>Pipeline Time: <span className="text-gray-300">{pipelineTime.toFixed(2)}s</span></div>
+                {metadata?.execution_time_ms && <div>DB Query: <span className="text-gray-300">{metadata.execution_time_ms.toFixed(1)}ms</span></div>}
+                <div>Rows Found: <span className="text-gray-300">{result?.row_count}</span></div>
+              </div>
+            </div>
 
-            {/* 2-Column Grid: Left 60% / Right 40% */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+            {/* Timeline spans full width */}
+            <Timeline agentLogs={agentLogs} isLoading={false} />
+
+            {/* 2-Column Grid Layout (Prevents overlapping) */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
               
-              {/* LEFT — 60% (3 of 5 cols) */}
-              <div className="lg:col-span-3 space-y-5">
+              {/* LEFT COLUMN - Primary Content (7 columns) */}
+              <div className="xl:col-span-7 flex flex-col gap-8 w-full min-w-0">
                 <PlannerPanel plan={plan} />
                 <SQLPanel sql={sql} warnings={warnings} />
                 <ResultTable result={result} />
               </div>
 
-              {/* RIGHT — 40% (2 of 5 cols) */}
-              <div className="lg:col-span-2 space-y-5">
-                <SchemaPanel metadata={metadata} />
+              {/* RIGHT COLUMN - Context & Visuals (5 columns) */}
+              <div className="xl:col-span-5 flex flex-col gap-8 w-full min-w-0">
                 <InsightPanel insight={insight} />
                 <ChartPanel result={result} intent={intent} />
+                <SchemaPanel metadata={metadata} />
               </div>
-            </div>
 
-            {/* Footer metadata */}
-            <div className="flex items-center justify-center gap-6 py-3 text-[10px] text-text-muted">
-              <span>Pipeline: <strong className="text-text-dim">{pipelineTime.toFixed(2)}s</strong></span>
-              {metadata?.execution_time_ms != null && (
-                <span>SQL: <strong className="text-text-dim">{metadata.execution_time_ms.toFixed(1)}ms</strong></span>
-              )}
-              {result?.row_count != null && (
-                <span>Rows: <strong className="text-text-dim">{result.row_count}</strong></span>
-              )}
-              <span>LLM: <strong className="text-accent">{response?.llm_mode || llmMode}</strong></span>
             </div>
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border mt-6">
-        <div className="max-w-[1440px] mx-auto px-6 py-3 flex justify-between text-[10px] text-text-muted">
-          <span>Agentic AI Business Intelligence — Final Year Project</span>
-          <span>Multi-Agent RAG Architecture</span>
-        </div>
-      </footer>
     </div>
   );
 }

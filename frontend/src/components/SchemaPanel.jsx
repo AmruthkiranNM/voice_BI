@@ -1,41 +1,27 @@
-/**
- * SchemaPanel — RAG-retrieved database tables
- */
 export default function SchemaPanel({ metadata }) {
   const tables = metadata?.tables_used || [];
   if (tables.length === 0) return null;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-6 fade-up-1
-                    hover:border-border-hover transition-colors duration-200">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+    <div className="panel-card w-full">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <span className="text-lg">🔍</span>
-          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wide">
-            RAG Schema
-          </h3>
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400">🔍</div>
+          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Retrieved Schema</h3>
         </div>
-        <span className="text-[11px] text-text-muted font-medium">
-          {tables.length} tables found
+        <span className="px-3 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700 text-xs font-bold uppercase">
+          {tables.length} TABLES
         </span>
       </div>
 
-      {/* Table List */}
-      <div className="space-y-2.5">
+      <div className="flex flex-wrap gap-3 mt-2">
         {tables.map((table) => (
-          <div key={table}
-            className="flex items-center gap-3 py-3 px-4 rounded-xl bg-bg/60 border border-border/40
-                       hover:border-indigo/20 transition-colors duration-200">
-            <span className="text-indigo-light text-xs">⬡</span>
-            <span className="text-sm font-mono font-semibold text-text-primary">{table}</span>
+          <div key={table} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 border border-gray-800">
+            <span className="text-cyan-500 text-sm">⬡</span>
+            <span className="text-sm font-mono font-bold text-gray-300">{table}</span>
           </div>
         ))}
       </div>
-
-      <p className="mt-4 text-[10px] text-text-muted text-right italic">
-        Retrieved via FAISS + sentence-transformers
-      </p>
     </div>
   );
 }
