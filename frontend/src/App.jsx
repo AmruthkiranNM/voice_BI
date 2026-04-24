@@ -11,9 +11,9 @@ import InsightPanel from './components/InsightPanel';
 import ChartPanel from './components/ChartPanel';
 import Timeline from './components/Timeline';
 import ErrorPanel from './components/ErrorPanel';
+import DatasetUpload from './components/DatasetUpload';
 
 export default function App() {
-  const [llmMode, setLlmMode] = useState('mock');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
@@ -24,7 +24,7 @@ export default function App() {
     setResponse(null);
 
     try {
-      const result = await submitQuery(query, llmMode);
+      const result = await submitQuery(query, 'ollama');
       setResponse(result);
       if (!result.success) setError(result.error);
     } catch (err) {
@@ -32,7 +32,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [llmMode]);
+  }, []);
 
   const plan = response?.metadata?.plan || null;
   const metadata = response?.metadata || null;
@@ -43,12 +43,11 @@ export default function App() {
   const pipelineTime = metadata?.pipeline_time_seconds || 0;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
-  const actualMode = response?.llm_mode || llmMode;
   const hasData = response && (sql || result?.row_count > 0 || insight);
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-[#E5E7EB] font-sans selection:bg-indigo-500/30">
-      <Header llmMode={llmMode} onModeChange={setLlmMode} isProcessing={isLoading} />
+      <Header isProcessing={isLoading} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-10 flex flex-col gap-10">
         
@@ -69,6 +68,7 @@ export default function App() {
 
         {/* Search Bar */}
         <div className="max-w-4xl mx-auto w-full z-10 relative">
+          <DatasetUpload />
           <QueryInput onSubmit={handleSubmit} isLoading={isLoading} />
         </div>
 
@@ -91,29 +91,22 @@ export default function App() {
           <div className="flex flex-col gap-8 w-full animate-in fade-in duration-500">
             
             {/* VERY CLEAR API MODE INDICATOR */}
-            <div className={`w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg
-              ${actualMode === 'gemini' 
-                ? 'bg-indigo-950/40 border-indigo-500/30 shadow-indigo-500/10' 
-                : 'bg-amber-950/30 border-amber-500/30 shadow-amber-500/5'}`}
-            >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
-                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : 'bg-amber-500/20'}`}>
-                {actualMode === 'gemini' ? '🧠' : '🤖'}
+            <div className="w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg glass-panel bg-emerald-950/40 border-emerald-500/30 shadow-emerald-500/10 transition-all hover:bg-emerald-900/40">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                🦙
               </div>
               <div className="flex-1">
-                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : 'text-amber-400'}`}>
-                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : 'Running in Mock Mode (Rule-Based)'}
+                <h3 className="text-lg font-bold mb-1 text-emerald-400 drop-shadow-md">
+                  Powered by Ollama (100% Local AI)
                 </h3>
-                <p className="text-sm text-gray-400">
-                  {actualMode === 'gemini' 
-                    ? 'The query planner, SQL generator, and insight agents are using real LLM calls.' 
-                    : 'No API key detected. The system is using the fallback mock engine to demonstrate the pipeline.'}
+                <p className="text-sm text-emerald-100/60">
+                  Privacy-first architecture. The query planner, SQL generator, and insight agents are running securely on your local hardware.
                 </p>
               </div>
-              <div className="hidden md:flex flex-col items-end gap-1 text-xs text-gray-500 font-mono">
-                <div>Pipeline Time: <span className="text-gray-300">{pipelineTime.toFixed(2)}s</span></div>
-                {metadata?.execution_time_ms && <div>DB Query: <span className="text-gray-300">{metadata.execution_time_ms.toFixed(1)}ms</span></div>}
-                <div>Rows Found: <span className="text-gray-300">{result?.row_count}</span></div>
+              <div className="hidden md:flex flex-col items-end gap-1 text-xs text-gray-500 font-mono bg-black/20 p-2 rounded-lg">
+                <div>Pipeline Time: <span className="text-emerald-400">{pipelineTime.toFixed(2)}s</span></div>
+                {metadata?.execution_time_ms && <div>DB Query: <span className="text-emerald-400">{metadata.execution_time_ms.toFixed(1)}ms</span></div>}
+                <div>Rows Found: <span className="text-emerald-400">{result?.row_count}</span></div>
               </div>
             </div>
 

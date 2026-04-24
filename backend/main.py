@@ -42,20 +42,24 @@ async def lifespan(app: FastAPI):
     logger.info("  Agentic AI BI System — Starting Up")
     logger.info("=" * 60)
 
-    # Step 1: Initialize Database
-    from services.database import initialize_database
-    logger.info("[Startup] Initializing database...")
-    initialize_database()
+    # Step 1: Initialize Database (Now handled dynamically via uploads)
+    logger.info("[Startup] Ensuring database directory exists...")
+    from config import DATABASE_PATH
+    from pathlib import Path
+    Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
 
     # Step 2: Build or load FAISS vector store
     from services.vector_store import load_index, build_index
     from models.schema_loader import generate_schema_documents
 
     if not load_index():
-        logger.info("[Startup] Building FAISS index from schema...")
+        logger.info("[Startup] Building FAISS index from current schema...")
         schema_docs = generate_schema_documents()
-        build_index(schema_docs)
-        logger.info("[Startup] FAISS index built with %d documents.", len(schema_docs))
+        if schema_docs:
+            build_index(schema_docs)
+            logger.info("[Startup] FAISS index built with %d documents.", len(schema_docs))
+        else:
+            logger.info("[Startup] Database is empty. Waiting for user uploads.")
     else:
         logger.info("[Startup] FAISS index loaded from disk.")
 
@@ -92,7 +96,9 @@ app.add_middleware(
 
 # ── Register Routes ──
 from routes.query import router as query_router
+from routes.upload import router as upload_router
 app.include_router(query_router)
+app.include_router(upload_router)
 
 
 # ── Root Endpoint ──
