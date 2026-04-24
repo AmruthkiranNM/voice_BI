@@ -1,161 +1,45 @@
-# Agentic AI-Based Business Intelligence System using RAG
+# Backend — Agentic AI BI System
 
-A production-quality backend system that converts natural language business queries into SQL, executes them, and generates AI-powered insights — powered by a multi-agent pipeline.
+The backend is a **FastAPI** application that orchestrates a 6-agent pipeline to convert natural language queries into SQL, execute them against a SQLite database, and generate AI-powered business insights.
 
-## 🏗️ Architecture
+All LLM inference runs **locally** via [Ollama](https://ollama.com/) — no API keys or cloud services required.
 
-```
-User (Text Query)
-       ↓
-  FastAPI Backend
-       ↓
-  Agent Orchestrator
-       ↓
- ┌─────────────────────────────┐
- │   1. Planner Agent          │  → Breaks query into steps
- │   2. RAG Retriever Agent    │  → Fetches relevant schema via FAISS
- │   3. SQL Generator Agent    │  → Generates SQL using LLM + schema
- │   4. Validator Agent        │  → Security + schema validation
- │   5. Execution Agent        │  → Runs SQL on database
- │   6. Insight Agent          │  → Generates business insights
- └─────────────────────────────┘
-       ↓
-  Structured Response (SQL + Data + Insights)
-```
-
-## 📁 Project Structure
-
-```
-backend/
-├── main.py                    # FastAPI app entry point
-├── config.py                  # Central configuration
-├── requirements.txt           # Python dependencies
-├── test_pipeline.py           # Pipeline test script
-│
-├── routes/
-│   └── query.py               # API endpoint: POST /api/query
-│
-├── agents/
-│   ├── orchestrator.py        # Central controller (pipeline coordinator)
-│   ├── planner.py             # Query planning & intent extraction
-│   ├── rag_agent.py           # RAG-based schema retrieval
-│   ├── sql_agent.py           # SQL generation using LLM
-│   ├── validator.py           # Security & schema validation
-│   ├── execution.py           # Database query execution
-│   └── insight.py             # AI insight generation
-│
-├── services/
-│   ├── database.py            # SQLite database management
-│   ├── embeddings.py          # Sentence-transformer embeddings
-│   ├── vector_store.py        # FAISS vector index management
-│   └── llm_service.py         # LLM provider (Gemini / Mock)
-│
-├── models/
-│   └── schema_loader.py       # Schema-to-document converter
-│
-├── data/
-│   └── sample_db.sql          # Sample database (sales, customers, etc.)
-│
-└── vector_store/              # Auto-generated FAISS index files
-```
-
-## 🚀 Setup & Run
-
-### 1. Install Dependencies
+## Quick Start
 
 ```bash
+# From project root
 cd backend
 pip install -r requirements.txt
-```
-
-### 2. Set Environment Variables
-
-```bash
-# Required: Google Gemini API Key
-set GEMINI_API_KEY=your_api_key_here
-
-# Optional: Use mock LLM for testing without API key
-set LLM_PROVIDER=mock
-```
-
-### 3. Run the Server
-
-```bash
-cd backend
+pip install pandas python-multipart
 uvicorn main:app --reload --port 8000
 ```
 
-### 4. Test the API
+## Configuration
 
-Open `http://localhost:8000/docs` for the interactive Swagger UI.
+All settings are in `config.py`:
 
-Or use curl:
+| Variable        | Default                        | Description                     |
+|-----------------|--------------------------------|---------------------------------|
+| `OLLAMA_HOST`   | `http://localhost:11434`       | Ollama server URL               |
+| `OLLAMA_MODEL`  | `qwen2.5-coder:3b`            | Model for SQL generation        |
+| `DATABASE_PATH` | `data/business.db`             | SQLite database file            |
+| `RAG_TOP_K`     | `5`                            | Number of schema docs retrieved |
+| `MAX_RESULT_ROWS` | `500`                        | Max rows returned per query     |
 
-```bash
-curl -X POST http://localhost:8000/api/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Show total sales last month"}'
-```
+## Agent Pipeline
 
-### 5. Run Pipeline Test (without server)
+1. **Planner** — Extracts intent, metrics, filters, and grouping from the query
+2. **RAG Retriever** — Searches the FAISS vector store for relevant table schemas
+3. **SQL Generator** — Sends the schema context + query to Ollama to generate SQL
+4. **Validator** — Blocks dangerous SQL keywords and validates table/column existence
+5. **Execution** — Runs the validated SQL on the SQLite database
+6. **Insight** — Sends the results back to Ollama for a plain-English summary
 
-```bash
-cd backend
-python test_pipeline.py
-```
-
-## 📡 API Endpoints
+## API Reference
 
 | Method | Endpoint       | Description                          |
 |--------|----------------|--------------------------------------|
 | POST   | `/api/query`   | Process a natural language query     |
+| POST   | `/api/upload`  | Upload a CSV to create a new table   |
 | GET    | `/api/health`  | Health check + vector store status   |
-| GET    | `/docs`        | Swagger API documentation            |
-
-### Request Body
-
-```json
-{
-  "query": "Show total sales last month"
-}
-```
-
-### Response
-
-```json
-{
-  "success": true,
-  "query": "Show total sales last month",
-  "sql": "SELECT SUM(total_price) as total_sales FROM sales WHERE ...",
-  "result": {
-    "columns": ["total_sales"],
-    "rows": [{"total_sales": 47500.0}],
-    "row_count": 1
-  },
-  "insight": "Total sales for last month were ₹47,500...",
-  "metadata": {
-    "pipeline_time_seconds": 2.34,
-    "tables_used": ["sales"],
-    "plan": { ... }
-  },
-  "agent_logs": [ ... ]
-}
-```
-
-## 🔐 Security Features
-
-- **SQL Injection Prevention**: Blocks DROP, DELETE, UPDATE, INSERT, ALTER, TRUNCATE, etc.
-- **SELECT-only Enforcement**: Only read operations are allowed.
-- **Multi-statement Blocking**: Prevents semicolon injection attacks.
-- **Schema Validation**: Ensures referenced tables/columns exist in the database.
-
-## 🛠️ Tech Stack
-
-| Component     | Technology                |
-|---------------|---------------------------|
-| Backend       | Python + FastAPI          |
-| Database      | SQLite                    |
-| LLM           | Google Gemini             |
-| Embeddings    | sentence-transformers     |
-| Vector Store  | FAISS                     |
-| RAG           | Custom (Embeddings+FAISS) |
+| GET    | `/docs`        | Swagger UI                           |

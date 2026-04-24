@@ -8,11 +8,17 @@ __pycache__/
 # Environment variables
 .env
 
-# Node (if you have frontend)
+# Node
 node_modules/
 
-# Vector DB / ML data (IMPORTANT)
+# Vector DB / ML data (auto-generated at runtime)
 backend/vector_store/
+
+# SQLite database (user-uploaded, created at runtime)
+backend/data/*.db
+
+# Test files
+backend/test_upload.csv
 
 # OS files
 .DS_Store
@@ -24,3 +30,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Build output
+frontend/dist/
