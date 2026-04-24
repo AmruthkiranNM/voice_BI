@@ -54,7 +54,7 @@ def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
         )
         effective_mode = "mock"
 
-    if effective_mode and effective_mode in ("mock", "gemini"):
+    if effective_mode and effective_mode in ("mock", "gemini", "ollama"):
         config.LLM_PROVIDER = effective_mode
         import services.llm_service as llm_svc
         llm_svc.LLM_PROVIDER = effective_mode

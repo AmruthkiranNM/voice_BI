@@ -6,7 +6,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 60000,
+  timeout: 300000, // 5 minutes timeout for local Ollama inference
   headers: { 'Content-Type': 'application/json' },
 });
 

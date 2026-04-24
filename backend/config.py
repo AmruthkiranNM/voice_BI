@@ -36,6 +36,9 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini" if GEMINI_API_KEY else "mock")
 # Gemini model to use (1.5-flash has broader free-tier availability than 2.0)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
+# Ollama model to use (if LLM_PROVIDER="ollama")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+
 # ──────────────────────────────────────────────
 # Embedding Configuration
 # ──────────────────────────────────────────────

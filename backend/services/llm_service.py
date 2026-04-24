@@ -11,7 +11,7 @@ import re
 import time
 from typing import Any
 
-from config import LLM_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL
+from config import LLM_PROVIDER, GEMINI_API_KEY, GEMINI_MODEL, OLLAMA_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -71,21 +71,62 @@ def _get_gemini_model():
     return _gemini_model
 
 
-def call_llm(prompt: str, expect_json: bool = False) -> str:
+def call_llm(prompt: str, expect_json: bool = False, provider: str = None) -> str:
     """
     Send a prompt to the configured LLM and return the response text.
 
     Args:
         prompt: The full prompt string.
         expect_json: If True, attempts to clean response for JSON parsing.
+        provider: Override provider for this call.
 
     Returns:
         Response text from the LLM.
     """
-    if LLM_PROVIDER == "mock":
+    active_provider = provider or LLM_PROVIDER
+    if active_provider == "mock":
         return _mock_llm(prompt)
+    elif active_provider == "ollama":
+        return _call_ollama(prompt, expect_json)
 
     return _call_gemini(prompt, expect_json)
+
+
+def _call_ollama(prompt: str, expect_json: bool = False) -> str:
+    """Call a local Ollama instance via HTTP."""
+    import urllib.request
+    import json
+    
+    url = "http://localhost:11434/api/generate"
+    data = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False
+    }
+    
+    if expect_json:
+        data["format"] = "json"
+        
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode('utf-8'),
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    try:
+        with urllib.request.urlopen(req, timeout=300) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            text = result.get('response', '').strip()
+            
+            if expect_json:
+                text = _clean_json_response(text)
+                
+            logger.debug("Ollama response (first 200 chars): %s", text[:200])
+            return text
+    except Exception as e:
+        logger.error("Ollama API call failed: %s", str(e))
+        raise RuntimeError(f"Ollama call failed. Is Ollama running on port 11434? Error: {e}") from e
+
 
 
 def _call_gemini(prompt: str, expect_json: bool = False) -> str:

@@ -46,14 +46,16 @@ export default function Header({ llmMode, onModeChange, isProcessing }) {
               id="llm-mode-select"
               value={llmMode}
               onChange={e => onModeChange(e.target.value)}
-              className="bg-transparent text-sm font-bold text-indigo outline-none cursor-pointer
-                         border-none appearance-auto"
+              className="bg-transparent text-sm font-bold text-indigo-400 outline-none cursor-pointer border-none appearance-auto"
             >
-              <option value="mock" className="bg-card text-text-primary">
+              <option value="mock" className="bg-gray-900 text-gray-200">
                 🧪 Mock (No API Key)
               </option>
-              <option value="gemini" className="bg-card text-text-primary">
-                ✨ Gemini
+              <option value="ollama" className="bg-gray-900 text-gray-200">
+                🦙 Ollama (Local LLM)
+              </option>
+              <option value="gemini" className="bg-gray-900 text-gray-200">
+                ✨ Gemini (Live API)
               </option>
             </select>
           </div>

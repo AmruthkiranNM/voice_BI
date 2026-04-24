@@ -94,19 +94,23 @@ export default function App() {
             <div className={`w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg
               ${actualMode === 'gemini' 
                 ? 'bg-indigo-950/40 border-indigo-500/30 shadow-indigo-500/10' 
+                : actualMode === 'ollama'
+                ? 'bg-emerald-950/30 border-emerald-500/30 shadow-emerald-500/5'
                 : 'bg-amber-950/30 border-amber-500/30 shadow-amber-500/5'}`}
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
-                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : 'bg-amber-500/20'}`}>
-                {actualMode === 'gemini' ? '🧠' : '🤖'}
+                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : actualMode === 'ollama' ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                {actualMode === 'gemini' ? '🧠' : actualMode === 'ollama' ? '🦙' : '🤖'}
               </div>
               <div className="flex-1">
-                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : 'text-amber-400'}`}>
-                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : 'Running in Mock Mode (Rule-Based)'}
+                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : actualMode === 'ollama' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : actualMode === 'ollama' ? 'Powered by Local Ollama (Qwen)' : 'Running in Mock Mode (Rule-Based)'}
                 </h3>
                 <p className="text-sm text-gray-400">
                   {actualMode === 'gemini' 
                     ? 'The query planner, SQL generator, and insight agents are using real LLM calls.' 
+                    : actualMode === 'ollama'
+                    ? 'Running fully locally using your Ollama instance. No internet connection required.'
                     : 'No API key detected. The system is using the fallback mock engine to demonstrate the pipeline.'}
                 </p>
               </div>
