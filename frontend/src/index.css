@@ -31,15 +31,24 @@ body {
 
 /* Base Card Style */
 .panel-card {
-  @apply bg-[#111827] border border-[#1F2937] rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col;
+  @apply bg-[#111827]/80 backdrop-blur-md border border-[#1F2937] rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.12)] overflow-hidden flex flex-col transition-all hover:border-[#374151] hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)];
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(16, 185, 129, 0.01) 100%);
+  border-top: 1px solid rgba(16, 185, 129, 0.2);
+  border-left: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 /* Smooth Fade In */
 .animate-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(15px); }
   to { opacity: 1; transform: translateY(0); }
 }

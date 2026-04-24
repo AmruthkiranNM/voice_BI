@@ -5,22 +5,17 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
-  timeout: 60000,
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: 'http://localhost:8000/api',
+  timeout: 120000,
 });
 
 /**
  * Submit a query to the BI pipeline
  * @param {string} query - Natural language question
- * @param {string} llmMode - 'mock' or 'gemini'
  */
-export async function submitQuery(query, llmMode = 'mock') {
+export async function submitQuery(query) {
   try {
-    const { data } = await api.post('/query', {
-      query,
-      llm_mode: llmMode,
-    });
+    const { data } = await api.post('/query', { query });
     return data;
   } catch (error) {
     if (error.response) {
@@ -30,6 +25,26 @@ export async function submitQuery(query, llmMode = 'mock') {
       throw new Error('Cannot reach backend. Is it running on port 8000?');
     }
     throw new Error(error.message);
+  }
+}
+
+/**
+ * Upload a CSV dataset
+ * @param {File} file - CSV file object
+ */
+export async function uploadDataset(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const { data } = await axios.post('http://localhost:8000/api/upload', formData);
+    return data;
+  } catch (error) {
+    const msg =
+      error.response?.data?.detail ||
+      error.message ||
+      'Upload failed. Check backend connection.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
   }
 }
 

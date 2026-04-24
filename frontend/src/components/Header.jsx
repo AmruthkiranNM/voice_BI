@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../services/api';
 
-export default function Header({ llmMode, onModeChange, isProcessing }) {
+export default function Header({ isProcessing }) {
   const [online, setOnline] = useState(false);
 
   useEffect(() => {
@@ -37,26 +37,6 @@ export default function Header({ llmMode, onModeChange, isProcessing }) {
 
         {/* Right — Controls */}
         <div className="flex items-center gap-4">
-          {/* API Mode Selector — Prominent */}
-          <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-bg border border-border">
-            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wide">
-              API Mode
-            </span>
-            <select
-              id="llm-mode-select"
-              value={llmMode}
-              onChange={e => onModeChange(e.target.value)}
-              className="bg-transparent text-sm font-bold text-indigo outline-none cursor-pointer
-                         border-none appearance-auto"
-            >
-              <option value="mock" className="bg-card text-text-primary">
-                🧪 Mock (No API Key)
-              </option>
-              <option value="gemini" className="bg-card text-text-primary">
-                ✨ Gemini
-              </option>
-            </select>
-          </div>
 
           {/* Status Badge */}
           <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold
