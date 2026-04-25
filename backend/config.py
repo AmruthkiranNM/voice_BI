@@ -7,6 +7,10 @@ and database paths. Uses environment variables with sensible defaults.
 
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file if it exists
+load_dotenv()
 
 # ──────────────────────────────────────────────
 # Project Paths
@@ -27,7 +31,16 @@ DATABASE_PATH = str(DATA_DIR / "business.db")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
-LLM_PROVIDER = "ollama"
+
+# Automatically fallback to "mock" if no valid API key is present
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini" if GEMINI_API_KEY else "mock")
+
+# Gemini model to use (1.5-flash has broader free-tier availability than 2.0)
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+# Ollama model to use (if LLM_PROVIDER="ollama")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
+
 
 # ──────────────────────────────────────────────
 # Embedding Configuration

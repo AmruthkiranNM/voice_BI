@@ -91,16 +91,29 @@ export default function App() {
           <div className="flex flex-col gap-8 w-full animate-in fade-in duration-500">
             
             {/* VERY CLEAR API MODE INDICATOR */}
-            <div className="w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg glass-panel bg-emerald-950/40 border-emerald-500/30 shadow-emerald-500/10 transition-all hover:bg-emerald-900/40">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                🦙
+
+            <div className={`w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg
+              ${actualMode === 'gemini' 
+                ? 'bg-indigo-950/40 border-indigo-500/30 shadow-indigo-500/10' 
+                : actualMode === 'ollama'
+                ? 'bg-emerald-950/30 border-emerald-500/30 shadow-emerald-500/5'
+                : 'bg-amber-950/30 border-amber-500/30 shadow-amber-500/5'}`}
+            >
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
+                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : actualMode === 'ollama' ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                {actualMode === 'gemini' ? '🧠' : actualMode === 'ollama' ? '🦙' : '🤖'}
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold mb-1 text-emerald-400 drop-shadow-md">
-                  Powered by Ollama (100% Local AI)
+                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : actualMode === 'ollama' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : actualMode === 'ollama' ? 'Powered by Local Ollama (Qwen)' : 'Running in Mock Mode (Rule-Based)'}
                 </h3>
-                <p className="text-sm text-emerald-100/60">
-                  Privacy-first architecture. The query planner, SQL generator, and insight agents are running securely on your local hardware.
+                <p className="text-sm text-gray-400">
+                  {actualMode === 'gemini' 
+                    ? 'The query planner, SQL generator, and insight agents are using real LLM calls.' 
+                    : actualMode === 'ollama'
+                    ? 'Running fully locally using your Ollama instance. No internet connection required.'
+                    : 'No API key detected. The system is using the fallback mock engine to demonstrate the pipeline.'}
+
                 </p>
               </div>
               <div className="hidden md:flex flex-col items-end gap-1 text-xs text-gray-500 font-mono bg-black/20 p-2 rounded-lg">

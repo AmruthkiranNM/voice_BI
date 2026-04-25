@@ -5,8 +5,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
-  timeout: 120000,
+
+  baseURL: '/api',
+  timeout: 300000, // 5 minutes timeout for local Ollama inference
+  headers: { 'Content-Type': 'application/json' },
+
 });
 
 /**

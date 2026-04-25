@@ -38,6 +38,30 @@ export default function Header({ isProcessing }) {
         {/* Right — Controls */}
         <div className="flex items-center gap-4">
 
+          {/* API Mode Selector — Prominent */}
+          <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-bg border border-border">
+            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wide">
+              API Mode
+            </span>
+            <select
+              id="llm-mode-select"
+              value={llmMode}
+              onChange={e => onModeChange(e.target.value)}
+              className="bg-transparent text-sm font-bold text-indigo-400 outline-none cursor-pointer border-none appearance-auto"
+            >
+              <option value="mock" className="bg-gray-900 text-gray-200">
+                🧪 Mock (No API Key)
+              </option>
+              <option value="ollama" className="bg-gray-900 text-gray-200">
+                🦙 Ollama (Local LLM)
+              </option>
+              <option value="gemini" className="bg-gray-900 text-gray-200">
+                ✨ Gemini (Live API)
+              </option>
+            </select>
+          </div>
+
+
           {/* Status Badge */}
           <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold
             ${isProcessing

@@ -59,7 +59,7 @@ class QueryResponse(BaseModel):
         "AI-generated business insights."
     ),
 )
-async def handle_query(request: QueryRequest):
+def handle_query(request: QueryRequest):
     """Process a natural language query through the agent pipeline."""
     logger.info("Received query: %s", request.query)
 
@@ -80,7 +80,7 @@ async def handle_query(request: QueryRequest):
     summary="Health check",
     description="Returns the health status of the API.",
 )
-async def health_check():
+def health_check():
     """Simple health check endpoint."""
     from services.vector_store import is_index_ready
 
