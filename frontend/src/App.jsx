@@ -14,6 +14,7 @@ import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
 
 export default function App() {
+  const [llmMode, setLlmMode] = useState('ollama');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
@@ -24,7 +25,7 @@ export default function App() {
     setResponse(null);
 
     try {
-      const result = await submitQuery(query, 'ollama');
+      const result = await submitQuery(query, llmMode);
       setResponse(result);
       if (!result.success) setError(result.error);
     } catch (err) {
@@ -32,7 +33,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [llmMode]);
 
   const plan = response?.metadata?.plan || null;
   const metadata = response?.metadata || null;
@@ -43,11 +44,12 @@ export default function App() {
   const pipelineTime = metadata?.pipeline_time_seconds || 0;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
+  const actualMode = response?.llm_mode || 'ollama';
   const hasData = response && (sql || result?.row_count > 0 || insight);
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-[#E5E7EB] font-sans selection:bg-indigo-500/30">
-      <Header isProcessing={isLoading} />
+      <Header llmMode={llmMode} onModeChange={setLlmMode} isProcessing={isLoading} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-10 flex flex-col gap-10">
         

@@ -33,3 +33,6 @@ Thumbs.db
 
 # Build output
 frontend/dist/
+
+frontend/.vite/
+node_modules/

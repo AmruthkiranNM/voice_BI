@@ -4,8 +4,9 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../services/api';
 
-export default function Header({ isProcessing }) {
+export default function Header({ llmMode, onModeChange, isProcessing }) {
   const [online, setOnline] = useState(false);
+  const [mode, setMode] = useState(llmMode || 'ollama');
 
   useEffect(() => {
     const check = () => checkHealth().then(d => setOnline(d.status === 'healthy'));
@@ -13,6 +14,11 @@ export default function Header({ isProcessing }) {
     const id = setInterval(check, 15000);
     return () => clearInterval(id);
   }, []);
+
+  const handleModeChange = (val) => {
+    setMode(val);
+    if (onModeChange) onModeChange(val);
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-md border-b border-border">
@@ -45,15 +51,15 @@ export default function Header({ isProcessing }) {
             </span>
             <select
               id="llm-mode-select"
-              value={llmMode}
-              onChange={e => onModeChange(e.target.value)}
+              value={mode}
+              onChange={e => handleModeChange(e.target.value)}
               className="bg-transparent text-sm font-bold text-indigo-400 outline-none cursor-pointer border-none appearance-auto"
             >
-              <option value="mock" className="bg-gray-900 text-gray-200">
-                🧪 Mock (No API Key)
-              </option>
               <option value="ollama" className="bg-gray-900 text-gray-200">
                 🦙 Ollama (Local LLM)
+              </option>
+              <option value="mock" className="bg-gray-900 text-gray-200">
+                🧪 Mock (Rule-Based)
               </option>
               <option value="gemini" className="bg-gray-900 text-gray-200">
                 ✨ Gemini (Live API)
