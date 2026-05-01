@@ -237,3 +237,32 @@ def _clean_json_response(text: str) -> str:
                 continue
 
     return text
+
+def _mock_llm(prompt: str) -> str:
+    """Fallback mock LLM that returns canned responses based on the prompt content."""
+    prompt_lower = prompt.lower()
+    
+    # 1. Planner Agent Mock
+    if "query planner agent" in prompt_lower:
+        return json.dumps({
+            "intent": "analytical",
+            "metrics": ["mock_metric"],
+            "grouping": ["mock_group"],
+            "filters": {},
+            "steps": ["Retrieve schema", "Generate SQL", "Extract Insight"]
+        })
+        
+    # 2. SQL Agent Mock
+    if "sql generator agent" in prompt_lower:
+        if "monthly" in prompt_lower or "trend" in prompt_lower:
+            return "SELECT MONTH_ID as month, SUM(SALES) as total_sales FROM sales_data_sample GROUP BY MONTH_ID ORDER BY MONTH_ID;"
+        return "SELECT 1 as mock_data, 'mock' as category;"
+        
+    # 3. Insight Agent Mock
+    if "insight" in prompt_lower or "business" in prompt_lower:
+        if "monthly" in prompt_lower or "trend" in prompt_lower:
+            return "The data shows a clear monthly trend with peaks in the latter half of the year (specifically November), typical of holiday season sales boosts."
+        return "Based on the mock data, the system is performing nominally. This is a placeholder insight."
+
+    # Default fallback
+    return json.dumps({"status": "mocked", "message": "This is a mock response."})
