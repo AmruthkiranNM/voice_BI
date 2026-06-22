@@ -48,6 +48,29 @@ def get_all_table_names() -> list[str]:
         conn.close()
 
 
+def drop_all_user_tables(except_table: str | None = None) -> list[str]:
+    """
+    Drop every user-uploaded table. Used when replacing the workspace with a new CSV.
+
+    Returns names of tables that were removed.
+    """
+    removed: list[str] = []
+    conn = get_connection()
+    try:
+        for name in get_all_table_names():
+            if except_table and name == except_table:
+                continue
+            conn.execute(f"DROP TABLE IF EXISTS [{name}];")
+            removed.append(name)
+        conn.commit()
+    finally:
+        conn.close()
+
+    if removed:
+        logger.info("Dropped tables: %s", ", ".join(removed))
+    return removed
+
+
 def get_table_row_count(table_name: str) -> int:
     """Return the number of rows in a table."""
     conn = get_connection()

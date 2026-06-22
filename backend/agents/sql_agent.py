@@ -71,6 +71,12 @@ def run(
 
     plan_text = _format_plan(plan)
     schema_context = rag_context.get("schema_context", "No schema available.")
+    pinned = rag_context.get("pinned_table")
+    if pinned:
+        schema_context = (
+            f"IMPORTANT: Query ONLY the table [{pinned}]. "
+            f"Do not use any other table.\n\n{schema_context}"
+        )
     today = datetime.now().strftime("%Y-%m-%d")
 
     retry_section = ""

@@ -97,3 +97,31 @@ def generate_schema_documents() -> list[dict[str, str]]:
 
     logger.info("Generated %d schema documents.", len(documents))
     return documents
+
+
+def generate_table_document(table_name: str) -> str:
+    """Build the RAG schema document for a single table."""
+    schema = get_full_schema()
+    if table_name not in schema:
+        raise ValueError(f"Table '{table_name}' not found in database.")
+
+    table_info = schema[table_name]
+    row_count = get_table_row_count(table_name)
+    col_names = [c["column_name"] for c in table_info["columns"]]
+    lines = [
+        f"Table: {table_name}",
+        f"Description: Business data uploaded by the owner — {row_count:,} records.",
+        f"Columns available: {', '.join(col_names)}",
+        "",
+        "Columns:",
+    ]
+
+    for col in table_info["columns"]:
+        lines.append(f"  - {_format_column(col)}")
+
+    lines.append("")
+    lines.append(_format_foreign_keys(table_info["foreign_keys"]))
+    lines.append("")
+    lines.append(_format_sample_rows(table_name))
+
+    return "\n".join(lines)

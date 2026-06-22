@@ -8,10 +8,9 @@ import sqlite3
 from config import DATABASE_PATH, MAX_UPLOAD_ROWS, MAX_UPLOAD_COLUMNS, MAX_UPLOAD_MB
 from services.vector_store import build_index
 from models.schema_loader import generate_schema_documents
-from services.database import get_all_table_names, get_table_row_count, get_table_schema
+from services.database import get_all_table_names, get_table_row_count, get_table_schema, drop_all_user_tables
 from services import query_cache
-from services.domain_detector import detect_domain
-from services.suggestions import generate_suggestions
+from services.suggestions import generate_suggestions_for_table
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +90,9 @@ async def upload_dataset(file: UploadFile = File(...)):
 
         table_name = _sanitize_table_name(file.filename)
 
+        # Replace workspace: only the newly uploaded file should be queryable.
+        drop_all_user_tables()
+
         conn = sqlite3.connect(DATABASE_PATH)
         df.to_sql(table_name, conn, if_exists="replace", index=False)
         conn.close()
@@ -105,7 +107,8 @@ async def upload_dataset(file: UploadFile = File(...)):
         columns = [col["column_name"] for col in get_table_schema(table_name)]
         column_types = {col: str(dtype) for col, dtype in df.dtypes.items()}
         preview_rows = df.head(8).fillna("").astype(str).to_dict(orient="records")
-        domain = detect_domain(columns)
+        schema = get_table_schema(table_name)
+        suggestion_bundle = generate_suggestions_for_table(table_name)
         tables = get_all_table_names()
 
         logger.info("Uploaded %s as table %s (%d rows)", file.filename, table_name, row_count)
@@ -116,12 +119,13 @@ async def upload_dataset(file: UploadFile = File(...)):
             "columns": columns,
             "column_types": column_types,
             "preview_rows": preview_rows,
-            "domain": domain,
+            "domain": suggestion_bundle["domain"],
             "total_tables": len(tables),
-            "suggestions": generate_suggestions(domain_id=domain["id"]),
+            "suggestions": suggestion_bundle["suggestions"],
             "message": (
                 f"Imported {row_count:,} rows from '{file.filename}'. "
-                f"Detected: {domain['label']}. You can now ask questions about your business data."
+                f"Detected: {suggestion_bundle['domain']['label']}. "
+                "You can now ask questions about your business data."
             ),
         }
 

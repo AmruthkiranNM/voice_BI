@@ -15,6 +15,7 @@ const api = axios.create({
 export async function submitQuery(query, options = {}) {
   const {
     model = null,
+    tableName = null,
     cacheMode = true,
     fastMode = false,
     skipInsight = false,
@@ -24,6 +25,7 @@ export async function submitQuery(query, options = {}) {
     const { data } = await api.post('/query', {
       query,
       model: model || null,
+      table_name: tableName || null,
       cache_mode: cacheMode,
       fast_mode: fastMode,
       skip_insight: skipInsight,

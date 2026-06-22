@@ -28,41 +28,36 @@ export default function ResultTable({ result }) {
   };
 
   return (
-    <div className="panel-card w-full">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">📊</div>
-          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Your Data</h3>
-        </div>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-white">Data</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={exportCsv}
-            className="px-3 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700 text-xs font-semibold hover:text-indigo-400 hover:border-indigo-500/40 transition-colors"
+            className="text-xs text-gray-500 hover:text-indigo-400 transition-colors"
           >
             Export CSV
           </button>
-          <span className="px-3 py-1 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-bold">
-            {row_count} ROWS
-          </span>
+          <span className="text-xs text-gray-600">{row_count} rows</span>
         </div>
       </div>
 
-      <div className="overflow-x-auto overflow-y-auto max-h-[400px] border border-gray-800 rounded-xl w-full bg-gray-900/30">
-        <table className="w-full text-sm text-left">
-          <thead className="text-xs text-gray-400 uppercase bg-gray-800/80 sticky top-0 z-10 backdrop-blur-sm">
+      <div className="overflow-x-auto overflow-y-auto max-h-64 rounded-lg border border-white/5">
+        <table className="w-full text-xs text-left">
+          <thead className="text-[10px] font-bold text-gray-400 uppercase bg-[#0b0f19] sticky top-0 z-10 border-b border-white/5">
             <tr>
               {columns.map(c => (
-                <th key={c} className="px-6 py-4 font-bold border-b border-gray-700 whitespace-nowrap">
+                <th key={c} className="px-5 py-3 whitespace-nowrap">
                   {c.replace(/_/g, ' ')}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-800/50">
+          <tbody className="divide-y divide-white/5">
             {rows.map((row, i) => (
-              <tr key={i} className="hover:bg-gray-800/40 transition-colors">
+              <tr key={i} className="hover:bg-indigo-500/5 transition-colors">
                 {columns.map(c => (
-                  <td key={c} className="px-6 py-3.5 whitespace-nowrap text-gray-200 font-mono text-[13px]">
+                  <td key={c} className="px-5 py-3 whitespace-nowrap text-gray-300 font-mono text-[11px]">
                     {fmt(row[c])}
                   </td>
                 ))}

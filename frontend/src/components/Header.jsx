@@ -11,33 +11,24 @@ export default function Header({ isProcessing }) {
     return () => clearInterval(id);
   }, []);
 
-  return (
-    <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-md border-b border-border">
-      <div className="h-[2px] bg-gradient-to-r from-indigo via-indigo-light to-green" />
+  const status = isProcessing ? 'working' : online ? 'ready' : 'offline';
 
-      <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-9 h-9 rounded-xl bg-indigo/10 border border-indigo/20 flex items-center justify-center text-lg">
-            🎙️
-          </div>
-          <div>
-            <h1 className="text-base font-bold text-text-primary leading-tight">
-              Voice BI
-            </h1>
-            <p className="text-[11px] text-text-muted">
-              AI Business Analysis for Owners
-            </p>
-          </div>
+  return (
+    <header className="sticky top-0 z-50 bg-[#030712]/80 backdrop-blur-md border-b border-white/5">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <span className="text-lg">📊</span>
+          <span className="font-bold text-white text-sm sm:text-base">Voice BI</span>
         </div>
 
-        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold
-          ${isProcessing ? 'bg-amber/10 border-amber/30 text-amber'
-            : online ? 'bg-green/10 border-green/30 text-green'
-            : 'bg-red/10 border-red/30 text-red'}`}>
+        <div className={`flex items-center gap-2 text-xs font-medium ${
+          status === 'working' ? 'text-amber-400' : status === 'ready' ? 'text-emerald-400' : 'text-red-400'
+        }`}>
           <span className={`w-2 h-2 rounded-full ${
-            isProcessing ? 'bg-amber animate-pulse' : online ? 'bg-green' : 'bg-red'
+            status === 'working' ? 'bg-amber-400 animate-pulse'
+              : status === 'ready' ? 'bg-emerald-400' : 'bg-red-400'
           }`} />
-          {isProcessing ? 'Analyzing...' : online ? 'Ready' : 'Offline'}
+          {status === 'working' ? 'Analyzing' : status === 'ready' ? 'Ready' : 'Offline'}
         </div>
       </div>
     </header>

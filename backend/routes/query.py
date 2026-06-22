@@ -43,6 +43,10 @@ class QueryRequest(BaseModel):
         default=False,
         description="Skip insight generation (auto-enabled when fast_mode is on)",
     )
+    table_name: str | None = Field(
+        default=None,
+        description="Active uploaded table to query (scopes SQL to this dataset)",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -81,12 +85,20 @@ def handle_query(request: QueryRequest):
             detail="No business data found. Please upload a CSV file before asking questions.",
         )
 
-    logger.info("Received query: %s", request.query)
+    logger.info("Received query: %s (table=%s)", request.query, request.table_name)
+
+    table_name = request.table_name
+    if not table_name:
+        from services.database import get_all_table_names
+        tables = get_all_table_names()
+        if len(tables) == 1:
+            table_name = tables[0]
 
     try:
         result = process_query(
             request.query,
             model=request.model,
+            table_name=table_name,
             cache_mode=request.cache_mode,
             fast_mode=request.fast_mode,
             skip_insight=request.skip_insight,

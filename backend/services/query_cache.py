@@ -33,10 +33,12 @@ def _cache_key(
     model: str | None,
     fast_mode: bool,
     skip_insight: bool,
+    table_name: str | None = None,
 ) -> str:
     normalized = " ".join(query.strip().lower().split())
     model_name = model or "default"
-    payload = f"{normalized}|{model_name}|fast={fast_mode}|insight={not skip_insight}"
+    table = table_name or "*"
+    payload = f"{normalized}|{model_name}|fast={fast_mode}|insight={not skip_insight}|table={table}"
     fingerprint = get_schema_fingerprint()
     return hashlib.sha256(f"{payload}|{fingerprint}".encode()).hexdigest()
 
@@ -60,10 +62,11 @@ def get(
     model: str | None,
     fast_mode: bool,
     skip_insight: bool,
+    table_name: str | None = None,
 ) -> dict[str, Any] | None:
     """Return a cached response if available and still valid."""
     _evict_expired()
-    key = _cache_key(query, model, fast_mode, skip_insight)
+    key = _cache_key(query, model, fast_mode, skip_insight, table_name)
     entry = _cache.get(key)
     if not entry:
         return None
@@ -98,6 +101,7 @@ def set(
     fast_mode: bool,
     skip_insight: bool,
     response: dict[str, Any],
+    table_name: str | None = None,
 ) -> None:
     """Store a successful pipeline response."""
     if not response.get("success"):
@@ -105,7 +109,7 @@ def set(
 
     _evict_expired()
     _evict_oldest()
-    key = _cache_key(query, model, fast_mode, skip_insight)
+    key = _cache_key(query, model, fast_mode, skip_insight, table_name)
 
     stored = dict(response)
     metadata = dict(stored.get("metadata") or {})

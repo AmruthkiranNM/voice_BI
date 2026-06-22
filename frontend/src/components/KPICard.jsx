@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /** Detect single-value KPI metrics from a query result. */
 export function detectKpiMetrics(result) {
   if (!result?.rows?.length || !result?.columns?.length) return null;
@@ -43,20 +44,13 @@ export default function KPICard({ result }) {
   if (!kpis?.length) return null;
 
   return (
-    <div className="panel-card w-full">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">🎯</div>
-        <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Key Metric</h3>
-      </div>
-
-      <div className={`grid gap-4 ${kpis.length === 1 ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-3'}`}>
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6">
+      <h3 className="text-sm font-semibold text-white mb-4">Key numbers</h3>
+      <div className={`grid gap-3 ${kpis.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
         {kpis.map(kpi => (
-          <div
-            key={kpi.label}
-            className="rounded-2xl border border-indigo-500/20 bg-gradient-to-br from-indigo-950/40 to-gray-900/60 p-6 text-center"
-          >
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{kpi.label}</p>
-            <p className="text-4xl font-extrabold text-indigo-300 tabular-nums">
+          <div key={kpi.label} className="rounded-xl border border-white/8 bg-black/20 p-4 text-center">
+            <p className="text-xs text-gray-500 mb-1 capitalize">{kpi.label}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
               {formatKpiValue(kpi.value)}
             </p>
           </div>

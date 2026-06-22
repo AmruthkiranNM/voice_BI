@@ -43,18 +43,9 @@ export default function ChartPanel({ result, intent }) {
   const { type, data, options } = config;
 
   return (
-    <div className="panel-card w-full h-[420px]">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-400">📈</div>
-          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Visualization</h3>
-        </div>
-        <span className="px-3 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700 text-xs font-bold uppercase">
-          {type} CHART
-        </span>
-      </div>
-
-      <div className="relative w-full flex-1 min-h-0">
+    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6 h-72">
+      <h3 className="text-sm font-semibold text-white mb-4">Chart</h3>
+      <div className="relative w-full h-[calc(100%-2rem)] min-h-0">
         {type === 'bar' && <Bar data={data} options={options} />}
         {type === 'line' && <Line data={data} options={options} />}
         {type === 'doughnut' && (

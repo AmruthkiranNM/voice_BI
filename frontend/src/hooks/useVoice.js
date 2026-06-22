@@ -5,14 +5,17 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  */
 export function useVoiceInput({ onResult, onError }) {
   const [isListening, setIsListening] = useState(false);
-  const [isSupported, setIsSupported] = useState(false);
+  const [isSupported] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    return !!SpeechRecognition;
+  });
   const recognitionRef = useRef(null);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
-    setIsSupported(true);
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;

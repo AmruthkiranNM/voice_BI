@@ -35,8 +35,10 @@ def test_upload_csv_creates_table_with_preview(client, temp_database):
     assert data["row_count"] == 2
     assert "product_name" in data["columns"]
     assert len(data["preview_rows"]) == 2
-    assert data["domain"]["id"] == "retail_sales"
-    assert len(data["suggestions"]) > 0
+    assert data["domain"]["id"] == "detected"
+    assert "sales" in data["domain"]["label"].lower() or "amount" in data["domain"]["label"].lower()
+    joined = " ".join(data["suggestions"]).lower()
+    assert "sales amount" in joined or "sales" in joined
 
 
 def test_upload_rejects_non_csv(client, temp_database):

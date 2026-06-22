@@ -12,7 +12,7 @@ from typing import Any
 
 from services.llm_service import call_llm
 from services.database import get_all_table_names, get_table_schema
-from services.domain_detector import detect_domain
+from services.domain_detector import analyze_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def run(query: str, sql: str, execution_result: dict[str, Any]) -> str:
         row_count=row_count,
         results_text=results_text,
         domain_label=domain["label"],
-        insight_tone=domain["insight_tone"],
+        insight_tone=domain.get("insight_tone", "Focus on key patterns in the results."),
     )
 
     insight = call_llm(prompt, expect_json=False)
@@ -109,9 +109,12 @@ def _format_results(rows: list[dict], max_rows: int = 20) -> str:
 
 
 def _get_domain_context() -> dict:
-    """Load domain context from uploaded column names."""
+    """Load dynamic data profile from all uploaded columns."""
     columns: list[str] = []
+    schema: list[dict] = []
     for table in get_all_table_names():
-        for col in get_table_schema(table):
+        table_schema = get_table_schema(table)
+        for col in table_schema:
             columns.append(col["column_name"])
-    return detect_domain(columns)
+            schema.append(col)
+    return analyze_dataset(columns, schema)

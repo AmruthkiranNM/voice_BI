@@ -26,6 +26,7 @@ def process_query(
     query: str,
     model: str | None = None,
     *,
+    table_name: str | None = None,
     cache_mode: bool = True,
     fast_mode: bool = False,
     skip_insight: bool = False,
@@ -58,7 +59,7 @@ def process_query(
         skip_insight = True
 
     if cache_mode:
-        cached = query_cache.get(query, model, fast_mode, skip_insight)
+        cached = query_cache.get(query, model, fast_mode, skip_insight, table_name)
         if cached:
             return cached
 
@@ -108,7 +109,7 @@ def process_query(
         # ════════════════════════════════════════════
         # STEP 2: RAG Retriever Agent
         # ════════════════════════════════════════════
-        rag_context = rag_agent.run(query, plan)
+        rag_context = rag_agent.run(query, plan, table_name=table_name)
         log_step("RAG Retriever Agent", "completed", {
             "tables_retrieved": rag_context.get("retrieved_tables"),
             "similarity_scores": rag_context.get("similarity_scores"),
@@ -213,12 +214,24 @@ def process_query(
         # ════════════════════════════════════════════
         pipeline_time = round(time.time() - pipeline_start, 3)
 
-        from services.domain_detector import detect_domain
+        from services.domain_detector import analyze_dataset
         from services.database import get_all_table_names, get_table_schema
-        all_cols = []
-        for t in get_all_table_names():
-            all_cols.extend(c["column_name"] for c in get_table_schema(t))
-        domain = detect_domain(all_cols)
+
+        active_table = table_name or (
+            rag_context.get("retrieved_tables") or [None]
+        )[0]
+        if active_table:
+            ts = get_table_schema(active_table)
+            domain = analyze_dataset([c["column_name"] for c in ts], ts)
+        else:
+            all_cols: list[str] = []
+            all_schema: list[dict] = []
+            for t in get_all_table_names():
+                ts = get_table_schema(t)
+                for col in ts:
+                    all_cols.append(col["column_name"])
+                    all_schema.append(col)
+            domain = analyze_dataset(all_cols, all_schema)
 
         response = {
             "success": True,
@@ -235,6 +248,7 @@ def process_query(
                 "pipeline_time_seconds": pipeline_time,
                 "execution_time_ms": exec_result["execution_time_ms"],
                 "tables_used": rag_context.get("retrieved_tables", []),
+                "active_table": active_table,
                 "plan": plan,
                 "validation_warnings": (
                     validation_result.get("warnings", []) if validation_result else []
@@ -249,7 +263,7 @@ def process_query(
         }
 
         if cache_mode:
-            query_cache.set(query, model, fast_mode, skip_insight, response)
+            query_cache.set(query, model, fast_mode, skip_insight, response, table_name)
 
         logger.info(
             "[Orchestrator] Pipeline completed in %.3f seconds — %d rows returned",

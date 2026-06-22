@@ -15,14 +15,15 @@ export default function QueryInput({
   isLoading,
   settings,
   onSettingsChange,
-  hasDataset,
   suggestions = [],
+  businessType,
   history = [],
   onClearHistory,
   onRemoveHistory,
 }) {
   const [query, setQuery] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [models, setModels] = useState([]);
   const [cacheCleared, setCacheCleared] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
@@ -30,8 +31,8 @@ export default function QueryInput({
   const handleVoiceResult = useCallback((transcript) => {
     setVoiceError(null);
     setQuery(transcript);
-    if (!isLoading && hasDataset) onSubmit(transcript);
-  }, [isLoading, hasDataset, onSubmit]);
+    if (!isLoading) onSubmit(transcript);
+  }, [isLoading, onSubmit]);
 
   const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput({
     onResult: handleVoiceResult,
@@ -50,7 +51,6 @@ export default function QueryInput({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!hasDataset) return;
     if (query.trim() && !isLoading) onSubmit(query.trim());
   };
 
@@ -66,198 +66,165 @@ export default function QueryInput({
     setTimeout(() => setCacheCleared(false), 2000);
   };
 
-  const displaySuggestions = suggestions.length > 0 ? suggestions : [];
-
   return (
-    <div className="fade-up">
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">Step 2</span>
-        <span className="text-sm font-semibold text-gray-300">Ask About Your Data</span>
-        {!hasDataset && (
-          <span className="text-xs text-amber-400 ml-auto">Upload a CSV first</span>
-        )}
-      </div>
+    <section className="space-y-4">
+      {businessType && (
+        <p className="text-sm text-gray-400">
+          Ask anything about your <span className="text-white font-medium">{businessType.toLowerCase()}</span>
+        </p>
+      )}
 
-      <form
-        onSubmit={handleSubmit}
-        className={`bg-card border rounded-2xl p-5 flex gap-3 items-center transition-colors duration-200
-          ${hasDataset ? 'border-border hover:border-border-hover' : 'border-amber-500/30 opacity-80'}`}
-      >
-        <svg className="w-5 h-5 text-text-muted flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-        </svg>
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <div className="flex-1 flex items-center gap-2 bg-white/[0.03] border border-white/8 rounded-xl px-4 py-3 focus-within:border-indigo-500/40 transition-colors">
+          <input
+            id="query-input"
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder='e.g. "What were my top selling products last month?"'
+            disabled={isLoading}
+            className="flex-1 bg-transparent text-sm sm:text-base text-white placeholder:text-gray-600 outline-none disabled:opacity-50"
+          />
 
-        <input
-          id="query-input"
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder={hasDataset
-            ? 'Type or speak your question — e.g. "What were my top selling products?"'
-            : 'Upload your CSV above, then ask a question here...'}
-          disabled={isLoading || !hasDataset}
-          className="flex-1 bg-transparent text-base text-text-primary placeholder:text-text-muted outline-none disabled:opacity-50"
-        />
-
-        {voiceSupported && (
-          <button
-            type="button"
-            onClick={isListening ? stopListening : startListening}
-            disabled={isLoading || !hasDataset}
-            title={isListening ? 'Stop listening' : 'Ask with your voice'}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all flex-shrink-0
-              ${isListening
-                ? 'bg-red-500/20 border-2 border-red-500 text-red-400 animate-pulse'
-                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:text-indigo-400 hover:border-indigo-500/50'}
-              disabled:opacity-30 disabled:cursor-not-allowed`}
-          >
-            {isListening ? (
-              <span className="w-3 h-3 rounded-full bg-red-500" />
-            ) : (
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.71V21h2v-3.29A7 7 0 0 0 19 11h-2Z" />
-              </svg>
-            )}
-          </button>
-        )}
+          {voiceSupported && (
+            <button
+              type="button"
+              onClick={isListening ? stopListening : startListening}
+              disabled={isLoading}
+              title={isListening ? 'Stop' : 'Speak'}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                isListening
+                  ? 'bg-red-500/20 text-red-400'
+                  : 'text-gray-500 hover:text-indigo-400'
+              }`}
+            >
+              {isListening ? (
+                <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
+              ) : (
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.71V21h2v-3.29A7 7 0 0 0 19 11h-2Z" />
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
 
         <button
-          id="submit-btn"
           type="submit"
-          disabled={!query.trim() || isLoading || !hasDataset}
-          className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo hover:bg-indigo-light
-                     disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 whitespace-nowrap"
+          disabled={!query.trim() || isLoading}
+          className="px-5 py-3 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
         >
-          {isLoading ? 'Analyzing...' : 'Analyze'}
+          {isLoading ? '…' : 'Ask'}
         </button>
       </form>
 
-      {voiceError && (
-        <p className="text-amber-400 text-xs mt-2 px-2">{voiceError}</p>
-      )}
+      {voiceError && <p className="text-red-400 text-xs">{voiceError}</p>}
       {isListening && (
-        <p className="text-indigo-400 text-xs mt-2 px-2 animate-pulse">Listening... speak your business question</p>
+        <p className="text-indigo-400 text-xs animate-pulse">Listening…</p>
       )}
 
-      {/* Advanced Settings */}
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(v => !v)}
-          className="flex items-center gap-2 text-xs font-semibold text-text-muted hover:text-indigo transition-colors px-2"
-        >
-          <svg className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="m9 5 7 7-7 7" />
-          </svg>
-          Advanced Settings
-        </button>
-
-        {showAdvanced && (
-          <div className="mt-3 p-4 rounded-xl bg-card border border-border grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wide">Ollama Model</span>
-              <select
-                value={settings.model || ''}
-                onChange={e => updateSetting('model', e.target.value)}
+      {suggestions.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-gray-500">Try asking:</p>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => { setQuery(s); if (!isLoading) onSubmit(s); }}
                 disabled={isLoading}
-                className="bg-bg border border-border rounded-lg px-3 py-2 text-sm text-emerald-400 font-medium outline-none"
+                className="text-left text-xs sm:text-sm text-gray-300 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/8
+                           hover:border-indigo-500/30 hover:text-white disabled:opacity-40 transition-colors"
               >
-                {models.length === 0
-                  ? <option value="">Loading...</option>
-                  : models.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </label>
-
-            <Toggle label="Cache Mode" description="Instant results for repeated questions"
-              checked={settings.cacheMode} onChange={v => updateSetting('cacheMode', v)} disabled={isLoading} />
-
-            <Toggle label="Fast Mode" description="Skip planner for quicker analysis"
-              checked={settings.fastMode} onChange={v => updateSetting('fastMode', v)} disabled={isLoading} />
-
-            <Toggle label="Speak Insights" description="Read AI analysis aloud when ready"
-              checked={settings.speakInsight} onChange={v => updateSetting('speakInsight', v)} disabled={isLoading} />
-
-            <div className="sm:col-span-2 flex justify-end pt-1 border-t border-border">
-              <button type="button" onClick={handleClearCache} disabled={isLoading}
-                className="text-xs font-semibold text-text-muted hover:text-amber transition-colors">
-                {cacheCleared ? 'Cache cleared!' : 'Clear cache'}
+                {s}
               </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Query history */}
-      {history.length > 0 && (
-        <div className="mt-4 px-2">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-text-muted font-medium">Recent questions</span>
-            <button type="button" onClick={onClearHistory}
-              className="text-[10px] text-text-muted hover:text-red-400 transition-colors">
-              Clear all
-            </button>
-          </div>
-          <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto">
-            {history.map(item => (
-              <div key={item.id}
-                className="flex items-center gap-2 group rounded-lg hover:bg-gray-800/40 px-2 py-1.5">
-                <button
-                  type="button"
-                  onClick={() => { setQuery(item.query); if (!isLoading && hasDataset) onSubmit(item.query); }}
-                  disabled={isLoading || !hasDataset}
-                  className="flex-1 text-left text-xs text-text-secondary hover:text-indigo truncate disabled:opacity-40"
-                >
-                  {item.query}
-                  {item.rowCount != null && (
-                    <span className="text-gray-600 ml-2">{item.rowCount} rows</span>
-                  )}
-                </button>
-                <button type="button" onClick={() => onRemoveHistory?.(item.id)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs px-1">
-                  ×
-                </button>
-              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Dynamic suggestions from uploaded data */}
-      {hasDataset && displaySuggestions.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-4 px-2">
-          <span className="text-[11px] text-text-muted self-center mr-1 font-medium">Suggested for your data:</span>
-          {displaySuggestions.map(s => (
-            <button
-              key={s}
-              onClick={() => { setQuery(s); if (!isLoading) onSubmit(s); }}
+      <div className="flex items-center gap-4 pt-1">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(v => !v)}
+          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+        >
+          {showAdvanced ? 'Hide settings' : 'Settings'}
+        </button>
+        {history.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowHistory(v => !v)}
+            className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+          >
+            {showHistory ? 'Hide recent' : `Recent (${history.length})`}
+          </button>
+        )}
+      </div>
+
+      {showAdvanced && (
+        <div className="p-4 rounded-xl bg-black/20 border border-white/5 space-y-4 text-sm">
+          <label className="block">
+            <span className="text-xs text-gray-500 block mb-1">AI model</span>
+            <select
+              value={settings.model || ''}
+              onChange={e => updateSetting('model', e.target.value)}
               disabled={isLoading}
-              className="px-3 py-1.5 rounded-lg text-xs text-text-secondary bg-card border border-border
-                         hover:text-indigo hover:border-indigo/40 disabled:opacity-30 transition-all"
+              className="w-full bg-gray-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-gray-200 outline-none"
             >
-              {s}
-            </button>
-          ))}
+              {models.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </label>
+          <Toggle label="Remember answers (cache)" checked={settings.cacheMode}
+            onChange={v => updateSetting('cacheMode', v)} disabled={isLoading} />
+          <Toggle label="Fast mode (skip summary)" checked={settings.fastMode}
+            onChange={v => updateSetting('fastMode', v)} disabled={isLoading} />
+          <Toggle label="Read answers aloud" checked={settings.speakInsight}
+            onChange={v => updateSetting('speakInsight', v)} disabled={isLoading} />
+          <button type="button" onClick={handleClearCache} disabled={isLoading}
+            className="text-xs text-gray-500 hover:text-amber-400">
+            {cacheCleared ? 'Cache cleared' : 'Clear cache'}
+          </button>
         </div>
       )}
-    </div>
+
+      {showHistory && history.length > 0 && (
+        <div className="space-y-1">
+          {history.map(item => (
+            <div key={item.id} className="flex items-center gap-2 group">
+              <button
+                type="button"
+                onClick={() => { setQuery(item.query); if (!isLoading) onSubmit(item.query); }}
+                disabled={isLoading}
+                className="flex-1 text-left text-xs text-gray-500 hover:text-indigo-300 truncate py-1.5"
+              >
+                {item.query}
+              </button>
+              <button type="button" onClick={() => onRemoveHistory?.(item.id)}
+                className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 text-xs px-1">
+                ×
+              </button>
+            </div>
+          ))}
+          <button type="button" onClick={onClearHistory}
+            className="text-xs text-gray-600 hover:text-red-400 pt-1">
+            Clear all
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
-function Toggle({ label, description, checked, onChange, disabled }) {
+function Toggle({ label, checked, onChange, disabled }) {
   return (
-    <label className="flex items-start gap-3 cursor-pointer select-none">
+    <label className="flex items-center gap-3 cursor-pointer">
       <button type="button" role="switch" aria-checked={checked} disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-5 rounded-full flex-shrink-0 mt-0.5 transition-colors
-          ${checked ? 'bg-indigo' : 'bg-gray-700'} ${disabled ? 'opacity-40' : ''}`}>
-        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform
-          ${checked ? 'translate-x-5' : ''}`} />
+        className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${checked ? 'bg-indigo-600' : 'bg-gray-700'} ${disabled ? 'opacity-30' : ''}`}>
+        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : ''}`} />
       </button>
-      <div>
-        <span className="text-sm font-semibold text-text-primary">{label}</span>
-        <p className="text-[11px] text-text-muted mt-0.5">{description}</p>
-      </div>
+      <span className="text-xs text-gray-400">{label}</span>
     </label>
   );
 }
