@@ -14,7 +14,7 @@ import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
 
 export default function App() {
-  const [llmMode, setLlmMode] = useState('ollama');
+  const [selectedModel, setSelectedModel] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
@@ -25,7 +25,7 @@ export default function App() {
     setResponse(null);
 
     try {
-      const result = await submitQuery(query, llmMode);
+      const result = await submitQuery(query, selectedModel);
       setResponse(result);
       if (!result.success) setError(result.error);
     } catch (err) {
@@ -33,7 +33,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [llmMode]);
+  }, [selectedModel]);
 
   const plan = response?.metadata?.plan || null;
   const metadata = response?.metadata || null;
@@ -44,12 +44,11 @@ export default function App() {
   const pipelineTime = metadata?.pipeline_time_seconds || 0;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
-  const actualMode = response?.llm_mode || 'ollama';
   const hasData = response && (sql || result?.row_count > 0 || insight);
 
   return (
     <div className="min-h-screen bg-[#0B1120] text-[#E5E7EB] font-sans selection:bg-indigo-500/30">
-      <Header llmMode={llmMode} onModeChange={setLlmMode} isProcessing={isLoading} />
+      <Header selectedModel={selectedModel} onModelChange={setSelectedModel} isProcessing={isLoading} />
 
       <main className="max-w-[1400px] mx-auto px-6 py-10 flex flex-col gap-10">
         
@@ -94,28 +93,16 @@ export default function App() {
             
             {/* VERY CLEAR API MODE INDICATOR */}
 
-            <div className={`w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg
-              ${actualMode === 'gemini' 
-                ? 'bg-indigo-950/40 border-indigo-500/30 shadow-indigo-500/10' 
-                : actualMode === 'ollama'
-                ? 'bg-emerald-950/30 border-emerald-500/30 shadow-emerald-500/5'
-                : 'bg-amber-950/30 border-amber-500/30 shadow-amber-500/5'}`}
-            >
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0
-                ${actualMode === 'gemini' ? 'bg-indigo-500/20' : actualMode === 'ollama' ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
-                {actualMode === 'gemini' ? '🧠' : actualMode === 'ollama' ? '🦙' : '🤖'}
+            <div className="w-full rounded-2xl border p-5 flex items-center gap-5 shadow-lg bg-emerald-950/30 border-emerald-500/30 shadow-emerald-500/5">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 bg-emerald-500/20">
+                🦙
               </div>
               <div className="flex-1">
-                <h3 className={`text-lg font-bold mb-1 ${actualMode === 'gemini' ? 'text-indigo-400' : actualMode === 'ollama' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {actualMode === 'gemini' ? 'Powered by Google Gemini (Live AI)' : actualMode === 'ollama' ? 'Powered by Local Ollama (Qwen)' : 'Running in Mock Mode (Rule-Based)'}
+                <h3 className="text-lg font-bold mb-1 text-emerald-400">
+                  Powered by Local Ollama ({response?.llm_mode || selectedModel || 'Loading...'})
                 </h3>
                 <p className="text-sm text-gray-400">
-                  {actualMode === 'gemini' 
-                    ? 'The query planner, SQL generator, and insight agents are using real LLM calls.' 
-                    : actualMode === 'ollama'
-                    ? 'Running fully locally using your Ollama instance. No internet connection required.'
-                    : 'No API key detected. The system is using the fallback mock engine to demonstrate the pipeline.'}
-
+                  Running fully locally using your Ollama instance. No internet connection required.
                 </p>
               </div>
               <div className="hidden md:flex flex-col items-end gap-1 text-xs text-gray-500 font-mono bg-black/20 p-2 rounded-lg">

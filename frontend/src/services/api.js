@@ -16,18 +16,18 @@ const api = axios.create({
  * Submit a query to the BI pipeline
  * @param {string} query - Natural language question
  */
-export async function submitQuery(query, llmMode) {
+export async function submitQuery(query, model) {
   try {
-    const { data } = await api.post('/query', { query, llm_mode: llmMode });
+    const { data } = await api.post('/query', { query, model });
     return data;
   } catch (error) {
     if (error.response) {
-      throw new Error(error.response.data?.detail || `Server error: ${error.response.status}`);
+      throw new Error(error.response.data?.detail || `Server error: ${error.response.status}`, { cause: error });
     }
     if (error.request) {
-      throw new Error('Cannot reach backend. Is it running on port 8000?');
+      throw new Error('Cannot reach backend. Is it running on port 8000?', { cause: error });
     }
-    throw new Error(error.message);
+    throw new Error(error.message, { cause: error });
   }
 }
 
@@ -47,7 +47,7 @@ export async function uploadDataset(file) {
       error.response?.data?.detail ||
       error.message ||
       'Upload failed. Check backend connection.';
-    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
   }
 }
 
@@ -58,5 +58,15 @@ export async function checkHealth() {
     return data;
   } catch {
     return { status: 'offline' };
+  }
+}
+
+/** Fetch available local Ollama models */
+export async function getModels() {
+  try {
+    const { data } = await api.get('/models');
+    return data.models || [];
+  } catch {
+    return [];
   }
 }

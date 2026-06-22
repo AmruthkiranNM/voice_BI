@@ -27,15 +27,9 @@ DATABASE_PATH = str(DATA_DIR / "business.db")
 # ──────────────────────────────────────────────
 # LLM Configuration
 # ──────────────────────────────────────────────
-# Supports: "ollama" (local), "gemini" (Google AI), or "mock" (no API needed)
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-
+# Supports: "ollama" (local)
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
-
-# Default to "ollama" for local inference; falls back to "mock" if no key
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
 
 
 # ──────────────────────────────────────────────

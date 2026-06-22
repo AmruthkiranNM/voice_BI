@@ -2,11 +2,11 @@
  * Header — Top bar with project title, API mode selector, and status
  */
 import { useState, useEffect } from 'react';
-import { checkHealth } from '../services/api';
+import { checkHealth, getModels } from '../services/api';
 
-export default function Header({ llmMode, onModeChange, isProcessing }) {
+export default function Header({ selectedModel, onModelChange, isProcessing }) {
   const [online, setOnline] = useState(false);
-  const [mode, setMode] = useState(llmMode || 'ollama');
+  const [models, setModels] = useState([]);
 
   useEffect(() => {
     const check = () => checkHealth().then(d => setOnline(d.status === 'healthy'));
@@ -15,10 +15,15 @@ export default function Header({ llmMode, onModeChange, isProcessing }) {
     return () => clearInterval(id);
   }, []);
 
-  const handleModeChange = (val) => {
-    setMode(val);
-    if (onModeChange) onModeChange(val);
-  };
+  useEffect(() => {
+    getModels().then(list => {
+      setModels(list);
+      // Auto-select first model if none is currently selected
+      if (list.length > 0 && !selectedModel && onModelChange) {
+        onModelChange(list[0]);
+      }
+    });
+  }, [selectedModel, onModelChange]);
 
   return (
     <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-md border-b border-border">
@@ -44,27 +49,29 @@ export default function Header({ llmMode, onModeChange, isProcessing }) {
         {/* Right — Controls */}
         <div className="flex items-center gap-4">
 
-          {/* API Mode Selector — Prominent */}
+          {/* Ollama Model Selector */}
           <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-bg border border-border">
             <span className="text-[11px] text-text-muted font-medium uppercase tracking-wide">
-              API Mode
+              Model
             </span>
-            <select
-              id="llm-mode-select"
-              value={mode}
-              onChange={e => handleModeChange(e.target.value)}
-              className="bg-transparent text-sm font-bold text-indigo-400 outline-none cursor-pointer border-none appearance-auto"
-            >
-              <option value="ollama" className="bg-gray-900 text-gray-200">
-                🦙 Ollama (Local LLM)
-              </option>
-              <option value="mock" className="bg-gray-900 text-gray-200">
-                🧪 Mock (Rule-Based)
-              </option>
-              <option value="gemini" className="bg-gray-900 text-gray-200">
-                ✨ Gemini (Live API)
-              </option>
-            </select>
+            {models.length > 0 ? (
+              <select
+                id="ollama-model-select"
+                value={selectedModel || ''}
+                onChange={e => onModelChange && onModelChange(e.target.value)}
+                className="bg-transparent text-sm font-bold text-emerald-400 outline-none cursor-pointer border-none appearance-auto"
+              >
+                {models.map(m => (
+                  <option key={m} value={m} className="bg-gray-900 text-gray-200">
+                    🦙 {m}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm font-bold text-emerald-400 animate-pulse">
+                🦙 Loading...
+              </span>
+            )}
           </div>
 
 

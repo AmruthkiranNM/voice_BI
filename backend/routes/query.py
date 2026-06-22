@@ -27,9 +27,9 @@ class QueryRequest(BaseModel):
         description="Natural language business question",
         examples=["Show total sales last month", "Top 5 customers by revenue"],
     )
-    llm_mode: str | None = Field(
+    model: str | None = Field(
         default=None,
-        description="Optional LLM provider override: 'mock' or 'gemini'",
+        description="Optional Ollama model override",
     )
 
 
@@ -64,7 +64,7 @@ def handle_query(request: QueryRequest):
     logger.info("Received query: %s", request.query)
 
     try:
-        result = process_query(request.query, llm_mode=request.llm_mode)
+        result = process_query(request.query, model=request.model)
         return QueryResponse(**result)
 
     except Exception as e:
@@ -88,3 +88,30 @@ def health_check():
         "status": "healthy",
         "vector_store_ready": is_index_ready(),
     }
+
+
+@router.get(
+    "/models",
+    summary="List available local Ollama models",
+    description="Fetches installed models from local Ollama service, falling back to a static list if offline.",
+)
+def list_models():
+    """Fetch available local Ollama models."""
+    import urllib.request
+    import json
+    import config
+
+    try:
+        url = f"{config.OLLAMA_HOST}/api/tags"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode())
+            models = [m["name"] for m in data.get("models", [])]
+            # Ensure the default configured model is at least shown if not fetched
+            if config.OLLAMA_MODEL not in models:
+                models.insert(0, config.OLLAMA_MODEL)
+            return {"models": models}
+    except Exception as e:
+        logger.warning("Failed to fetch models from Ollama: %s", e)
+        # Fallback list including common/default models
+        return {"models": [config.OLLAMA_MODEL, "qwen2.5-coder:3b", "qwen2.5-coder:1.5b"]}

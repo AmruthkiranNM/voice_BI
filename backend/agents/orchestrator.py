@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 MAX_SQL_RETRIES = 3
 
 
-def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
+def process_query(query: str, model: str | None = None) -> dict[str, Any]:
     """
     Process a natural language query through the full agent pipeline.
 
@@ -36,28 +36,14 @@ def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
 
     Args:
         query: Natural language business question.
-        llm_mode: Optional LLM provider override ('mock' or 'gemini').
 
     Returns:
         Complete response with SQL, results, insights, and agent logs.
     """
-    # Allow per-request LLM mode override
     import config
-    original_provider = config.LLM_PROVIDER
-
-    # Validate Gemini mode — check if API key is available
-    effective_mode = llm_mode
-    if llm_mode == "gemini" and not config.GEMINI_API_KEY:
-        logger.warning(
-            "[Orchestrator] Gemini mode requested but GEMINI_API_KEY is not set. "
-            "Falling back to mock mode."
-        )
-        effective_mode = "mock"
-
-    if effective_mode and effective_mode in ("mock", "gemini", "ollama"):
-        config.LLM_PROVIDER = effective_mode
-        import services.llm_service as llm_svc
-        llm_svc.LLM_PROVIDER = effective_mode
+    original_model = config.OLLAMA_MODEL
+    if model:
+        config.OLLAMA_MODEL = model
 
     pipeline_start = time.time()
 
@@ -202,7 +188,7 @@ def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
                 "row_count": exec_result["row_count"],
             },
             "insight": insight_text,
-            "llm_mode": config.LLM_PROVIDER,
+            "llm_mode": "ollama",
             "metadata": {
                 "pipeline_time_seconds": pipeline_time,
                 "execution_time_ms": exec_result["execution_time_ms"],
@@ -231,11 +217,7 @@ def process_query(query: str, llm_mode: str | None = None) -> dict[str, Any]:
             pipeline_time=time.time() - pipeline_start,
         )
     finally:
-        # Restore original LLM provider after request
-        config.LLM_PROVIDER = original_provider
-        if llm_mode and llm_mode in ("mock", "gemini"):
-            import services.llm_service as llm_svc
-            llm_svc.LLM_PROVIDER = original_provider
+        config.OLLAMA_MODEL = original_model
 
 
 def _error_response(
@@ -257,7 +239,7 @@ def _error_response(
         },
         "insight": None,
         "error": error,
-        "llm_mode": "mock",
+        "llm_mode": "ollama",
         "metadata": {
             "pipeline_time_seconds": round(pipeline_time, 3),
         },
