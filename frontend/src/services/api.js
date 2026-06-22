@@ -16,9 +16,9 @@ const api = axios.create({
  * Submit a query to the BI pipeline
  * @param {string} query - Natural language question
  */
-export async function submitQuery(query) {
+export async function submitQuery(query, llmMode) {
   try {
-    const { data } = await api.post('/query', { query });
+    const { data } = await api.post('/query', { query, llm_mode: llmMode });
     return data;
   } catch (error) {
     if (error.response) {

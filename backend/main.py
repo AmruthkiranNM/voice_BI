@@ -12,6 +12,8 @@ Initializes:
 
 Usage:
     uvicorn main:app --reload --port 8000
+
+# Trigger reload 2
 """
 
 import sys

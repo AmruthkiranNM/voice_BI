@@ -27,6 +27,7 @@ CRITICAL RULES:
 - Generate ONLY a SELECT query. Never generate INSERT, UPDATE, DELETE, DROP, or ALTER.
 - Use ONLY the tables and columns shown in the schema below. Do NOT invent tables or columns.
 - For date filtering, use SQLite date functions like date('now', '-1 month').
+- For monthly/yearly trends, if columns like MONTH_ID and YEAR_ID exist, prioritize grouping by them. If not, use strftime('%Y-%m', date_column) for SQLite.
 - Today's date is {today}.
 - Use proper JOINs when data spans multiple tables.
 - Use aliases for readability.
