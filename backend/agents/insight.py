@@ -11,28 +11,30 @@ import logging
 from typing import Any
 
 from services.llm_service import call_llm
+from services.database import get_all_table_names, get_table_schema
+from services.domain_detector import detect_domain
 
 logger = logging.getLogger(__name__)
 
-INSIGHT_PROMPT_TEMPLATE = """You are a Business Intelligence Insight Agent.
+INSIGHT_PROMPT_TEMPLATE = """You are a Business Advisor AI helping a business owner understand their data.
 
-Given a user's original question and the query results from a database,
-generate a clear, concise, and insightful business analysis.
+Business type: {domain_label}
+Advisory focus: {insight_tone}
+
+The owner uploaded their own business CSV and asked a question. Based on the query results,
+write a clear, actionable analysis they can use to make better decisions.
 
 RULES:
-1. Be specific — reference actual numbers from the data.
-2. Highlight key findings, trends, or notable patterns.
-3. If the data allows, mention comparisons or percentage changes.
-4. Keep it concise — 2-4 sentences maximum.
-5. Use a professional but accessible tone.
-6. If the result set is empty, inform the user clearly.
+1. Speak directly to the business owner — use "your business", "your data".
+2. Reference specific numbers from the results.
+3. Highlight the most important finding first.
+4. Suggest one practical next step or business action when possible.
+5. Keep it concise — 3-5 sentences maximum.
+6. Avoid technical jargon (no SQL, no database terms).
+7. If the result set is empty, explain what that means for their business.
 
 ═══════════════════════════════════════
-USER QUESTION: {query}
-═══════════════════════════════════════
-
-SQL EXECUTED: {sql}
-
+OWNER'S QUESTION: {query}
 ═══════════════════════════════════════
 
 QUERY RESULTS ({row_count} rows):
@@ -40,7 +42,7 @@ QUERY RESULTS ({row_count} rows):
 
 ═══════════════════════════════════════
 
-Generate the business insight now:"""
+Write the business analysis now:"""
 
 
 def run(query: str, sql: str, execution_result: dict[str, Any]) -> str:
@@ -62,18 +64,20 @@ def run(query: str, sql: str, execution_result: dict[str, Any]) -> str:
 
     # Handle empty results
     if row_count == 0:
-        insight = "No data was found matching your query. This could mean the specified criteria don't match any records in the database."
+        insight = "No matching records were found in your data. Try broadening your question or check that your CSV contains the categories or dates you are asking about."
         logger.info("[Insight Agent] No data — returning empty insight.")
         return insight
 
     # Format results for the prompt (limit to avoid token overflow)
     results_text = _format_results(rows, max_rows=20)
+    domain = _get_domain_context()
 
     prompt = INSIGHT_PROMPT_TEMPLATE.format(
         query=query,
-        sql=sql,
         row_count=row_count,
         results_text=results_text,
+        domain_label=domain["label"],
+        insight_tone=domain["insight_tone"],
     )
 
     insight = call_llm(prompt, expect_json=False)
@@ -102,3 +106,12 @@ def _format_results(rows: list[dict], max_rows: int = 20) -> str:
         lines.append(f"... and {len(rows) - max_rows} more rows (truncated)")
 
     return "\n".join(lines)
+
+
+def _get_domain_context() -> dict:
+    """Load domain context from uploaded column names."""
+    columns: list[str] = []
+    for table in get_all_table_names():
+        for col in get_table_schema(table):
+            columns.append(col["column_name"])
+    return detect_domain(columns)

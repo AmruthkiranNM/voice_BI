@@ -9,7 +9,7 @@ a single table with its columns, types, relationships, and sample data.
 import logging
 from typing import Any
 
-from services.database import get_full_schema, get_sample_data
+from services.database import get_full_schema, get_sample_data, get_table_row_count
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +71,12 @@ def generate_schema_documents() -> list[dict[str, str]]:
     documents = []
 
     for table_name, table_info in schema.items():
+        row_count = get_table_row_count(table_name)
+        col_names = [c["column_name"] for c in table_info["columns"]]
         lines = [
             f"Table: {table_name}",
-            f"Description: This table stores {table_name} data.",
+            f"Description: Business data uploaded by the owner — {row_count:,} records.",
+            f"Columns available: {', '.join(col_names)}",
             "",
             "Columns:",
         ]

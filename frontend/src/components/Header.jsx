@@ -1,12 +1,8 @@
-/**
- * Header — Top bar with project title, API mode selector, and status
- */
 import { useState, useEffect } from 'react';
-import { checkHealth, getModels } from '../services/api';
+import { checkHealth } from '../services/api';
 
-export default function Header({ selectedModel, onModelChange, isProcessing }) {
+export default function Header({ isProcessing }) {
   const [online, setOnline] = useState(false);
-  const [models, setModels] = useState([]);
 
   useEffect(() => {
     const check = () => checkHealth().then(d => setOnline(d.status === 'healthy'));
@@ -15,80 +11,33 @@ export default function Header({ selectedModel, onModelChange, isProcessing }) {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    getModels().then(list => {
-      setModels(list);
-      // Auto-select first model if none is currently selected
-      if (list.length > 0 && !selectedModel && onModelChange) {
-        onModelChange(list[0]);
-      }
-    });
-  }, [selectedModel, onModelChange]);
-
   return (
     <header className="sticky top-0 z-50 bg-card/90 backdrop-blur-md border-b border-border">
-      {/* Accent line */}
       <div className="h-[2px] bg-gradient-to-r from-indigo via-indigo-light to-green" />
 
       <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-        {/* Left — Title */}
         <div className="flex items-center gap-4">
           <div className="w-9 h-9 rounded-xl bg-indigo/10 border border-indigo/20 flex items-center justify-center text-lg">
-            🧠
+            🎙️
           </div>
           <div>
             <h1 className="text-base font-bold text-text-primary leading-tight">
-              Agentic AI BI System
+              Voice BI
             </h1>
             <p className="text-[11px] text-text-muted">
-              RAG-Powered Business Intelligence
+              AI Business Analysis for Owners
             </p>
           </div>
         </div>
 
-        {/* Right — Controls */}
-        <div className="flex items-center gap-4">
-
-          {/* Ollama Model Selector */}
-          <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-bg border border-border">
-            <span className="text-[11px] text-text-muted font-medium uppercase tracking-wide">
-              Model
-            </span>
-            {models.length > 0 ? (
-              <select
-                id="ollama-model-select"
-                value={selectedModel || ''}
-                onChange={e => onModelChange && onModelChange(e.target.value)}
-                className="bg-transparent text-sm font-bold text-emerald-400 outline-none cursor-pointer border-none appearance-auto"
-              >
-                {models.map(m => (
-                  <option key={m} value={m} className="bg-gray-900 text-gray-200">
-                    🦙 {m}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="text-sm font-bold text-emerald-400 animate-pulse">
-                🦙 Loading...
-              </span>
-            )}
-          </div>
-
-
-          {/* Status Badge */}
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold
-            ${isProcessing
-              ? 'bg-amber/10 border-amber/30 text-amber'
-              : online
-                ? 'bg-green/10 border-green/30 text-green'
-                : 'bg-red/10 border-red/30 text-red'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${
-              isProcessing ? 'bg-amber animate-pulse' : online ? 'bg-green' : 'bg-red'
-            }`} />
-            {isProcessing ? 'Processing...' : online ? 'Online' : 'Offline'}
-          </div>
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-semibold
+          ${isProcessing ? 'bg-amber/10 border-amber/30 text-amber'
+            : online ? 'bg-green/10 border-green/30 text-green'
+            : 'bg-red/10 border-red/30 text-red'}`}>
+          <span className={`w-2 h-2 rounded-full ${
+            isProcessing ? 'bg-amber animate-pulse' : online ? 'bg-green' : 'bg-red'
+          }`} />
+          {isProcessing ? 'Analyzing...' : online ? 'Ready' : 'Offline'}
         </div>
       </div>
     </header>

@@ -4,19 +4,13 @@ Agentic AI-Based Business Intelligence System
 
 Main FastAPI application entry point.
 
-Initializes:
-  1. Database (SQLite with sample data)
-  2. Schema embeddings (sentence-transformers)
-  3. FAISS vector store (for RAG retrieval)
-  4. FastAPI server with query endpoint
+Business owners upload CSV data, then ask natural-language questions.
+A multi-agent pipeline generates SQL, runs analysis, and returns insights.
 
 Usage:
     uvicorn main:app --reload --port 8000
-
-# Trigger reload 2
 """
 
-import sys
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -99,8 +93,10 @@ app.add_middleware(
 # ── Register Routes ──
 from routes.query import router as query_router
 from routes.upload import router as upload_router
+from routes.datasets import router as datasets_router
 app.include_router(query_router)
 app.include_router(upload_router)
+app.include_router(datasets_router)
 
 
 # ── Root Endpoint ──

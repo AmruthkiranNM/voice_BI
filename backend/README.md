@@ -1,45 +1,36 @@
-# Backend — Agentic AI BI System
+# Backend — Voice BI
 
-The backend is a **FastAPI** application that orchestrates a 6-agent pipeline to convert natural language queries into SQL, execute them against a SQLite database, and generate AI-powered business insights.
-
-All LLM inference runs **locally** via [Ollama](https://ollama.com/) — no API keys or cloud services required.
+FastAPI backend that orchestrates a multi-agent pipeline to help business owners analyze their uploaded CSV data using local Ollama inference.
 
 ## Quick Start
 
 ```bash
-# From project root
 cd backend
 pip install -r requirements.txt
-pip install pandas python-multipart
 uvicorn main:app --reload --port 8000
 ```
 
-## Configuration
+## User Flow
 
-All settings are in `config.py`:
+1. Owner uploads a CSV via `POST /api/upload`
+2. System creates a SQLite table and builds a FAISS schema index
+3. Owner asks a question via `POST /api/query` (text or voice-transcribed on frontend)
+4. Pipeline returns SQL, data, charts metadata, and business insight
 
-| Variable        | Default                        | Description                     |
-|-----------------|--------------------------------|---------------------------------|
-| `OLLAMA_HOST`   | `http://localhost:11434`       | Ollama server URL               |
-| `OLLAMA_MODEL`  | `qwen2.5-coder:3b`            | Model for SQL generation        |
-| `DATABASE_PATH` | `data/business.db`             | SQLite database file            |
-| `RAG_TOP_K`     | `5`                            | Number of schema docs retrieved |
-| `MAX_RESULT_ROWS` | `500`                        | Max rows returned per query     |
+## Configuration (`config.py`)
 
-## Agent Pipeline
+| Variable           | Default                  | Description              |
+|--------------------|--------------------------|--------------------------|
+| `OLLAMA_MODEL`     | `qwen2.5-coder:3b`       | Local LLM for SQL/insight |
+| `MAX_UPLOAD_ROWS`  | `100000`                 | Max CSV rows             |
+| `MAX_UPLOAD_MB`    | `50`                     | Max upload file size     |
+| `CACHE_TTL_SECONDS`| `3600`                   | Query cache lifetime     |
 
-1. **Planner** — Extracts intent, metrics, filters, and grouping from the query
-2. **RAG Retriever** — Searches the FAISS vector store for relevant table schemas
-3. **SQL Generator** — Sends the schema context + query to Ollama to generate SQL
-4. **Validator** — Blocks dangerous SQL keywords and validates table/column existence
-5. **Execution** — Runs the validated SQL on the SQLite database
-6. **Insight** — Sends the results back to Ollama for a plain-English summary
+## API
 
-## API Reference
-
-| Method | Endpoint       | Description                          |
-|--------|----------------|--------------------------------------|
-| POST   | `/api/query`   | Process a natural language query     |
-| POST   | `/api/upload`  | Upload a CSV to create a new table   |
-| GET    | `/api/health`  | Health check + vector store status   |
-| GET    | `/docs`        | Swagger UI                           |
+| Method | Endpoint        | Description              |
+|--------|-----------------|--------------------------|
+| POST   | `/api/upload`   | Upload business CSV      |
+| GET    | `/api/datasets` | Dataset status           |
+| POST   | `/api/query`    | Natural language query   |
+| DELETE | `/api/cache`    | Clear query cache        |

@@ -1,8 +1,8 @@
 """
 Database Service Module
 
-Handles SQLite database initialization, connection management,
-schema introspection, and query execution.
+Handles SQLite connection management, schema introspection, and query execution.
+Business data is loaded exclusively via user CSV uploads.
 """
 
 import sqlite3
@@ -10,51 +10,33 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from config import DATABASE_PATH, DATA_DIR, MAX_RESULT_ROWS
+from config import DATABASE_PATH, MAX_RESULT_ROWS
 
 logger = logging.getLogger(__name__)
 
 
+def ensure_data_directory() -> None:
+    """Create the data directory if it does not exist."""
+    Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
+
+
 def get_connection() -> sqlite3.Connection:
     """Create and return a new SQLite connection with row factory."""
+    ensure_data_directory()
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def initialize_database() -> None:
-    """
-    Initialize the database from the sample SQL file.
-    Only runs if the database file does not already exist.
-    """
-    db_path = Path(DATABASE_PATH)
-
-    if db_path.exists():
-        logger.info("Database already exists at %s", DATABASE_PATH)
-        return
-
-    # Ensure directory exists
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-
-    sql_file = DATA_DIR / "sample_db.sql"
-    if not sql_file.exists():
-        raise FileNotFoundError(f"Sample SQL file not found: {sql_file}")
-
-    logger.info("Initializing database from %s", sql_file)
-
-    conn = sqlite3.connect(DATABASE_PATH)
-    try:
-        with open(sql_file, "r", encoding="utf-8") as f:
-            sql_script = f.read()
-        conn.executescript(sql_script)
-        conn.commit()
-        logger.info("Database initialized successfully.")
-    finally:
-        conn.close()
+def has_datasets() -> bool:
+    """Return True if the user has uploaded at least one table."""
+    return len(get_all_table_names()) > 0
 
 
 def get_all_table_names() -> list[str]:
     """Return a list of all user table names in the database."""
+    if not Path(DATABASE_PATH).exists():
+        return []
     conn = get_connection()
     try:
         cursor = conn.execute(
@@ -66,10 +48,20 @@ def get_all_table_names() -> list[str]:
         conn.close()
 
 
+def get_table_row_count(table_name: str) -> int:
+    """Return the number of rows in a table."""
+    conn = get_connection()
+    try:
+        cursor = conn.execute(f"SELECT COUNT(*) AS cnt FROM [{table_name}];")
+        return int(cursor.fetchone()["cnt"])
+    finally:
+        conn.close()
+
+
 def get_table_schema(table_name: str) -> list[dict[str, Any]]:
     """
     Return column information for a given table.
-    Each dict has: cid, name, type, notnull, dflt_value, pk
+    Each dict has: column_name, data_type, is_primary_key, is_nullable, default_value
     """
     conn = get_connection()
     try:
@@ -127,7 +119,7 @@ def get_sample_data(table_name: str, limit: int = 3) -> list[dict]:
     conn = get_connection()
     try:
         cursor = conn.execute(
-            f"SELECT * FROM {table_name} LIMIT ?;", (limit,)
+            f"SELECT * FROM [{table_name}] LIMIT ?;", (limit,)
         )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]

@@ -31,6 +31,18 @@ class QueryRequest(BaseModel):
         default=None,
         description="Optional Ollama model override",
     )
+    cache_mode: bool = Field(
+        default=True,
+        description="Use cached results for repeated identical queries",
+    )
+    fast_mode: bool = Field(
+        default=False,
+        description="Skip planner LLM call and use heuristic plan for faster execution",
+    )
+    skip_insight: bool = Field(
+        default=False,
+        description="Skip insight generation (auto-enabled when fast_mode is on)",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -61,10 +73,24 @@ class QueryResponse(BaseModel):
 )
 def handle_query(request: QueryRequest):
     """Process a natural language query through the agent pipeline."""
+    from services.database import has_datasets
+
+    if not has_datasets():
+        raise HTTPException(
+            status_code=400,
+            detail="No business data found. Please upload a CSV file before asking questions.",
+        )
+
     logger.info("Received query: %s", request.query)
 
     try:
-        result = process_query(request.query, model=request.model)
+        result = process_query(
+            request.query,
+            model=request.model,
+            cache_mode=request.cache_mode,
+            fast_mode=request.fast_mode,
+            skip_insight=request.skip_insight,
+        )
         return QueryResponse(**result)
 
     except Exception as e:
@@ -73,6 +99,17 @@ def handle_query(request: QueryRequest):
             status_code=500,
             detail=f"Internal server error: {str(e)}",
         )
+
+
+@router.delete(
+    "/cache",
+    summary="Clear query result cache",
+)
+def clear_cache():
+    """Clear all cached query results."""
+    from services import query_cache
+    query_cache.invalidate()
+    return {"success": True, "message": "Query cache cleared"}
 
 
 @router.get(

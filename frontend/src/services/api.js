@@ -1,24 +1,33 @@
 /**
- * API Service
- * Handles all backend communication
+ * API Service — backend communication for Voice BI
  */
 import axios from 'axios';
 
 const api = axios.create({
-
   baseURL: '/api',
-  timeout: 300000, // 5 minutes timeout for local Ollama inference
+  timeout: 300000,
   headers: { 'Content-Type': 'application/json' },
-
 });
 
 /**
- * Submit a query to the BI pipeline
- * @param {string} query - Natural language question
+ * Submit a business question to the analysis pipeline
  */
-export async function submitQuery(query, model) {
+export async function submitQuery(query, options = {}) {
+  const {
+    model = null,
+    cacheMode = true,
+    fastMode = false,
+    skipInsight = false,
+  } = options;
+
   try {
-    const { data } = await api.post('/query', { query, model });
+    const { data } = await api.post('/query', {
+      query,
+      model: model || null,
+      cache_mode: cacheMode,
+      fast_mode: fastMode,
+      skip_insight: skipInsight,
+    });
     return data;
   } catch (error) {
     if (error.response) {
@@ -31,16 +40,15 @@ export async function submitQuery(query, model) {
   }
 }
 
-/**
- * Upload a CSV dataset
- * @param {File} file - CSV file object
- */
+/** Upload a business CSV dataset */
 export async function uploadDataset(file) {
   const formData = new FormData();
   formData.append('file', file);
 
   try {
-    const { data } = await axios.post('http://localhost:8000/api/upload', formData);
+    const { data } = await api.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return data;
   } catch (error) {
     const msg =
@@ -48,6 +56,26 @@ export async function uploadDataset(file) {
       error.message ||
       'Upload failed. Check backend connection.';
     throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
+/** Get uploaded datasets and tailored suggestions */
+export async function getDatasets() {
+  try {
+    const { data } = await api.get('/datasets');
+    return data;
+  } catch {
+    return { has_data: false, tables: [], suggestions: [] };
+  }
+}
+
+/** Clear server-side query cache */
+export async function clearCache() {
+  try {
+    const { data } = await api.delete('/cache');
+    return data;
+  } catch {
+    return { success: false };
   }
 }
 

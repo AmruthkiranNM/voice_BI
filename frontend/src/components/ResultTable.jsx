@@ -9,16 +9,42 @@ export default function ResultTable({ result }) {
     return String(v);
   };
 
+  const exportCsv = () => {
+    const header = columns.join(',');
+    const body = rows.map(row =>
+      columns.map(c => {
+        const val = row[c];
+        const str = val == null ? '' : String(val);
+        return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')
+    ).join('\n');
+    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'business-analysis.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="panel-card w-full">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-400">📊</div>
-          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Database Results</h3>
+          <h3 className="text-sm font-bold text-gray-200 uppercase tracking-wider">Your Data</h3>
         </div>
-        <span className="px-3 py-1 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-bold">
-          {row_count} ROWS RETURNED
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportCsv}
+            className="px-3 py-1 rounded-md bg-gray-800 text-gray-400 border border-gray-700 text-xs font-semibold hover:text-indigo-400 hover:border-indigo-500/40 transition-colors"
+          >
+            Export CSV
+          </button>
+          <span className="px-3 py-1 rounded-md bg-green-500/10 text-green-400 border border-green-500/20 text-xs font-bold">
+            {row_count} ROWS
+          </span>
+        </div>
       </div>
 
       <div className="overflow-x-auto overflow-y-auto max-h-[400px] border border-gray-800 rounded-xl w-full bg-gray-900/30">

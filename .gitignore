@@ -17,9 +17,6 @@ backend/vector_store/
 # SQLite database (user-uploaded, created at runtime)
 backend/data/*.db
 
-# Test files
-backend/test_upload.csv
-
 # OS files
 .DS_Store
 Thumbs.db

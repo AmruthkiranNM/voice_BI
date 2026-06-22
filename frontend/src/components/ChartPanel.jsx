@@ -6,6 +6,7 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import KPICard, { detectKpiMetrics } from './KPICard';
 
 ChartJS.register(
   CategoryScale, LinearScale,
@@ -23,10 +24,20 @@ const COLORS = [
 ];
 
 export default function ChartPanel({ result, intent }) {
+  const kpis = useMemo(() => detectKpiMetrics(result), [result]);
   const config = useMemo(() => {
+    if (kpis) return null;
     if (!result?.columns?.length || !result?.rows?.length) return null;
     return buildChart(result, intent);
-  }, [result, intent]);
+  }, [result, intent, kpis]);
+
+  if (kpis) {
+    return (
+      <div className="flex flex-col gap-8">
+        <KPICard result={result} />
+      </div>
+    );
+  }
 
   if (!config) return null;
   const { type, data, options } = config;
@@ -48,9 +59,9 @@ export default function ChartPanel({ result, intent }) {
         {type === 'line' && <Line data={data} options={options} />}
         {type === 'doughnut' && (
           <div className="absolute inset-0 flex items-center justify-center">
-             <div className="w-full max-w-[300px] aspect-square">
-                <Doughnut data={data} options={options} />
-             </div>
+            <div className="w-full max-w-[300px] aspect-square">
+              <Doughnut data={data} options={options} />
+            </div>
           </div>
         )}
       </div>
@@ -68,7 +79,9 @@ function buildChart(result, intent) {
   const labels = rows.map(r => String(r[labelCol]));
   const isTime = labels.some(l => /^\d{4}[-/]|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(l));
 
-  let type = isTime || intent === 'trend' ? 'line' : rows.length <= 6 && valCols.length === 1 ? 'doughnut' : 'bar';
+  let type = isTime || intent === 'trend' || intent === 'comparison'
+    ? 'line'
+    : rows.length <= 6 && valCols.length === 1 ? 'doughnut' : 'bar';
 
   const datasets = valCols.map((col, i) => ({
     label: col.replace(/_/g, ' ').toUpperCase(),
@@ -103,10 +116,6 @@ function buildChart(result, intent) {
         borderWidth: 1,
         padding: 12,
         cornerRadius: 8,
-        titleFont: { size: 13, weight: 'bold' },
-        bodyFont: { size: 12 },
-        displayColors: true,
-        boxPadding: 6,
       },
     },
     ...(type !== 'doughnut' && {

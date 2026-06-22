@@ -56,6 +56,17 @@ BLOCKED_SQL_KEYWORDS = [
 # Maximum rows returned from any query
 MAX_RESULT_ROWS = int(os.getenv("MAX_RESULT_ROWS", "500"))
 
+# CSV upload limits
+MAX_UPLOAD_ROWS = int(os.getenv("MAX_UPLOAD_ROWS", "100000"))
+MAX_UPLOAD_COLUMNS = int(os.getenv("MAX_UPLOAD_COLUMNS", "100"))
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))
+
+# ──────────────────────────────────────────────
+# Query Cache
+# ──────────────────────────────────────────────
+CACHE_TTL_SECONDS = int(os.getenv("CACHE_TTL_SECONDS", "3600"))
+CACHE_MAX_ENTRIES = int(os.getenv("CACHE_MAX_ENTRIES", "100"))
+
 # ──────────────────────────────────────────────
 # Logging
 # ──────────────────────────────────────────────

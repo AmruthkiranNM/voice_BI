@@ -22,25 +22,46 @@ logger = logging.getLogger(__name__)
 MAX_SQL_RETRIES = 3
 
 
-def process_query(query: str, model: str | None = None) -> dict[str, Any]:
+def process_query(
+    query: str,
+    model: str | None = None,
+    *,
+    cache_mode: bool = True,
+    fast_mode: bool = False,
+    skip_insight: bool = False,
+) -> dict[str, Any]:
     """
     Process a natural language query through the full agent pipeline.
 
     Pipeline:
-        1. Planner Agent      → Structured execution plan
+        1. Planner Agent      → Structured execution plan (skipped in fast_mode)
         2. RAG Retriever Agent → Relevant database schema
         3. SQL Generator Agent → SQL query
         4. Validator Agent     → Security & schema check
         5. Execution Agent     → Query execution
-        6. Insight Agent       → Business insight
+        6. Insight Agent       → Business insight (skipped if skip_insight or fast_mode)
 
     Args:
         query: Natural language business question.
+        model: Optional Ollama model override.
+        cache_mode: Return cached results for identical queries when available.
+        fast_mode: Skip planner LLM call (heuristic plan) for faster execution.
+        skip_insight: Skip insight LLM call (auto-enabled when fast_mode is True).
 
     Returns:
         Complete response with SQL, results, insights, and agent logs.
     """
     import config
+    from services import query_cache
+
+    if fast_mode:
+        skip_insight = True
+
+    if cache_mode:
+        cached = query_cache.get(query, model, fast_mode, skip_insight)
+        if cached:
+            return cached
+
     original_model = config.OLLAMA_MODEL
     if model:
         config.OLLAMA_MODEL = model
@@ -62,14 +83,21 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
 
     try:
         # ════════════════════════════════════════════
-        # STEP 1: Planner Agent
+        # STEP 1: Planner Agent (or fast heuristic plan)
         # ════════════════════════════════════════════
-        plan = planner.run(query)
-        log_step("Planner Agent", "completed", {
-            "intent": plan.get("intent"),
-            "steps": plan.get("steps"),
-            "metrics": plan.get("metrics"),
-        })
+        if fast_mode:
+            plan = planner.build_fast_plan(query)
+            log_step("Planner Agent", "skipped_fast_mode", {
+                "intent": plan.get("intent"),
+                "metrics": plan.get("metrics"),
+            })
+        else:
+            plan = planner.run(query)
+            log_step("Planner Agent", "completed", {
+                "intent": plan.get("intent"),
+                "steps": plan.get("steps"),
+                "metrics": plan.get("metrics"),
+            })
 
         # DEBUG: Log planner output
         logger.info("[DEBUG] Query: %s", query)
@@ -90,11 +118,13 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
         logger.info("[DEBUG] RAG tables: %s", rag_context.get('retrieved_tables'))
 
         # ════════════════════════════════════════════
-        # STEP 3 & 4: SQL Generation + Validation (with retry loop)
+        # STEP 3–5: SQL Generation, Validation & Execution (with retry + error feedback)
         # ════════════════════════════════════════════
         sql = None
         validation_result = None
+        exec_result = None
         last_error = None
+        previous_sql = None
 
         for attempt in range(1, MAX_SQL_RETRIES + 1):
             logger.info(
@@ -102,16 +132,14 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
                 attempt, MAX_SQL_RETRIES,
             )
 
-            # Generate SQL
-            sql = sql_agent.run(query, plan, rag_context)
-            log_step("SQL Generator Agent", f"attempt_{attempt}", {
-                "sql": sql,
-            })
-
-            # DEBUG: Log generated SQL
+            sql = sql_agent.run(
+                query, plan, rag_context,
+                previous_sql=previous_sql,
+                error_message=last_error,
+            )
+            log_step("SQL Generator Agent", f"attempt_{attempt}", {"sql": sql})
             logger.info("[DEBUG] Generated SQL: %s", sql)
 
-            # Validate SQL
             try:
                 validation_result = validator.run(
                     sql,
@@ -120,17 +148,15 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
                 log_step("Validator Agent", "passed", {
                     "warnings": validation_result.get("warnings", []),
                 })
-                break  # Validation passed — exit retry loop
-
             except ValidationError as ve:
                 last_error = str(ve)
+                previous_sql = sql
                 log_step("Validator Agent", f"failed_attempt_{attempt}", {
                     "error": last_error,
                     "type": ve.violation_type,
                 })
 
                 if ve.violation_type == "security":
-                    # Security failures are not retriable
                     return _error_response(
                         query=query,
                         error=f"Security violation: {last_error}",
@@ -138,7 +164,6 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
                         pipeline_time=time.time() - pipeline_start,
                     )
 
-                # Schema errors might be fixed with a retry
                 if attempt == MAX_SQL_RETRIES:
                     return _error_response(
                         query=query,
@@ -146,37 +171,54 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
                         agent_logs=agent_logs,
                         pipeline_time=time.time() - pipeline_start,
                     )
+                continue
+
+            exec_result = execution.run(sql)
+            if exec_result["success"]:
+                log_step("Execution Agent", "completed", {
+                    "row_count": exec_result.get("row_count"),
+                    "execution_time_ms": exec_result.get("execution_time_ms"),
+                })
+                break
+
+            last_error = exec_result["error"]
+            previous_sql = sql
+            log_step("Execution Agent", f"failed_attempt_{attempt}", {"error": last_error})
+
+            if attempt == MAX_SQL_RETRIES:
+                return _error_response(
+                    query=query,
+                    error=f"Query execution failed after {MAX_SQL_RETRIES} attempts: {last_error}",
+                    sql=sql,
+                    agent_logs=agent_logs,
+                    pipeline_time=time.time() - pipeline_start,
+                )
 
         # ════════════════════════════════════════════
-        # STEP 5: Execution Agent
+        # STEP 6: Insight Agent (optional)
         # ════════════════════════════════════════════
-        exec_result = execution.run(sql)
-        log_step("Execution Agent", "completed", {
-            "row_count": exec_result.get("row_count"),
-            "execution_time_ms": exec_result.get("execution_time_ms"),
-        })
-
-        if not exec_result["success"]:
-            return _error_response(
-                query=query,
-                error=f"Query execution failed: {exec_result['error']}",
-                sql=sql,
-                agent_logs=agent_logs,
-                pipeline_time=time.time() - pipeline_start,
-            )
-
-        # ════════════════════════════════════════════
-        # STEP 6: Insight Agent
-        # ════════════════════════════════════════════
-        insight_text = insight.run(query, sql, exec_result)
-        log_step("Insight Agent", "completed", {
-            "insight_length": len(insight_text),
-        })
+        if skip_insight:
+            insight_text = None
+            log_step("Insight Agent", "skipped", {
+                "reason": "fast_mode" if fast_mode else "disabled",
+            })
+        else:
+            insight_text = insight.run(query, sql, exec_result)
+            log_step("Insight Agent", "completed", {
+                "insight_length": len(insight_text),
+            })
 
         # ════════════════════════════════════════════
         # Build Final Response
         # ════════════════════════════════════════════
         pipeline_time = round(time.time() - pipeline_start, 3)
+
+        from services.domain_detector import detect_domain
+        from services.database import get_all_table_names, get_table_schema
+        all_cols = []
+        for t in get_all_table_names():
+            all_cols.extend(c["column_name"] for c in get_table_schema(t))
+        domain = detect_domain(all_cols)
 
         response = {
             "success": True,
@@ -197,9 +239,17 @@ def process_query(query: str, model: str | None = None) -> dict[str, Any]:
                 "validation_warnings": (
                     validation_result.get("warnings", []) if validation_result else []
                 ),
+                "cache_hit": False,
+                "fast_mode": fast_mode,
+                "skip_insight": skip_insight,
+                "cache_mode": cache_mode,
+                "domain": domain,
             },
             "agent_logs": agent_logs,
         }
+
+        if cache_mode:
+            query_cache.set(query, model, fast_mode, skip_insight, response)
 
         logger.info(
             "[Orchestrator] Pipeline completed in %.3f seconds — %d rows returned",

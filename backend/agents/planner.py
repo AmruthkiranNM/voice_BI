@@ -11,18 +11,16 @@ from services.llm_service import call_llm
 
 logger = logging.getLogger(__name__)
 
-PLANNER_PROMPT_TEMPLATE = """You are a Query Planner Agent in a Business Intelligence system.
+PLANNER_PROMPT_TEMPLATE = """You are a Query Planner helping a business owner analyze their uploaded CSV data.
 
-Your job is to analyze a natural language business query and produce a structured plan
-that downstream agents will use to retrieve data.
+Analyze their natural language question and produce a structured plan for retrieving insights.
 
 IMPORTANT RULES:
-1. Break complex queries into logical steps.
-2. Identify what type of data operation is needed (aggregation, comparison, filtering, etc.).
-3. Identify time ranges, filters, groupings mentioned in the query.
-4. Output ONLY valid JSON — no extra text.
+1. The owner is NOT technical — focus on business intent (sales, customers, trends, comparisons).
+2. Identify metrics, time ranges, filters, and groupings mentioned in the question.
+3. Output ONLY valid JSON — no extra text.
 
-User Query: "{query}"
+Owner's Question: "{query}"
 
 Respond with this exact JSON structure:
 {{
@@ -41,9 +39,67 @@ Respond with this exact JSON structure:
     }},
     "grouping": "<e.g., by city, by month, by product, or null>",
     "requires_aggregation": true/false,
-    "requires_comparison": true/false
+    "requires_comparison": true/false,
+    "comparison_type": "<one of: period, category, growth, ranking, null>"
 }}
 """
+
+
+def build_fast_plan(query: str) -> dict:
+    """
+    Heuristic plan without an LLM call — used in fast mode to skip the planner agent.
+    """
+    q = query.lower()
+    intent = "detail"
+    requires_comparison = False
+    comparison_type = None
+
+    comparison_words = (
+        "compare", "vs", "versus", "difference", "growth", "better", "worse",
+        "highest", "lowest", "best", "worst", "rank", "against", "between",
+    )
+    if any(w in q for w in comparison_words):
+        intent = "comparison"
+        requires_comparison = True
+        if any(w in q for w in ("month", "year", "quarter", "week", "period", "vs last")):
+            comparison_type = "period"
+        elif any(w in q for w in ("growth", "percent", "%", "increase", "decrease")):
+            comparison_type = "growth"
+        elif any(w in q for w in ("top", "best", "highest", "worst", "lowest", "rank")):
+            comparison_type = "ranking"
+        else:
+            comparison_type = "category"
+    elif any(w in q for w in ("total", "sum", "average", "avg", "count", "how many")):
+        intent = "aggregation"
+    elif any(w in q for w in ("trend", "monthly", "yearly", "over time")):
+        intent = "trend"
+
+    metrics = []
+    for word in ("sales", "revenue", "orders", "customers", "profit", "quantity"):
+        if word in q:
+            metrics.append(word)
+
+    grouping = None
+    if " by " in q:
+        grouping = q.split(" by ", 1)[1].split()[0]
+
+    return {
+        "original_query": query,
+        "steps": ["Retrieve data matching the query"],
+        "intent": intent,
+        "metrics": metrics,
+        "filters": {
+            "time_range": None,
+            "location": None,
+            "category": None,
+            "other": None,
+        },
+        "grouping": grouping,
+        "requires_aggregation": intent in ("aggregation", "comparison", "trend"),
+        "requires_comparison": requires_comparison,
+        "comparison_type": comparison_type,
+        "fast_mode": True,
+    }
 
 
 def run(query: str) -> dict:
