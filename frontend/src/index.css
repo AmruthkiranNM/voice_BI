@@ -1,55 +1,45 @@
 @import "tailwindcss";
 
+/*
+  Design system: "ledger" — a structured, editorial data-tool look.
+  Warm near-black instead of cool navy, a single confident lime accent
+  instead of the indigo/cyan AI-gradient cliché, flat bordered cards
+  instead of floating glassmorphism blobs, monospace for every number.
+*/
 @theme {
-  --color-bg: #030712;
-  --color-card: rgba(17, 24, 39, 0.45);
-  --color-border: rgba(255, 255, 255, 0.06);
-  --color-border-hover: rgba(99, 102, 241, 0.25);
-  
-  --color-indigo-glow: rgba(99, 102, 241, 0.15);
-  --color-emerald-glow: rgba(16, 185, 129, 0.1);
+  --color-bg: #0a0a08;
+  --color-surface: #121210;
+  --color-card: #131310;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(200, 255, 77, 0.35);
+
+  --color-accent: #c8ff4d;
+  --color-accent-dim: rgba(200, 255, 77, 0.12);
 }
 
 body {
   background-color: var(--color-bg);
-  color: #F3F4F6;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  color: #F2F2EE;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   position: relative;
   overflow-x: hidden;
 }
 
-/* Background Radial Glows for Premium Depth */
-body::before {
-  content: "";
-  position: absolute;
-  top: -10%;
-  left: -10%;
-  width: 60%;
-  height: 60%;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(80px);
-}
-
-body::after {
-  content: "";
-  position: absolute;
-  top: 20%;
-  right: -10%;
-  width: 50%;
-  height: 60%;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.06) 0%, transparent 70%);
-  z-index: -1;
-  pointer-events: none;
-  filter: blur(80px);
-}
-
 /* Typography styles */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Outfit', sans-serif;
-  letter-spacing: -0.02em;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* Numbers, SQL, code — always monospace so data reads like data */
+.font-data, code, pre {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-feature-settings: "tnum" 1;
 }
 
 /* Custom Scrollbar */
@@ -58,76 +48,59 @@ h1, h2, h3, h4, h5, h6 {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(3, 7, 18, 0.5);
+  background: rgba(10, 10, 8, 0.5);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.15);
+  background: rgba(200, 255, 77, 0.15);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.3);
+  background: rgba(200, 255, 77, 0.3);
 }
 
-/* High-End Glassmorphism Card Style */
+/* Flat bordered card — no blur, no floating glow */
 .panel-card {
-  background: rgba(17, 24, 39, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   padding: 1.5rem;
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.15s ease;
   overflow: hidden;
 }
 
 .panel-card:hover {
-  border-color: rgba(99, 102, 241, 0.25);
-  box-shadow: 0 15px 45px -10px rgba(99, 102, 241, 0.08), 0 10px 40px -10px rgba(0, 0, 0, 0.6);
-  transform: translateY(-2px);
+  border-color: var(--color-border-hover);
 }
 
-/* Glass panel background colors */
 .glass-panel {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  background: rgba(17, 24, 39, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
-/* Interactive hover active glow states */
-.glow-indigo {
-  box-shadow: 0 0 20px -3px rgba(99, 102, 241, 0.2);
-}
-
-.glow-emerald {
-  box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.15);
-}
-
-/* Custom premium buttons */
+/* Accent button — solid, not a gradient */
 .btn-primary {
-  background: linear-gradient(135deg, #4f46e5 0%, #312e81 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 20px -2px rgba(79, 70, 229, 0.4);
-  transition: all 0.2s ease-in-out;
+  background: var(--color-accent);
+  color: #0a0a08;
+  border: 1px solid var(--color-accent);
+  font-weight: 600;
+  transition: all 0.15s ease;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%);
-  box-shadow: 0 4px 25px 0 rgba(99, 102, 241, 0.5);
-  transform: translateY(-1px);
+  background: #d9ff80;
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(1px);
 }
 
-/* Smooth Fade In */
+/* Quick fade-in, no overshoot */
 .animate-in {
-  animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }

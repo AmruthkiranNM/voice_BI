@@ -8,6 +8,8 @@ Provides a unified interface to interact with a local Ollama server.
 import logging
 import json
 import re
+import socket
+import urllib.error
 import urllib.request
 from typing import Any
 
@@ -53,15 +55,25 @@ def _call_ollama(prompt: str, expect_json: bool = False) -> str:
     )
     
     try:
-        with urllib.request.urlopen(req, timeout=300) as response:
+        with urllib.request.urlopen(req, timeout=config.OLLAMA_TIMEOUT_SECONDS) as response:
             result = json.loads(response.read().decode('utf-8'))
             text = result.get('response', '').strip()
-            
+
             if expect_json:
                 text = _clean_json_response(text)
-                
+
             logger.debug("Ollama response (first 200 chars): %s", text[:200])
             return text
+    except (socket.timeout, TimeoutError) as e:
+        logger.error("Ollama API call timed out after %ss", config.OLLAMA_TIMEOUT_SECONDS)
+        raise RuntimeError(
+            f"Ollama did not respond within {config.OLLAMA_TIMEOUT_SECONDS}s. "
+            "The model may be overloaded for this hardware — try a smaller model "
+            "or enable fast mode."
+        ) from e
+    except urllib.error.URLError as e:
+        logger.error("Ollama API call failed: %s", str(e))
+        raise RuntimeError(f"Ollama call failed. Is Ollama running at {config.OLLAMA_HOST}? Error: {e}") from e
     except Exception as e:
         logger.error("Ollama API call failed: %s", str(e))
         raise RuntimeError(f"Ollama call failed. Is Ollama running at {config.OLLAMA_HOST}? Error: {e}") from e

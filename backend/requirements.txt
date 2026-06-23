@@ -12,6 +12,11 @@ python-multipart==0.0.9
 pandas>=2.0.0
 
 # Embeddings
+# torch is pulled in by sentence-transformers; pin the CPU-only build so
+# pip doesn't grab a multi-GB CUDA wheel. Embeddings run on CPU (see
+# config.EMBEDDING_DEVICE) so the local GPU's VRAM stays free for Ollama.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.4.1+cpu
 sentence-transformers==3.0.0
 
 # Vector store

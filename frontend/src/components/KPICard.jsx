@@ -44,13 +44,13 @@ export default function KPICard({ result }) {
   if (!kpis?.length) return null;
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6">
-      <h3 className="text-sm font-semibold text-white mb-4">Key numbers</h3>
-      <div className={`grid gap-3 ${kpis.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+    <div className="panel-card !rounded-sm">
+      <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-4">Key numbers</h3>
+      <div className={`grid gap-3 ${kpis.length === 1 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4' : 'grid-cols-2 lg:grid-cols-4'}`}>
         {kpis.map(kpi => (
-          <div key={kpi.label} className="rounded-xl border border-white/8 bg-black/20 p-4 text-center">
+          <div key={kpi.label} className="border-l-2 border-[#c8ff4d]/60 bg-black/20 px-4 py-3">
             <p className="text-xs text-gray-500 mb-1 capitalize">{kpi.label}</p>
-            <p className="text-2xl sm:text-3xl font-bold text-white tabular-nums">
+            <p className="text-2xl sm:text-3xl font-semibold text-white font-data">
               {formatKpiValue(kpi.value)}
             </p>
           </div>

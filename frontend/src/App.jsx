@@ -4,12 +4,9 @@ import { useQueryHistory } from './hooks/useQueryHistory';
 
 import Header from './components/Header';
 import QueryInput, { DEFAULT_SETTINGS } from './components/QueryInput';
-import ResultTable from './components/ResultTable';
-import InsightPanel from './components/InsightPanel';
-import ChartPanel from './components/ChartPanel';
 import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
-import TechnicalDetails from './components/TechnicalDetails';
+import ResultsDashboard from './components/ResultsDashboard';
 
 export default function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -26,6 +23,8 @@ export default function App() {
       domain: uploadResult.domain || null,
       tableName: uploadResult.table_name,
       rowCount: uploadResult.row_count,
+      columns: uploadResult.columns || [],
+      columnTypes: uploadResult.column_types || {},
     });
     setResponse(null);
     setError(null);
@@ -66,37 +65,30 @@ export default function App() {
     }
   }, [settings, datasetInfo.has_data, datasetInfo.tableName, addEntry]);
 
-  const plan = response?.metadata?.plan || null;
-  const metadata = response?.metadata || null;
-  const sql = response?.sql || null;
-  const result = response?.result || null;
-  const insight = response?.insight || null;
-  const warnings = metadata?.validation_warnings || [];
-  const intent = plan?.intent || null;
-  const hasResults = response && (sql || result?.row_count > 0 || insight);
+  const hasResults = response && (
+    response.sql || response.result?.row_count > 0 || response.insight
+  );
 
   return (
-    <div className="min-h-screen bg-[#030712] text-gray-100 font-sans">
-      <Header isProcessing={isLoading} />
+    <div className="min-h-screen bg-[#0a0a08] text-gray-100 font-sans">
+      <Header isProcessing={isLoading} wide={hasResults} />
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col gap-8">
-
-        {/* Hero — only before upload */}
+      {/* Input area — centered */}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8">
         {!datasetInfo.has_data && !hasResults && !isLoading && (
-          <section className="text-center space-y-3 pt-4 pb-2">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
-              Ask questions about your business data
+          <section className="text-center space-y-3 pt-6 pb-2">
+            <p className="text-xs font-data uppercase tracking-[0.2em] text-[#c8ff4d]">Local · Private · No cloud</p>
+            <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+              Ask your business data a question
             </h2>
             <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-              Upload a spreadsheet, then ask in plain English — by voice or text.
+              Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
             </p>
           </section>
         )}
 
-        {/* Step 1: Upload */}
         <DatasetUpload onUploadSuccess={handleUploadSuccess} />
 
-        {/* Step 2: Ask — only after upload */}
         {datasetInfo.has_data && (
           <QueryInput
             onSubmit={handleSubmit}
@@ -115,29 +107,24 @@ export default function App() {
 
         {isLoading && (
           <div className="flex flex-col items-center gap-4 py-16">
-            <div className="w-10 h-10 border-3 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+            <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
             <p className="text-sm text-gray-400">Working on your question…</p>
           </div>
         )}
+      </div>
 
-        {/* Step 3: Results */}
-        {hasResults && !isLoading && (
-          <section className="flex flex-col gap-6 animate-in">
-            <InsightPanel
-              insight={insight}
-              autoSpeak={settings.speakInsight && !settings.skipInsight}
+      {/* Results — full screen width */}
+      {hasResults && !isLoading && (
+        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 pb-12 border-t border-white/8">
+          <div className="max-w-[1600px] mx-auto pt-8">
+            <ResultsDashboard
+              response={response}
+              datasetInfo={datasetInfo}
+              settings={settings}
             />
-            <ChartPanel result={result} intent={intent} />
-            <ResultTable result={result} />
-            <TechnicalDetails
-              sql={sql}
-              plan={plan}
-              metadata={metadata}
-              warnings={warnings}
-            />
-          </section>
-        )}
-      </main>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
