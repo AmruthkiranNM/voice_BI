@@ -36,6 +36,7 @@ export default function QueryInput({
 
   const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput({
     onResult: handleVoiceResult,
+    onInterim: (t) => setQuery(t),
     onError: setVoiceError,
   });
 

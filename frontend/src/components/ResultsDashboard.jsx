@@ -83,6 +83,7 @@ export default function ResultsDashboard({
               model={settings.model}
               messages={chatMessages}
               onMessagesChange={onChatMessagesChange}
+              autoSpeak={settings.speakInsight}
             />
           </div>
         </div>

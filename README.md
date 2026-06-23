@@ -45,8 +45,9 @@ Each step in the pipeline is logged with timing and surfaced in the UI as a **pi
 ## Key Features
 
 - **CSV upload** — tables created automatically, plus an instant **data quality report** (missing values, duplicates, inconsistent types, constant columns) computed directly from the data, no LLM involved
-- **Voice input/output** — ask by microphone, hear answers read back (Web Speech API)
+- **Voice input/output** — ask by microphone with a live transcript, hear answers read back (Web Speech API)
 - **Conversational follow-ups** — after a result, keep asking ("how can I improve this?") without re-running the full SQL pipeline; the thread persists across questions in a session
+- **Hands-free conversation mode** — speak a follow-up, hear the answer, and the mic re-opens automatically for the next question — a true end-to-end voice loop over your data
 - **Data-grounded callouts** — period-over-period change, outliers, and correlation hints computed straight from the result rows, so they're never hallucinated
 - **Rich visualization** — bar/line/horizontal/doughnut/cumulative charts, trendline overlay, PNG export, sortable & filterable result table, CSV export
 - **Forecasting** — for time-series results, project the next few periods with a least-squares linear trend, drawn as a dashed extension on the line chart (client-side, no LLM, no added latency)

@@ -2,8 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
  * Browser speech-to-text for voice queries (Web Speech API).
+ *
+ * Supports interim (live) transcripts via onInterim, so the UI can show
+ * words as they're spoken. Callbacks are held in a ref so the recognition
+ * object is created once and never re-initialised on re-render.
  */
-export function useVoiceInput({ onResult, onError }) {
+export function useVoiceInput({ onResult, onError, onInterim } = {}) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -11,6 +15,11 @@ export function useVoiceInput({ onResult, onError }) {
     return !!SpeechRecognition;
   });
   const recognitionRef = useRef(null);
+  const cbs = useRef({});
+
+  useEffect(() => {
+    cbs.current = { onResult, onError, onInterim };
+  }, [onResult, onError, onInterim]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -18,13 +27,19 @@ export function useVoiceInput({ onResult, onError }) {
 
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript.trim();
-      if (transcript) onResult?.(transcript);
-      setIsListening(false);
+      let finalText = '';
+      let interimText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const seg = event.results[i][0].transcript;
+        if (event.results[i].isFinal) finalText += seg;
+        else interimText += seg;
+      }
+      if (interimText) cbs.current.onInterim?.(interimText);
+      if (finalText.trim()) cbs.current.onResult?.(finalText.trim());
     };
 
     recognition.onerror = (event) => {
@@ -34,7 +49,11 @@ export function useVoiceInput({ onResult, onError }) {
         'no-speech': 'No speech detected. Please try again.',
         'network': 'Voice recognition requires an internet connection in some browsers.',
       };
-      onError?.(messages[event.error] || `Voice error: ${event.error}`);
+      // "aborted"/"no-speech" are routine when stopping a hands-free loop —
+      // don't surface them as errors.
+      if (event.error !== 'aborted') {
+        cbs.current.onError?.(messages[event.error] || `Voice error: ${event.error}`);
+      }
     };
 
     recognition.onend = () => setIsListening(false);
@@ -43,7 +62,7 @@ export function useVoiceInput({ onResult, onError }) {
     return () => {
       recognition.abort();
     };
-  }, [onResult, onError]);
+  }, []);
 
   const startListening = useCallback(() => {
     if (!recognitionRef.current || isListening) return;
@@ -51,9 +70,9 @@ export function useVoiceInput({ onResult, onError }) {
       recognitionRef.current.start();
       setIsListening(true);
     } catch {
-      onError?.('Could not start voice recognition. Try again.');
+      // start() throws if already started — ignore.
     }
-  }, [isListening, onError]);
+  }, [isListening]);
 
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
@@ -64,7 +83,9 @@ export function useVoiceInput({ onResult, onError }) {
 }
 
 /**
- * Text-to-speech for reading business insights aloud.
+ * Text-to-speech for reading business insights and chat replies aloud.
+ * speak() accepts an optional onEnd callback so callers can chain actions
+ * (e.g. re-open the mic for a hands-free conversation loop).
  */
 export function useSpeechOutput() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -72,8 +93,11 @@ export function useSpeechOutput() {
 
   const isSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-  const speak = useCallback((text) => {
-    if (!isSupported || !text?.trim()) return;
+  const speak = useCallback((text, { onEnd } = {}) => {
+    if (!isSupported || !text?.trim()) {
+      onEnd?.();
+      return;
+    }
 
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -82,8 +106,8 @@ export function useSpeechOutput() {
     utterance.lang = 'en-US';
 
     utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onend = () => { setIsSpeaking(false); onEnd?.(); };
+    utterance.onerror = () => { setIsSpeaking(false); onEnd?.(); };
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
