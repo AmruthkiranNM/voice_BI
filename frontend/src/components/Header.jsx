@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../services/api';
 
-export default function Header({ isProcessing, wide = false }) {
+export default function Header({ isProcessing }) {
   const [online, setOnline] = useState(false);
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Header({ isProcessing, wide = false }) {
 
   return (
     <header className="sticky top-0 z-50 bg-[#0a0a08]/90 backdrop-blur-sm border-b border-white/8">
-      <div className={`${wide ? 'max-w-[1600px]' : 'max-w-3xl'} mx-auto px-4 sm:px-6 lg:px-10 h-14 flex items-center justify-between`}>
+      <div className="px-4 sm:px-6 lg:px-10 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <rect width="32" height="32" rx="6" fill="#c8ff4d" />

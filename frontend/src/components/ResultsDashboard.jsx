@@ -5,6 +5,7 @@ import DatasetSummary from './DatasetSummary';
 import ResultStats from './ResultStats';
 import KPICard, { detectKpiMetrics } from './KPICard';
 import TechnicalDetails from './TechnicalDetails';
+import FollowUpChat from './FollowUpChat';
 
 export default function ResultsDashboard({
   response,
@@ -59,6 +60,7 @@ export default function ResultsDashboard({
           )}
           {kpis && <KPICard result={result} />}
           <ResultStats result={result} />
+          <FollowUpChat query={query} sql={sql} result={result} insight={insight} model={settings.model} />
         </div>
         <div className="lg:col-span-4">
           <DatasetSummary datasetInfo={datasetInfo} />

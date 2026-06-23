@@ -71,60 +71,65 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0a0a08] text-gray-100 font-sans">
-      <Header isProcessing={isLoading} wide={hasResults} />
+      <Header isProcessing={isLoading} />
 
-      {/* Input area — centered */}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-8">
-        {!datasetInfo.has_data && !hasResults && !isLoading && (
-          <section className="text-center space-y-3 pt-6 pb-2">
-            <p className="text-xs font-data uppercase tracking-[0.2em] text-[#c8ff4d]">Local · Private · No cloud</p>
-            <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
-              Ask your business data a question
-            </h2>
-            <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-              Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
-            </p>
-          </section>
-        )}
+      <div className="flex flex-col lg:flex-row lg:items-start">
+        {/* Left column — chat / query */}
+        <aside className="w-full lg:w-[360px] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-white/8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto px-4 sm:px-6 py-6">
+          <p className="text-xs font-data uppercase tracking-[0.2em] text-[#c8ff4d] mb-4">Ask a question</p>
 
-        <DatasetUpload onUploadSuccess={handleUploadSuccess} />
+          {datasetInfo.has_data ? (
+            <QueryInput
+              onSubmit={handleSubmit}
+              isLoading={isLoading}
+              settings={settings}
+              onSettingsChange={setSettings}
+              suggestions={datasetInfo.suggestions}
+              businessType={datasetInfo.domain?.business_type || datasetInfo.domain?.label}
+              history={history}
+              onClearHistory={clearHistory}
+              onRemoveHistory={removeEntry}
+            />
+          ) : (
+            <div className="border border-white/10 bg-white/[0.02] px-4 py-5 text-sm text-gray-500">
+              Upload a spreadsheet to start asking questions.
+            </div>
+          )}
 
-        {datasetInfo.has_data && (
-          <QueryInput
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-            settings={settings}
-            onSettingsChange={setSettings}
-            suggestions={datasetInfo.suggestions}
-            businessType={datasetInfo.domain?.business_type || datasetInfo.domain?.label}
-            history={history}
-            onClearHistory={clearHistory}
-            onRemoveHistory={removeEntry}
-          />
-        )}
+          {error && <div className="mt-4"><ErrorPanel error={error} /></div>}
+        </aside>
 
-        {error && <ErrorPanel error={error} />}
+        {/* Middle column — upload + live results */}
+        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 space-y-6">
+          {!datasetInfo.has_data && !isLoading && (
+            <section className="text-center space-y-3 pt-6 pb-2">
+              <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+                Ask your business data a question
+              </h2>
+              <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
+                Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
+              </p>
+            </section>
+          )}
 
-        {isLoading && (
-          <div className="flex flex-col items-center gap-4 py-16">
-            <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
-            <p className="text-sm text-gray-400">Working on your question…</p>
-          </div>
-        )}
-      </div>
+          <DatasetUpload onUploadSuccess={handleUploadSuccess} />
 
-      {/* Results — full screen width */}
-      {hasResults && !isLoading && (
-        <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 pb-12 border-t border-white/8">
-          <div className="max-w-[1600px] mx-auto pt-8">
+          {isLoading && (
+            <div className="flex flex-col items-center gap-4 py-16">
+              <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Working on your question…</p>
+            </div>
+          )}
+
+          {hasResults && !isLoading && (
             <ResultsDashboard
               response={response}
               datasetInfo={datasetInfo}
               settings={settings}
             />
-          </div>
-        </div>
-      )}
+          )}
+        </main>
+      </div>
     </div>
   );
 }
