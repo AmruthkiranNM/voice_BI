@@ -1,11 +1,25 @@
 """Tests for the SQL validator agent."""
 
+import sqlite3
+
 import pytest
 
+import config
 from agents.validator import ValidationError, run as validate
 
 
-def test_allows_simple_select():
+@pytest.fixture
+def sales_table(temp_database):
+    """Create a minimal 'sales' table so schema validation has something to check."""
+    conn = sqlite3.connect(config.DATABASE_PATH)
+    conn.execute("CREATE TABLE sales (name TEXT, amount REAL)")
+    conn.execute("INSERT INTO sales VALUES ('Widget', 100)")
+    conn.commit()
+    conn.close()
+    return "sales"
+
+
+def test_allows_simple_select(sales_table):
     result = validate("SELECT name, amount FROM sales;")
     assert result["is_valid"] is True
 

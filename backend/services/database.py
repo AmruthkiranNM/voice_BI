@@ -150,6 +150,42 @@ def get_sample_data(table_name: str, limit: int = 3) -> list[dict]:
         conn.close()
 
 
+def get_sample_values(
+    table_name: str,
+    schema: list[dict[str, Any]] | None = None,
+    per_column: int = 40,
+) -> list[str]:
+    """
+    Collect distinct text values from a table's text/category columns, used to
+    classify the business domain from cell contents (not just column names).
+    """
+    schema = schema or get_table_schema(table_name)
+    text_cols = [
+        c["column_name"]
+        for c in schema
+        if (c.get("data_type") or "").upper() in ("TEXT", "VARCHAR", "CHAR", "STRING", "")
+    ]
+    if not text_cols:
+        return []
+
+    values: list[str] = []
+    conn = get_connection()
+    try:
+        for col in text_cols:
+            try:
+                cursor = conn.execute(
+                    f"SELECT DISTINCT [{col}] FROM [{table_name}] "
+                    f"WHERE [{col}] IS NOT NULL LIMIT ?;",
+                    (per_column,),
+                )
+                values.extend(str(row[0]) for row in cursor.fetchall())
+            except sqlite3.OperationalError:
+                continue
+    finally:
+        conn.close()
+    return values
+
+
 def execute_query(sql: str) -> dict[str, Any]:
     """
     Execute a read-only SQL query and return results.
