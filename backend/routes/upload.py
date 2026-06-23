@@ -5,12 +5,14 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 import sqlite3
 
-from config import DATABASE_PATH, MAX_UPLOAD_ROWS, MAX_UPLOAD_COLUMNS, MAX_UPLOAD_MB
+import config
+from config import MAX_UPLOAD_ROWS, MAX_UPLOAD_COLUMNS, MAX_UPLOAD_MB
 from services.vector_store import build_index
 from models.schema_loader import generate_schema_documents
 from services.database import get_all_table_names, get_table_row_count, get_table_schema, drop_all_user_tables
 from services import query_cache
 from services.suggestions import generate_suggestions_for_table
+from services import data_quality
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +95,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         # Replace workspace: only the newly uploaded file should be queryable.
         drop_all_user_tables()
 
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = sqlite3.connect(config.DATABASE_PATH)
         df.to_sql(table_name, conn, if_exists="replace", index=False)
         conn.close()
 
@@ -110,6 +112,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         schema = get_table_schema(table_name)
         suggestion_bundle = generate_suggestions_for_table(table_name)
         tables = get_all_table_names()
+        quality_report = data_quality.assess(df)
 
         logger.info("Uploaded %s as table %s (%d rows)", file.filename, table_name, row_count)
         return {
@@ -122,6 +125,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             "domain": suggestion_bundle["domain"],
             "total_tables": len(tables),
             "suggestions": suggestion_bundle["suggestions"],
+            "data_quality": quality_report,
             "message": (
                 f"Imported {row_count:,} rows from '{file.filename}'. "
                 f"Detected: {suggestion_bundle['domain']['label']}. "

@@ -6,11 +6,15 @@ import ResultStats from './ResultStats';
 import KPICard, { detectKpiMetrics } from './KPICard';
 import TechnicalDetails from './TechnicalDetails';
 import FollowUpChat from './FollowUpChat';
+import AnomalyCallouts from './AnomalyCallouts';
+import Timeline from './Timeline';
 
 export default function ResultsDashboard({
   response,
   datasetInfo,
   settings,
+  chatMessages,
+  onChatMessagesChange,
 }) {
   const query = response?.query;
   const plan = response?.metadata?.plan || null;
@@ -24,7 +28,7 @@ export default function ResultsDashboard({
   const pipelineTime = metadata?.pipeline_time_seconds;
 
   return (
-    <section className="w-full animate-in space-y-6">
+    <section className="w-full animate-in space-y-6 print-report">
       {/* Query header bar */}
       <div className="border-l-2 border-[#c8ff4d] bg-[#c8ff4d]/[0.04] px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
         <div className="min-w-0">
@@ -46,8 +50,17 @@ export default function ResultsDashboard({
           {metadata?.cache_hit && (
             <span className="text-amber-400">cached</span>
           )}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="no-print px-2.5 py-1 bg-white/5 border border-white/10 hover:border-[#c8ff4d]/40 hover:text-white transition-colors"
+          >
+            Export report
+          </button>
         </div>
       </div>
+
+      <Timeline agentLogs={response?.agent_logs} />
 
       {/* Top row: answer + dataset context */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -59,8 +72,19 @@ export default function ResultsDashboard({
             />
           )}
           {kpis && <KPICard result={result} />}
+          <AnomalyCallouts result={result} />
           <ResultStats result={result} />
-          <FollowUpChat query={query} sql={sql} result={result} insight={insight} model={settings.model} />
+          <div className="no-print">
+            <FollowUpChat
+              query={query}
+              sql={sql}
+              result={result}
+              insight={insight}
+              model={settings.model}
+              messages={chatMessages}
+              onMessagesChange={onChatMessagesChange}
+            />
+          </div>
         </div>
         <div className="lg:col-span-4">
           <DatasetSummary datasetInfo={datasetInfo} />

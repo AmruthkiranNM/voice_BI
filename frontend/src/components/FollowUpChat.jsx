@@ -2,22 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { sendChatMessage } from '../services/api';
 
 /**
- * Conversational follow-up thread about an existing query result, e.g.
- * "how can I improve my sales with this data?" asked right after a query.
- * Resets whenever the underlying query/result changes.
+ * Conversational thread about the dataset. Context (query/sql/result/insight)
+ * always reflects the most recent query, but `messages`/`onMessagesChange`
+ * are controlled by the parent so the conversation persists across multiple
+ * top-level questions in the same session — only a new dataset upload
+ * clears it.
  */
-export default function FollowUpChat({ query, sql, result, insight, model }) {
-  const [messages, setMessages] = useState([]);
+export default function FollowUpChat({ query, sql, result, insight, model, messages, onMessagesChange }) {
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    setMessages([]);
-    setDraft('');
-    setError(null);
-  }, [query, sql]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -29,7 +24,7 @@ export default function FollowUpChat({ query, sql, result, insight, model }) {
     if (!text || isSending) return;
 
     const nextMessages = [...messages, { role: 'user', content: text }];
-    setMessages(nextMessages);
+    onMessagesChange(nextMessages);
     setDraft('');
     setIsSending(true);
     setError(null);
@@ -37,7 +32,7 @@ export default function FollowUpChat({ query, sql, result, insight, model }) {
     try {
       const res = await sendChatMessage(text, { query, sql, result, insight, history: messages, model });
       if (res.success) {
-        setMessages([...nextMessages, { role: 'assistant', content: res.reply }]);
+        onMessagesChange([...nextMessages, { role: 'assistant', content: res.reply }]);
       } else {
         setError(res.error || 'Could not get a reply.');
       }
@@ -52,7 +47,18 @@ export default function FollowUpChat({ query, sql, result, insight, model }) {
 
   return (
     <div className="panel-card">
-      <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-4">Ask a follow-up</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-data uppercase tracking-wide text-gray-500">Ask a follow-up</h3>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onMessagesChange([])}
+            className="text-xs text-gray-600 hover:text-red-400 transition-colors font-data"
+          >
+            Clear thread
+          </button>
+        )}
+      </div>
 
       {messages.length > 0 && (
         <div ref={scrollRef} className="space-y-3 mb-4 max-h-72 overflow-y-auto pr-1">

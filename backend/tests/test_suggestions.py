@@ -2,12 +2,12 @@
 
 import sqlite3
 
-from config import DATABASE_PATH
+import config
 from services.suggestions import generate_suggestions_for_table, generate_all_dataset_suggestions
 
 
 def _create_table(name: str, columns_sql: str, rows: list[tuple]):
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(config.DATABASE_PATH)
     conn.execute(f"DROP TABLE IF EXISTS [{name}]")
     conn.execute(f"CREATE TABLE [{name}] ({columns_sql})")
     conn.executemany(

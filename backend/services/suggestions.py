@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from services.database import get_all_table_names, get_table_schema, get_table_row_count
+from services.database import (
+    get_all_table_names,
+    get_table_schema,
+    get_table_row_count,
+    get_sample_values,
+)
 from services.domain_detector import analyze_dataset
 
 
@@ -138,7 +143,8 @@ def generate_suggestions_for_table(
         return {"table_name": table_name, "domain": empty, "suggestions": []}
 
     column_names = [c["column_name"] for c in schema]
-    profile = analyze_dataset(column_names, schema)
+    sample_values = get_sample_values(table_name, schema)
+    profile = analyze_dataset(column_names, schema, sample_values)
     row_count = get_table_row_count(table_name)
 
     suggestions = _build_natural_questions(profile, row_count, max_suggestions)

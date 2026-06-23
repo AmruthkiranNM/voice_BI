@@ -6,7 +6,7 @@ import pandas as pd
 import sqlite3
 from fastapi.testclient import TestClient
 
-from config import DATABASE_PATH
+import config
 from main import app
 from services.database import get_all_table_names
 
@@ -39,7 +39,7 @@ def test_upload_replaces_previous_tables(temp_database):
 
 
 def test_rag_pins_to_active_table(temp_database):
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(config.DATABASE_PATH)
     conn.execute("CREATE TABLE sales (product TEXT, revenue REAL)")
     conn.execute("INSERT INTO sales VALUES ('Widget', 999)")
     conn.execute("CREATE TABLE restaurant (menu_item TEXT, orders INTEGER)")

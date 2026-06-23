@@ -71,3 +71,22 @@ def test_restaurant_scores_higher_than_sales_for_menu_data():
     restaurant_cols = ["menu_item", "tip_amount", "dish_name"]
     scores = _score_themes(restaurant_cols)
     assert scores["restaurant"] > scores["sales"]
+
+
+def test_restaurant_detected_from_values_with_generic_columns():
+    """Generic column names but restaurant menu items in the data values."""
+    columns = ["Order ID", "Date", "Product", "Price", "Quantity", "City"]
+    sample_values = ["Fries", "Beverages", "Burger", "Coffee", "Pizza", "London"]
+    profile = analyze_dataset(columns, sample_values=sample_values)
+
+    assert profile["id"] == "restaurant"
+    assert "Restaurant" in profile["business_type"]
+
+
+def test_retail_still_wins_for_non_food_product_values():
+    """Generic product column with non-food values should not become restaurant."""
+    columns = ["Order ID", "Product", "Price", "Store"]
+    sample_values = ["Laptop", "T-Shirt", "Headphones", "Notebook"]
+    profile = analyze_dataset(columns, sample_values=sample_values)
+
+    assert profile["id"] != "restaurant"

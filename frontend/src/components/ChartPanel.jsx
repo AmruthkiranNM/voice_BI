@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale,
@@ -6,6 +6,7 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { movingAverage, cumulativeSum } from '../utils/resultAnalytics';
 
 ChartJS.register(
   CategoryScale, LinearScale,
@@ -26,6 +27,7 @@ const CHART_TYPES = [
   { id: 'bar', label: 'Bar' },
   { id: 'horizontal', label: 'Horizontal' },
   { id: 'line', label: 'Line' },
+  { id: 'cumulative', label: 'Cumulative' },
   { id: 'doughnut', label: 'Pie' },
 ];
 
@@ -36,23 +38,41 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
   }, [result, intent]);
 
   const [activeType, setActiveType] = useState(null);
+  const [showTrend, setShowTrend] = useState(false);
 
   if (!chartData) return null;
 
   const { labels, datasets, defaultType } = chartData;
   const type = activeType || defaultType;
+  const isCumulative = type === 'cumulative';
+  const renderType = isCumulative ? 'line' : type;
   const displayRows = Math.min(labels.length, type === 'doughnut' ? 8 : 20);
   const slicedLabels = labels.slice(0, displayRows);
-  const slicedDatasets = datasets.map(ds => ({
-    ...ds,
-    data: ds.data.slice(0, displayRows),
-    backgroundColor: type === 'doughnut'
-      ? COLORS.slice(0, displayRows)
-      : ds.backgroundColor,
-  }));
+  const slicedDatasets = datasets.map(ds => {
+    const sliced = ds.data.slice(0, displayRows);
+    return {
+      ...ds,
+      data: isCumulative ? cumulativeSum(sliced) : sliced,
+      backgroundColor: type === 'doughnut' ? COLORS.slice(0, displayRows) : ds.backgroundColor,
+    };
+  });
+
+  if (renderType === 'line' && showTrend && slicedDatasets[0]) {
+    slicedDatasets.push({
+      label: `${slicedDatasets[0].label} (trend)`,
+      data: movingAverage(slicedDatasets[0].data, 3),
+      borderColor: 'rgba(255,255,255,0.5)',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [5, 4],
+      pointRadius: 0,
+      fill: false,
+      tension: 0.35,
+    });
+  }
 
   const data = { labels: slicedLabels, datasets: slicedDatasets };
-  const options = buildOptions(type, slicedDatasets.length);
+  const options = buildOptions(renderType, slicedDatasets.length);
 
   const heightClass = fullWidth ? 'h-80 lg:h-96' : 'h-72';
 
@@ -61,13 +81,15 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
       <div className={`grid gap-6 ${fullWidth ? 'grid-cols-1 xl:grid-cols-2' : 'grid-cols-1'}`}>
         <ChartCard
           title="Primary view"
-          type={type}
+          type={renderType}
           data={data}
           options={options}
           heightClass={heightClass}
           chartTypes={CHART_TYPES}
           selectedType={type}
           onTypeChange={setActiveType}
+          showTrend={showTrend}
+          onToggleTrend={renderType === 'line' && !isCumulative ? () => setShowTrend(v => !v) : null}
         />
 
         {fullWidth && chartData.secondary && (
@@ -91,38 +113,70 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
   );
 }
 
-function ChartCard({ title, type, data, options, heightClass, chartTypes, selectedType, onTypeChange, readOnly }) {
+function ChartCard({ title, type, data, options, heightClass, chartTypes, selectedType, onTypeChange, readOnly, showTrend, onToggleTrend }) {
+  const chartRef = useRef(null);
+
+  const exportPng = () => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const url = chart.toBase64Image();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title.toLowerCase().replace(/\s+/g, '-')}.png`;
+    a.click();
+  };
+
   return (
     <div className="panel-card flex flex-col">
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <h3 className="text-xs font-data uppercase tracking-wide text-gray-500">{title}</h3>
-        {!readOnly && chartTypes && (
-          <div className="flex gap-1">
-            {chartTypes.map(ct => (
-              <button
-                key={ct.id}
-                type="button"
-                onClick={() => onTypeChange(ct.id)}
-                className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                  selectedType === ct.id
-                    ? 'bg-[#c8ff4d] text-[#0a0a08]'
-                    : 'text-gray-500 hover:text-white bg-white/5'
-                }`}
-              >
-                {ct.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          {onToggleTrend && (
+            <button
+              type="button"
+              onClick={onToggleTrend}
+              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                showTrend ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white bg-white/5'
+              }`}
+            >
+              Trendline
+            </button>
+          )}
+          {!readOnly && chartTypes && (
+            <div className="flex gap-1">
+              {chartTypes.map(ct => (
+                <button
+                  key={ct.id}
+                  type="button"
+                  onClick={() => onTypeChange(ct.id)}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                    selectedType === ct.id
+                      ? 'bg-[#c8ff4d] text-[#0a0a08]'
+                      : 'text-gray-500 hover:text-white bg-white/5'
+                  }`}
+                >
+                  {ct.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={exportPng}
+            className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-white bg-white/5 transition-colors"
+          >
+            Export PNG
+          </button>
+        </div>
       </div>
       <div className={`relative w-full ${heightClass} min-h-[240px]`}>
-        {type === 'bar' && <Bar data={data} options={options} />}
-        {type === 'horizontal' && <Bar data={data} options={{ ...options, indexAxis: 'y' }} />}
-        {type === 'line' && <Line data={data} options={options} />}
+        {type === 'bar' && <Bar ref={chartRef} data={data} options={options} />}
+        {type === 'horizontal' && <Bar ref={chartRef} data={data} options={{ ...options, indexAxis: 'y' }} />}
+        {type === 'line' && <Line ref={chartRef} data={data} options={options} />}
         {type === 'doughnut' && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-full max-w-sm aspect-square">
-              <Doughnut data={data} options={options} />
+              <Doughnut ref={chartRef} data={data} options={options} />
             </div>
           </div>
         )}
@@ -150,9 +204,13 @@ function prepareChartData(result, intent) {
   else if (rows.length <= 6 && valCols.length === 1) defaultType = 'doughnut';
   else if (rows.length > 8) defaultType = 'horizontal';
 
+  // Time-series data should render in chronological order, not value-sorted.
+  const displayRows = isTime ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol]))) : sorted;
+  const displayLabels = displayRows.map(r => String(r[labelCol]));
+
   const datasets = valCols.map((col, i) => ({
     label: col.replace(/_/g, ' '),
-    data: sorted.map(r => Number(r[col]) || 0),
+    data: displayRows.map(r => Number(r[col]) || 0),
     backgroundColor: COLORS[i % COLORS.length],
     borderColor: COLORS[i % COLORS.length],
     borderWidth: defaultType === 'line' ? 2 : defaultType === 'doughnut' ? 2 : 0,
@@ -198,7 +256,7 @@ function prepareChartData(result, intent) {
     };
   }
 
-  return { labels, datasets, defaultType, secondary };
+  return { labels: displayLabels, datasets, defaultType, secondary };
 }
 
 function buildOptions(type, datasetCount) {

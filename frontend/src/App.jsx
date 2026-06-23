@@ -14,6 +14,7 @@ export default function App() {
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
   const [datasetInfo, setDatasetInfo] = useState({ has_data: false, suggestions: [], domain: null });
+  const [chatMessages, setChatMessages] = useState([]);
   const { history, addEntry, clearHistory, removeEntry } = useQueryHistory();
 
   const handleUploadSuccess = useCallback((uploadResult) => {
@@ -25,9 +26,11 @@ export default function App() {
       rowCount: uploadResult.row_count,
       columns: uploadResult.columns || [],
       columnTypes: uploadResult.column_types || {},
+      dataQuality: uploadResult.data_quality || null,
     });
     setResponse(null);
     setError(null);
+    setChatMessages([]);
   }, []);
 
   const handleSubmit = useCallback(async (query) => {
@@ -71,11 +74,13 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#0a0a08] text-gray-100 font-sans">
-      <Header isProcessing={isLoading} />
+      <div className="no-print">
+        <Header isProcessing={isLoading} />
+      </div>
 
       <div className="flex flex-col lg:flex-row lg:items-start">
         {/* Left column — chat / query */}
-        <aside className="w-full lg:w-[360px] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-white/8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto px-4 sm:px-6 py-6">
+        <aside className="no-print w-full lg:w-[360px] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-white/8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto px-4 sm:px-6 py-6">
           <p className="text-xs font-data uppercase tracking-[0.2em] text-[#c8ff4d] mb-4">Ask a question</p>
 
           {datasetInfo.has_data ? (
@@ -101,31 +106,35 @@ export default function App() {
 
         {/* Middle column — upload + live results */}
         <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 space-y-6">
-          {!datasetInfo.has_data && !isLoading && (
-            <section className="text-center space-y-3 pt-6 pb-2">
-              <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
-                Ask your business data a question
-              </h2>
-              <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-                Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
-              </p>
-            </section>
-          )}
+          <div className="no-print space-y-6">
+            {!datasetInfo.has_data && !isLoading && (
+              <section className="text-center space-y-3 pt-6 pb-2">
+                <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+                  Ask your business data a question
+                </h2>
+                <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
+                  Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
+                </p>
+              </section>
+            )}
 
-          <DatasetUpload onUploadSuccess={handleUploadSuccess} />
+            <DatasetUpload onUploadSuccess={handleUploadSuccess} />
 
-          {isLoading && (
-            <div className="flex flex-col items-center gap-4 py-16">
-              <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
-              <p className="text-sm text-gray-400">Working on your question…</p>
-            </div>
-          )}
+            {isLoading && (
+              <div className="flex flex-col items-center gap-4 py-16">
+                <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
+                <p className="text-sm text-gray-400">Working on your question…</p>
+              </div>
+            )}
+          </div>
 
           {hasResults && !isLoading && (
             <ResultsDashboard
               response={response}
               datasetInfo={datasetInfo}
               settings={settings}
+              chatMessages={chatMessages}
+              onChatMessagesChange={setChatMessages}
             />
           )}
         </main>
