@@ -172,17 +172,17 @@ python -m scripts.benchmark --no-fast # full pipeline (LLM planner)
 Latest measured result on this machine (`qwen2.5-coder:3b`, fast mode):
 
 ```
-Overall accuracy: 21/22 (95%)
-Avg time per query: 8.0s
+Overall accuracy: 22/22 (100%)
+Avg time per query: 9.0s
 
 Per-category:
-  aggregation  7/8  (88%)
+  aggregation  8/8  (100%)
   filter       4/4  (100%)
   grouping     6/6  (100%)
   ranking      4/4  (100%)
 ```
 
-The single aggregation miss is illustrative: for "how many sales are there in total?" the model generated `SUM(amount)` instead of `COUNT(*)` — a phrasing-ambiguity error rather than a structural one. The benchmark also reports how many queries were rescued by the SQL self-correction retry loop.
+An earlier run scored 21/22: "how many sales are there in total?" generated `SUM(amount)` instead of `COUNT(*)` — a count-vs-sum phrasing ambiguity. This was fixed by adding explicit count/sum/average disambiguation to the SQL-generation prompt, demonstrating how the benchmark drives targeted prompt improvements. The benchmark also reports how many queries were rescued by the SQL self-correction retry loop.
 
 ---
 

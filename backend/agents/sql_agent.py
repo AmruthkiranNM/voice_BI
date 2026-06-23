@@ -23,6 +23,10 @@ CRITICAL RULES:
 - Generate ONLY a SELECT query. Never generate INSERT, UPDATE, DELETE, DROP, or ALTER.
 - Use ONLY the tables and columns shown in the schema below. Do NOT invent tables or columns.
 - Column names come from the owner's CSV — match them exactly (case may vary).
+- COUNT vs SUM — read the question carefully:
+  * "how many", "number of", "count of" → COUNT(*) (counting rows/records). "How many sales/orders" means COUNT(*), NOT SUM of an amount.
+  * "total", "sum of", "combined", "how much revenue/money" → SUM(<value column>).
+  * "average", "mean" → AVG(<value column>). "highest"/"lowest"/"maximum"/"minimum" → MAX/MIN.
 - For date filtering, use SQLite date functions like date('now', '-1 month').
 - For trends, use strftime('%Y-%m', date_column) when grouping by month.
 - For COMPARISONS (vs, compare, growth, difference, best vs worst):
