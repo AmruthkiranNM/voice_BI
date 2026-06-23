@@ -1,6 +1,31 @@
 import { useState, useRef, useCallback } from 'react';
 import { uploadDataset } from '../services/api';
 
+function DataQuality({ report }) {
+  if (!report) return null;
+  const { score, issues } = report;
+  const color = score >= 85 ? 'text-[#c8ff4d]' : score >= 60 ? 'text-amber-400' : 'text-red-400';
+
+  return (
+    <div className="border-l-2 border-white/20 bg-black/20 px-3 py-2 space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-400 font-medium">Data quality</span>
+        <span className={`text-sm font-data font-semibold ${color}`}>{score}/100</span>
+      </div>
+      {issues.length > 0 && (
+        <ul className="space-y-1">
+          {issues.slice(0, 3).map((issue, i) => (
+            <li key={i} className="text-xs text-gray-500 leading-snug">• {issue.message}</li>
+          ))}
+          {issues.length > 3 && (
+            <li className="text-xs text-gray-600">+ {issues.length - 3} more</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function DataPreview({ upload }) {
   if (!upload?.preview_rows?.length) return null;
   const columns = upload.columns || Object.keys(upload.preview_rows[0]);
@@ -127,6 +152,8 @@ export default function DatasetUpload({ onUploadSuccess }) {
               <span className="text-white text-sm font-semibold">{businessType}</span>
             </div>
           )}
+
+          <DataQuality report={lastUpload.data_quality} />
 
           <button
             type="button"

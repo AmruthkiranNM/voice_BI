@@ -11,7 +11,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-from config import CACHE_MAX_ENTRIES, CACHE_TTL_SECONDS, DATABASE_PATH
+import config
+from config import CACHE_MAX_ENTRIES, CACHE_TTL_SECONDS
 from services.database import get_all_table_names
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 def get_schema_fingerprint() -> str:
     """Fingerprint current DB tables + file mtime for cache invalidation."""
     tables = ",".join(sorted(get_all_table_names()))
-    db_path = Path(DATABASE_PATH)
+    db_path = Path(config.DATABASE_PATH)
     mtime = db_path.stat().st_mtime if db_path.exists() else 0
     raw = f"{tables}:{mtime}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]

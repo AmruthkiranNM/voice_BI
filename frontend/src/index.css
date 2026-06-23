@@ -104,3 +104,12 @@ h1, h2, h3, h4, h5, h6 {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Printable report export — hide chrome, keep only the results dashboard */
+@media print {
+  body { background: #fff; color: #111; background-image: none; }
+  .no-print { display: none !important; }
+  .panel-card { border: 1px solid #ccc; box-shadow: none; background: #fff; color: #111; break-inside: avoid; }
+  .print-report { color: #111; }
+  .print-report * { color: inherit !important; }
+}

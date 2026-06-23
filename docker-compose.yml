@@ -1,0 +1,32 @@
+version: "3.9"
+
+# One-command setup for backend + frontend. Ollama itself is NOT
+# containerized here — install it on the host (https://ollama.com) and
+# run `ollama pull qwen2.5-coder:3b` (or your configured OLLAMA_MODEL)
+# before starting this stack. The backend reaches it via
+# host.docker.internal, which Docker Desktop maps to the host machine.
+#
+# Usage:
+#   docker compose up --build
+#   App:     http://localhost:5173
+#   API:     http://localhost:8000/docs
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/vector_store:/app/vector_store
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
