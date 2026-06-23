@@ -12,16 +12,16 @@ export default function InsightPanel({ insight, autoSpeak = false }) {
   if (!insight) return null;
 
   return (
-    <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-6">
+    <div className="panel-card">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white">Answer</h3>
+        <h3 className="text-xs font-data uppercase tracking-wide text-gray-500">Answer</h3>
         {isSupported && (
           <button
             type="button"
             onClick={() => isSpeaking ? stop() : speak(insight)}
-            className="text-xs text-gray-500 hover:text-indigo-400 transition-colors"
+            className="text-xs text-gray-500 hover:text-[#c8ff4d] transition-colors"
           >
-            {isSpeaking ? 'Stop' : '🔊 Listen'}
+            {isSpeaking ? 'Stop' : 'Listen'}
           </button>
         )}
       </div>
@@ -36,7 +36,7 @@ function highlightNumbers(text) {
   const parts = text.split(/(\$?[\d,]+\.?\d*%?)/g);
   return parts.map((part, i) =>
     /^\$?[\d,]+\.?\d*%?$/.test(part)
-      ? <span key={i} className="font-semibold text-amber-300">{part}</span>
+      ? <span key={i} className="font-data font-semibold text-[#c8ff4d]">{part}</span>
       : part
   );
 }

@@ -31,6 +31,11 @@ DATABASE_PATH = str(DATA_DIR / "business.db")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
+# Per-call timeout for Ollama generation requests. Kept well under the old
+# 300s default so a stuck/overloaded local model fails fast with a clear
+# error instead of hanging the request for 5 minutes on modest hardware.
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
+
 
 # ──────────────────────────────────────────────
 # Embedding Configuration
@@ -39,6 +44,11 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 EMBEDDING_MODEL = os.getenv(
     "EMBEDDING_MODEL", "all-MiniLM-L6-v2"
 )
+
+# Force embeddings onto CPU so the GPU's limited VRAM (e.g. 4GB on a
+# GTX 1650) is reserved entirely for the Ollama LLM. The embedding model
+# is tiny and runs fine on CPU.
+EMBEDDING_DEVICE = os.getenv("EMBEDDING_DEVICE", "cpu")
 
 # Number of top-k schema chunks to retrieve via RAG
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))

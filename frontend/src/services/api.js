@@ -61,6 +61,30 @@ export async function uploadDataset(file) {
   }
 }
 
+/** Ask a conversational follow-up about an existing query result */
+export async function sendChatMessage(message, { query, sql, result, insight, history = [], model = null } = {}) {
+  try {
+    const { data } = await api.post('/chat', {
+      message,
+      query,
+      sql: sql || null,
+      result,
+      insight: insight || null,
+      history: history.map(h => ({ role: h.role, content: h.content })),
+      model: model || null,
+    });
+    return data;
+  } catch (error) {
+    if (error.response) {
+      throw new Error(error.response.data?.detail || `Server error: ${error.response.status}`, { cause: error });
+    }
+    if (error.request) {
+      throw new Error('Cannot reach backend. Is it running on port 8000?', { cause: error });
+    }
+    throw new Error(error.message, { cause: error });
+  }
+}
+
 /** Get uploaded datasets and tailored suggestions */
 export async function getDatasets() {
   try {

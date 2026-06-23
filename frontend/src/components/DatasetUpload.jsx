@@ -75,17 +75,19 @@ export default function DatasetUpload({ onUploadSuccess }) {
         setIsDragging(false);
         processFile(e.dataTransfer.files[0]);
       }}
-      className={`rounded-2xl border p-5 sm:p-6 transition-colors ${
+      className={`border p-5 sm:p-6 transition-colors ${
         isDragging
-          ? 'border-indigo-400/50 bg-indigo-950/20'
+          ? 'border-[#c8ff4d]/50 bg-[#c8ff4d]/[0.04]'
           : lastUpload
-            ? 'border-emerald-500/20 bg-emerald-950/10'
-            : 'border-white/8 bg-white/[0.02]'
+            ? 'border-[#c8ff4d]/25 bg-[#c8ff4d]/[0.02]'
+            : 'border-white/10 bg-white/[0.02]'
       }`}
     >
       {!lastUpload ? (
         <div className="text-center space-y-4 py-4">
-          <p className="text-4xl">📁</p>
+          <svg className="mx-auto" width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4v11M7 10l5 5 5-5M4 19h16" stroke="#c8ff4d" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
           <div>
             <p className="text-white font-medium">Drop your CSV here</p>
             <p className="text-gray-500 text-sm mt-1">Sales, inventory, payroll — any business spreadsheet</p>
@@ -94,7 +96,7 @@ export default function DatasetUpload({ onUploadSuccess }) {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-colors"
+            className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
           >
             {isUploading ? 'Uploading…' : 'Choose file'}
           </button>
@@ -103,9 +105,9 @@ export default function DatasetUpload({ onUploadSuccess }) {
         <div className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-emerald-400 text-sm font-medium">✓ Data loaded</p>
+              <p className="text-[#c8ff4d] text-xs font-data uppercase tracking-wide">Data loaded</p>
               <p className="text-white font-semibold mt-1 truncate">{lastUpload.table_name?.replace(/_/g, ' ')}</p>
-              <p className="text-gray-500 text-sm mt-0.5">
+              <p className="text-gray-500 text-sm mt-0.5 font-data">
                 {lastUpload.row_count?.toLocaleString()} rows · {lastUpload.columns?.length} columns
               </p>
             </div>
@@ -113,25 +115,25 @@ export default function DatasetUpload({ onUploadSuccess }) {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="text-xs text-gray-400 hover:text-white shrink-0 px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/20 transition-colors"
+              className="text-xs text-gray-400 hover:text-white shrink-0 px-3 py-1.5 border border-white/10 hover:border-white/25 transition-colors"
             >
               Replace
             </button>
           </div>
 
           {businessType && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-              <span className="text-indigo-300 text-xs font-medium">{typeLabel}</span>
-              <span className="text-indigo-100 text-sm font-semibold">{businessType}</span>
+            <div className="flex items-center gap-2 px-3 py-2 border-l-2 border-[#c8ff4d]/60 bg-black/20">
+              <span className="text-gray-400 text-xs font-medium">{typeLabel}</span>
+              <span className="text-white text-sm font-semibold">{businessType}</span>
             </div>
           )}
 
           <button
             type="button"
             onClick={() => setShowPreview(v => !v)}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors font-data"
           >
-            {showPreview ? '▾ Hide preview' : '▸ Preview data'}
+            {showPreview ? '− Hide preview' : '+ Preview data'}
           </button>
           {showPreview && <DataPreview upload={lastUpload} />}
         </div>

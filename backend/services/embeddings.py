@@ -9,7 +9,7 @@ import logging
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-from config import EMBEDDING_MODEL
+from config import EMBEDDING_MODEL, EMBEDDING_DEVICE
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +21,10 @@ def get_model() -> SentenceTransformer:
     """Load and cache the sentence-transformer embedding model."""
     global _model
     if _model is None:
-        logger.info("Loading embedding model: %s", EMBEDDING_MODEL)
-        _model = SentenceTransformer(EMBEDDING_MODEL)
+        logger.info(
+            "Loading embedding model: %s (device=%s)", EMBEDDING_MODEL, EMBEDDING_DEVICE
+        )
+        _model = SentenceTransformer(EMBEDDING_MODEL, device=EMBEDDING_DEVICE)
         logger.info("Embedding model loaded successfully.")
     return _model
 
