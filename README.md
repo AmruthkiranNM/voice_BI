@@ -160,19 +160,28 @@ pytest tests/ -q
 
 ### SQL accuracy benchmark
 
-Measures whether the pipeline returns the *correct answer* (not exact SQL text match) for a small hand-labeled set of questions against a known dataset. Requires a running local Ollama:
+Measures whether the pipeline returns the *correct answer* (not exact SQL text match) for a hand-labeled set of questions spanning three datasets (sales, HR, restaurant) and five query categories. Requires a running local Ollama:
 
 ```bash
 cd backend
-python -m scripts.benchmark
+python -m scripts.benchmark           # fast mode (heuristic planner)
+python -m scripts.benchmark --no-fast # full pipeline (LLM planner)
 ```
 
 Latest measured result on this machine (`qwen2.5-coder:3b`, fast mode):
 
 ```
-Accuracy: 5/5 (100%)
-Avg time per query: 7.5s
+Overall accuracy: 21/22 (95%)
+Avg time per query: 8.0s
+
+Per-category:
+  aggregation  7/8  (88%)
+  filter       4/4  (100%)
+  grouping     6/6  (100%)
+  ranking      4/4  (100%)
 ```
+
+The single aggregation miss is illustrative: for "how many sales are there in total?" the model generated `SUM(amount)` instead of `COUNT(*)` — a phrasing-ambiguity error rather than a structural one. The benchmark also reports how many queries were rescued by the SQL self-correction retry loop.
 
 ---
 
