@@ -73,6 +73,36 @@ _THEME_KEYWORDS: list[tuple[str, str, dict[str, int]]] = [
 _MIN_THEME_SCORE = 3
 _MIN_SCORE_MARGIN = 2
 
+# theme_id -> friendly label, for resolving any theme picked semantically.
+_THEME_LABELS: dict[str, str] = {tid: label for label, tid, _ in _THEME_KEYWORDS}
+
+# Natural-language descriptions of each domain. When keyword scoring is
+# inconclusive, the dataset's text (columns + sample values) is embedded and
+# compared against these via cosine similarity — semantic matching that
+# catches datasets whose vocabulary isn't in the keyword lists (e.g. an
+# unusual menu, or synonyms the lists don't cover). Reuses the same
+# sentence-transformer already loaded for RAG.
+_THEME_ANCHORS: dict[str, str] = {
+    "restaurant": "Restaurant, cafe, bar or food service data: menu items, dishes, food and drink orders, dining, kitchen and table service.",
+    "retail": "Retail and e-commerce data: products, SKUs, stores, shopping carts, merchandise, brands and customer purchases.",
+    "sales": "Sales and revenue data: deals, invoices, orders, sales pipeline, commissions and revenue performance.",
+    "inventory": "Inventory and supply chain data: warehouse stock levels, suppliers, shipments, reorder points and units on hand.",
+    "finance": "Finance and accounting data: expenses, ledgers, accounts payable and receivable, budgets, margins and profit.",
+    "hr": "Human resources and workforce data: employees, salaries, payroll, departments, attendance, hiring and headcount.",
+    "healthcare": "Healthcare and clinic data: patients, doctors, diagnoses, treatments, prescriptions, hospital and appointments.",
+    "hospitality": "Hospitality and travel data: hotels, room bookings, guests, reservations and check-in details.",
+    "marketing": "Marketing and customer engagement data: campaigns, conversions, impressions, clicks, leads and subscribers.",
+}
+
+# Lazily-computed cache of anchor embeddings.
+_anchor_embeddings = None
+_anchor_ids: list[str] = []
+
+# Minimum cosine similarity (and margin over the runner-up) for an
+# embedding-based classification to be trusted over the honest fallback.
+_EMBED_MIN_SIM = 0.30
+_EMBED_MIN_MARGIN = 0.04
+
 
 def _humanize(name: str) -> str:
     return re.sub(r"\s+", " ", name.replace("_", " ").replace("-", " ")).strip()
@@ -164,6 +194,51 @@ def _score_themes(
     return scores
 
 
+def _embedding_theme_scores(
+    column_names: list[str],
+    sample_values: list[str] | None,
+) -> dict[str, float]:
+    """
+    Cosine similarity of the dataset's text against each theme anchor.
+
+    Returns {} if the embedding model can't be loaded (e.g. in a minimal
+    test environment), so callers must treat an empty result as "unavailable"
+    and fall back to keyword/heuristic classification.
+    """
+    global _anchor_embeddings, _anchor_ids
+    try:
+        from services.embeddings import generate_embedding, generate_embeddings_batch
+    except Exception:
+        return {}
+
+    try:
+        if _anchor_embeddings is None:
+            _anchor_ids = list(_THEME_ANCHORS.keys())
+            _anchor_embeddings = generate_embeddings_batch(
+                [_THEME_ANCHORS[tid] for tid in _anchor_ids]
+            )
+
+        parts = ["Columns: " + ", ".join(_humanize(c) for c in column_names)]
+        if sample_values:
+            # de-dup while keeping it small, values carry strong domain signal
+            seen: list[str] = []
+            for v in sample_values:
+                s = str(v).strip()
+                if s and s not in seen:
+                    seen.append(s)
+                if len(seen) >= 60:
+                    break
+            if seen:
+                parts.append("Sample values: " + ", ".join(seen))
+
+        query_emb = generate_embedding(". ".join(parts))
+        # anchors and query are L2-normalised, so dot product == cosine sim
+        sims = _anchor_embeddings @ query_emb
+        return {tid: float(sim) for tid, sim in zip(_anchor_ids, sims)}
+    except Exception:
+        return {}
+
+
 def _fallback_business_type(
     grouped: dict[str, list[str]],
     column_names: list[str],
@@ -187,27 +262,64 @@ def _fallback_business_type(
     return "General Business Data", "general", 0.0
 
 
+def _embedding_business_type(
+    column_names: list[str],
+    sample_values: list[str] | None,
+) -> tuple[str, str, float] | None:
+    """Classify semantically; returns None if embeddings are unavailable or weak."""
+    sims = _embedding_theme_scores(column_names, sample_values)
+    if not sims:
+        return None
+
+    ranked = sorted(sims.items(), key=lambda x: x[1], reverse=True)
+    best_id, best_sim = ranked[0]
+    second_sim = ranked[1][1] if len(ranked) > 1 else 0.0
+
+    if best_sim < _EMBED_MIN_SIM or (best_sim - second_sim) < _EMBED_MIN_MARGIN:
+        return None
+
+    # Map cosine sim (~0.3–0.7 typical) onto a sensible confidence band.
+    confidence = round(min(max(best_sim, 0.0), 1.0), 2)
+    return _THEME_LABELS[best_id], best_id, confidence
+
+
 def _infer_business_type(
     column_names: list[str],
     grouped: dict[str, list[str]],
     sample_values: list[str] | None = None,
+    use_embeddings: bool = False,
 ) -> tuple[str, str, float]:
-    """Return (friendly_label, theme_id, confidence) from column + value keywords."""
+    """
+    Return (friendly_label, theme_id, confidence).
+
+    Hybrid strategy: keyword scoring decides when it has a clear winner
+    (precise, fast, no model needed). When keywords are inconclusive and
+    embeddings are enabled, fall back to semantic similarity against theme
+    anchors; only if that is also weak do we use the honest heuristic label.
+    """
     scores = _score_themes(column_names, sample_values)
     ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
     best_id, best_score = ranked[0]
     second_score = ranked[1][1] if len(ranked) > 1 else 0
 
-    if best_score < _MIN_THEME_SCORE or (best_score - second_score) < _MIN_SCORE_MARGIN:
-        return _fallback_business_type(grouped, column_names)
+    keyword_decisive = (
+        best_score >= _MIN_THEME_SCORE
+        and (best_score - second_score) >= _MIN_SCORE_MARGIN
+    )
+    if keyword_decisive:
+        # Confidence reflects how dominant the winning theme is, not how many
+        # columns exist — a strong value-driven match shouldn't be penalised
+        # just because the table is wide.
+        confidence = round(min(best_score / (best_score + second_score + 5), 1.0), 2)
+        return _THEME_LABELS[best_id], best_id, confidence
 
-    label = next(label for label, tid, _ in _THEME_KEYWORDS if tid == best_id)
-    # Confidence reflects how dominant the winning theme is, not how many
-    # columns exist — a strong value-driven match shouldn't be penalised just
-    # because the table is wide.
-    confidence = round(min(best_score / (best_score + second_score + 5), 1.0), 2)
-    return label, best_id, confidence
+    if use_embeddings:
+        semantic = _embedding_business_type(column_names, sample_values)
+        if semantic is not None:
+            return semantic
+
+    return _fallback_business_type(grouped, column_names)
 
 
 def _pick_role(columns: list[str], keywords: tuple[str, ...]) -> str | None:
@@ -251,6 +363,7 @@ def analyze_dataset(
     column_names: list[str],
     schema: list[dict[str, Any]] | None = None,
     sample_values: list[str] | None = None,
+    use_embeddings: bool = False,
 ) -> dict[str, Any]:
     if not column_names:
         return _empty_profile()
@@ -267,7 +380,7 @@ def analyze_dataset(
         grouped[classify_column(name, type_map.get(name, ""))].append(name)
 
     business_type, theme_id, confidence = _infer_business_type(
-        column_names, grouped, sample_values
+        column_names, grouped, sample_values, use_embeddings
     )
     roles = infer_column_roles(grouped)
 
@@ -290,8 +403,9 @@ def detect_domain(
     column_names: list[str],
     schema: list[dict[str, Any]] | None = None,
     sample_values: list[str] | None = None,
+    use_embeddings: bool = False,
 ) -> dict[str, Any]:
-    return analyze_dataset(column_names, schema, sample_values)
+    return analyze_dataset(column_names, schema, sample_values, use_embeddings)
 
 
 def _empty_profile() -> dict[str, Any]:

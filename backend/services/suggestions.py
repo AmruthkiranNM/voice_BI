@@ -144,7 +144,9 @@ def generate_suggestions_for_table(
 
     column_names = [c["column_name"] for c in schema]
     sample_values = get_sample_values(table_name, schema)
-    profile = analyze_dataset(column_names, schema, sample_values)
+    # Embeddings enabled here: the model is already warm from RAG, and the
+    # upload path is where accurate domain detection matters most.
+    profile = analyze_dataset(column_names, schema, sample_values, use_embeddings=True)
     row_count = get_table_row_count(table_name)
 
     suggestions = _build_natural_questions(profile, row_count, max_suggestions)

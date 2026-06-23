@@ -1,5 +1,6 @@
 """Tests for dynamic dataset profiling."""
 
+import services.domain_detector as dd
 from services.domain_detector import (
     analyze_dataset,
     classify_column,
@@ -90,3 +91,40 @@ def test_retail_still_wins_for_non_food_product_values():
     profile = analyze_dataset(columns, sample_values=sample_values)
 
     assert profile["id"] != "restaurant"
+
+
+def test_embedding_rescues_ambiguous_keyword_case(monkeypatch):
+    """When keywords are inconclusive, a confident embedding match is used."""
+    # Columns/values that don't trigger any keyword theme decisively.
+    columns = ["ref", "label", "value", "loc"]
+
+    monkeypatch.setattr(
+        dd, "_embedding_theme_scores",
+        lambda cols, vals: {"healthcare": 0.55, "retail": 0.20, "sales": 0.10},
+    )
+
+    profile = analyze_dataset(columns, sample_values=["x", "y"], use_embeddings=True)
+    assert profile["id"] == "healthcare"
+    assert profile["confidence"] > 0.3
+
+
+def test_embedding_ignored_when_keywords_are_decisive(monkeypatch):
+    """A clear keyword winner is NOT overridden by embeddings."""
+    monkeypatch.setattr(
+        dd, "_embedding_theme_scores",
+        lambda cols, vals: {"retail": 0.99},  # would mislead if consulted
+    )
+    columns = ["patient", "doctor", "diagnosis", "treatment"]
+    profile = analyze_dataset(columns, use_embeddings=True)
+    assert profile["id"] == "healthcare"
+
+
+def test_embedding_disabled_by_default(monkeypatch):
+    """Without use_embeddings, the scorer must never be called (keeps unit tests offline)."""
+    def boom(*a, **k):
+        raise AssertionError("embeddings should not be used when disabled")
+
+    monkeypatch.setattr(dd, "_embedding_theme_scores", boom)
+    # Ambiguous columns that fall through to the heuristic fallback.
+    profile = analyze_dataset(["ref", "label", "value"], sample_values=["a", "b"])
+    assert profile["id"] in ("general", "sales", "retail")
