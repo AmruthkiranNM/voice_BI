@@ -49,6 +49,7 @@ Each step in the pipeline is logged with timing and surfaced in the UI as a **pi
 - **Conversational follow-ups** — after a result, keep asking ("how can I improve this?") without re-running the full SQL pipeline; the thread persists across questions in a session
 - **Data-grounded callouts** — period-over-period change, outliers, and correlation hints computed straight from the result rows, so they're never hallucinated
 - **Rich visualization** — bar/line/horizontal/doughnut/cumulative charts, trendline overlay, PNG export, sortable & filterable result table, CSV export
+- **Forecasting** — for time-series results, project the next few periods with a least-squares linear trend, drawn as a dashed extension on the line chart (client-side, no LLM, no added latency)
 - **Hybrid domain detection** — identifies the business type (restaurant, retail, HR, healthcare, …) from both column names *and* sampled cell values; keyword scoring decides clear cases, and an embedding-based semantic classifier (reusing the RAG sentence-transformer) rescues datasets whose vocabulary isn't in the keyword lists. Near-ties abstain to an honest label rather than guessing.
 - **Pipeline trace** — visualizes which agent ran, in what order, and how long each step took
 - **Printable report export** — one click to a clean, chart-included PDF via the browser's print dialog

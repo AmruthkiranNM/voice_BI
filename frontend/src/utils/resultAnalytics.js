@@ -176,6 +176,61 @@ export function cumulativeSum(values) {
 }
 
 /**
+ * Project future values with an ordinary least-squares linear trend fit on
+ * the series index. Clamped at 0 since business metrics are non-negative.
+ * Returns the slope/intercept too so callers can describe the trend.
+ */
+export function linearForecast(values, periods = 3) {
+  const n = values.length;
+  if (n < 2) return { forecast: [], slope: 0, intercept: values[0] ?? 0 };
+
+  const meanX = (n - 1) / 2;
+  const meanY = values.reduce((a, b) => a + b, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (let i = 0; i < n; i++) {
+    num += (i - meanX) * (values[i] - meanY);
+    den += (i - meanX) ** 2;
+  }
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = meanY - slope * meanX;
+
+  const forecast = [];
+  for (let k = 1; k <= periods; k++) {
+    forecast.push(Math.max(0, intercept + slope * (n - 1 + k)));
+  }
+  return { forecast, slope, intercept };
+}
+
+/**
+ * Generate labels for the projected periods. Understands YYYY-MM (increments
+ * the month) and plain integers; otherwise falls back to "+1, +2, …".
+ */
+export function nextLabels(labels, periods = 3) {
+  const last = String(labels[labels.length - 1] ?? '');
+
+  const month = last.match(/^(\d{4})-(\d{1,2})$/);
+  if (month) {
+    let year = Number(month[1]);
+    let mon = Number(month[2]);
+    const out = [];
+    for (let k = 0; k < periods; k++) {
+      mon += 1;
+      if (mon > 12) { mon = 1; year += 1; }
+      out.push(`${year}-${String(mon).padStart(2, '0')}`);
+    }
+    return out;
+  }
+
+  if (/^\d+$/.test(last)) {
+    const base = Number(last);
+    return Array.from({ length: periods }, (_, k) => String(base + k + 1));
+  }
+
+  return Array.from({ length: periods }, (_, k) => `+${k + 1}`);
+}
+
+/**
  * Build a list of plain-English callouts about the result — period change,
  * outliers, correlation — computed directly from the data (not the LLM),
  * so they're always accurate even on a small local model.

@@ -6,7 +6,9 @@ import {
   Title, Tooltip, Legend, Filler,
 } from 'chart.js';
 import { Bar, Line, Doughnut } from 'react-chartjs-2';
-import { movingAverage, cumulativeSum } from '../utils/resultAnalytics';
+import { movingAverage, cumulativeSum, linearForecast, nextLabels } from '../utils/resultAnalytics';
+
+const FORECAST_PERIODS = 3;
 
 ChartJS.register(
   CategoryScale, LinearScale,
@@ -39,15 +41,16 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
 
   const [activeType, setActiveType] = useState(null);
   const [showTrend, setShowTrend] = useState(false);
+  const [showForecast, setShowForecast] = useState(false);
 
   if (!chartData) return null;
 
-  const { labels, datasets, defaultType } = chartData;
+  const { labels, datasets, defaultType, isTime } = chartData;
   const type = activeType || defaultType;
   const isCumulative = type === 'cumulative';
   const renderType = isCumulative ? 'line' : type;
   const displayRows = Math.min(labels.length, type === 'doughnut' ? 8 : 20);
-  const slicedLabels = labels.slice(0, displayRows);
+  let chartLabels = labels.slice(0, displayRows);
   const slicedDatasets = datasets.map(ds => {
     const sliced = ds.data.slice(0, displayRows);
     return {
@@ -71,7 +74,39 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
     });
   }
 
-  const data = { labels: slicedLabels, datasets: slicedDatasets };
+  // Forecast: extend a time-series line with a projected, dashed segment.
+  const canForecast = renderType === 'line' && !isCumulative && isTime && chartLabels.length >= 4;
+  if (canForecast && showForecast && slicedDatasets[0]) {
+    const primaryValues = slicedDatasets[0].data;
+    const { forecast } = linearForecast(primaryValues, FORECAST_PERIODS);
+    const future = nextLabels(chartLabels, FORECAST_PERIODS);
+
+    chartLabels = [...chartLabels, ...future];
+    // pad existing datasets so they don't extend into the forecast region
+    for (const ds of slicedDatasets) {
+      ds.data = [...ds.data, ...Array(FORECAST_PERIODS).fill(null)];
+    }
+    // forecast line starts from the last actual point so the segments connect
+    slicedDatasets.push({
+      label: `${datasets[0].label} (forecast)`,
+      data: [
+        ...Array(primaryValues.length - 1).fill(null),
+        primaryValues[primaryValues.length - 1],
+        ...forecast,
+      ],
+      borderColor: '#c8ff4d',
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      borderDash: [6, 4],
+      pointStyle: 'rectRot',
+      pointRadius: 4,
+      fill: false,
+      tension: 0.2,
+      spanGaps: true,
+    });
+  }
+
+  const data = { labels: chartLabels, datasets: slicedDatasets };
   const options = buildOptions(renderType, slicedDatasets.length);
 
   const heightClass = fullWidth ? 'h-80 lg:h-96' : 'h-72';
@@ -90,6 +125,8 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
           onTypeChange={setActiveType}
           showTrend={showTrend}
           onToggleTrend={renderType === 'line' && !isCumulative ? () => setShowTrend(v => !v) : null}
+          showForecast={showForecast}
+          onToggleForecast={canForecast ? () => setShowForecast(v => !v) : null}
         />
 
         {fullWidth && chartData.secondary && (
@@ -113,7 +150,7 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
   );
 }
 
-function ChartCard({ title, type, data, options, heightClass, chartTypes, selectedType, onTypeChange, readOnly, showTrend, onToggleTrend }) {
+function ChartCard({ title, type, data, options, heightClass, chartTypes, selectedType, onTypeChange, readOnly, showTrend, onToggleTrend, showForecast, onToggleForecast }) {
   const chartRef = useRef(null);
 
   const exportPng = () => {
@@ -140,6 +177,17 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               }`}
             >
               Trendline
+            </button>
+          )}
+          {onToggleForecast && (
+            <button
+              type="button"
+              onClick={onToggleForecast}
+              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
+                showForecast ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-500 hover:text-white bg-white/5'
+              }`}
+            >
+              Forecast
             </button>
           )}
           {!readOnly && chartTypes && (
@@ -256,7 +304,7 @@ function prepareChartData(result, intent) {
     };
   }
 
-  return { labels: displayLabels, datasets, defaultType, secondary };
+  return { labels: displayLabels, datasets, defaultType, secondary, isTime };
 }
 
 function buildOptions(type, datasetCount) {
