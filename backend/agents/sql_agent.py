@@ -102,7 +102,34 @@ def run(
     )
 
     sql = _clean_sql(call_llm(prompt, expect_json=False))
+    sql = _repair_columns(sql, rag_context)
     logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
+    return sql
+
+
+def _repair_columns(sql: str, rag_context: dict) -> str:
+    """
+    Deterministically fix the most common LLM mistake: rewriting a spaced
+    column ("Blood Type") as "Blood_Type". Small local models do this even when
+    told not to, so we repair it against the real schema instead of relying on
+    the prompt. Replaces the underscore variant (quoted, bracketed or bare)
+    with the correctly-quoted real name.
+    """
+    import re
+    from services.database import get_table_schema, get_all_table_names
+
+    tables = (
+        [rag_context["pinned_table"]] if rag_context.get("pinned_table")
+        else rag_context.get("retrieved_tables") or get_all_table_names()
+    )
+    cols = [c["column_name"] for t in tables for c in get_table_schema(t)]
+
+    for col in cols:
+        if " " not in col:
+            continue
+        under = col.replace(" ", "_")
+        pattern = r'(["\[]?)\b' + re.escape(under) + r'\b(["\]]?)'
+        sql = re.sub(pattern, f'"{col}"', sql, flags=re.IGNORECASE)
     return sql
 
 
