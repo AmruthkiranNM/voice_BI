@@ -109,11 +109,12 @@ def run(
 
 def _repair_columns(sql: str, rag_context: dict) -> str:
     """
-    Deterministically fix the most common LLM mistake: rewriting a spaced
-    column ("Blood Type") as "Blood_Type". Small local models do this even when
-    told not to, so we repair it against the real schema instead of relying on
-    the prompt. Replaces the underscore variant (quoted, bracketed or bare)
-    with the correctly-quoted real name.
+    Deterministically fix the most common LLM mistake on multi-word columns:
+    rewriting "Medical Condition" as Medical_Condition or MedicalCondition.
+    Small local models do this even when told not to, so we repair against the
+    real schema rather than trusting the prompt. Any identifier (bare, quoted,
+    or bracketed) whose normalised form matches a real multi-word column is
+    replaced with the correctly-quoted real name.
     """
     import re
     from services.database import get_table_schema, get_all_table_names
@@ -124,13 +125,30 @@ def _repair_columns(sql: str, rag_context: dict) -> str:
     )
     cols = [c["column_name"] for t in tables for c in get_table_schema(t)]
 
-    for col in cols:
-        if " " not in col:
-            continue
-        under = col.replace(" ", "_")
-        pattern = r'(["\[]?)\b' + re.escape(under) + r'\b(["\]]?)'
-        sql = re.sub(pattern, f'"{col}"', sql, flags=re.IGNORECASE)
-    return sql
+    norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower())
+
+    # 1. Quote bare multi-word real names the model left unquoted
+    #    (SELECT Medical Condition -> SELECT "Medical Condition").
+    for c in cols:
+        if " " in c:
+            sql = re.sub(r'(?<!["\[\w])' + re.escape(c) + r'(?!["\]\w])', f'"{c}"', sql)
+
+    # 2. Map normalised forms of real columns AND any alias the model declared
+    #    (AS "Blood Group"), so self-mangled references resolve back.
+    real_by_norm = {norm(c): c for c in cols if " " in c or not c.isalnum()}
+    for alias in re.findall(r'\bAS\s+"([^"]+)"', sql, flags=re.IGNORECASE):
+        real_by_norm.setdefault(norm(alias), alias)
+    if not real_by_norm:
+        return sql
+
+    token_re = re.compile(r'(["\[])([^"\]]+)["\]]|\b([A-Za-z_][A-Za-z0-9_]*)\b')
+
+    def repl(m):
+        inner = m.group(2) if m.group(2) is not None else m.group(3)
+        real = real_by_norm.get(norm(inner))
+        return f'"{real}"' if real and real != inner else m.group(0)
+
+    return token_re.sub(repl, sql)
 
 
 def _format_plan(plan: dict) -> str:
