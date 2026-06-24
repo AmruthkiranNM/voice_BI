@@ -48,6 +48,28 @@ def _sanitize_table_name(filename: str) -> str:
     return name[:64]
 
 
+def _sanitize_columns(columns) -> list[str]:
+    """
+    Convert CSV headers to space-free snake_case so generated SQL never needs
+    to quote column names — the root cause of most SQL failures on a small
+    local model ("Medical Condition" -> medical_condition). The frontend
+    renders underscores back as spaces for display.
+    """
+    out: list[str] = []
+    seen: dict[str, int] = {}
+    for c in columns:
+        s = re.sub(r"[^0-9a-zA-Z]+", "_", str(c)).strip("_").lower() or "col"
+        if s[0].isdigit():
+            s = f"c_{s}"
+        if s in seen:
+            seen[s] += 1
+            s = f"{s}_{seen[s]}"
+        else:
+            seen[s] = 0
+        out.append(s)
+    return out
+
+
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a business CSV, create a queryable table, and rebuild the RAG index."""
@@ -77,6 +99,8 @@ async def upload_dataset(file: UploadFile = File(...)):
 
         if df.empty:
             raise HTTPException(status_code=400, detail="CSV file is empty.")
+
+        df.columns = _sanitize_columns(df.columns)
 
         if len(df) > MAX_UPLOAD_ROWS:
             raise HTTPException(
