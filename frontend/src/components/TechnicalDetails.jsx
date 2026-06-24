@@ -10,7 +10,7 @@ export default function TechnicalDetails({ sql, plan, metadata, warnings }) {
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="text-xs text-gray-600 hover:text-gray-400 transition-colors font-data"
+        className="text-xs text-gray-400 hover:text-white transition-colors font-data"
       >
         {open ? '− Hide technical details' : '+ Technical details'}
       </button>

@@ -106,7 +106,7 @@ export default function FollowUpChat({
               type="button"
               onClick={toggleHandsFree}
               className={`px-2.5 py-1 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                handsFree ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-500 hover:text-white bg-white/5'
+                handsFree ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
               }`}
               title="Hands-free conversation: speak, hear the answer, then keep talking"
             >
@@ -118,7 +118,7 @@ export default function FollowUpChat({
             <button
               type="button"
               onClick={() => onMessagesChange([])}
-              className="text-xs text-gray-600 hover:text-red-400 transition-colors font-data"
+              className="text-xs text-gray-400 hover:text-red-400 transition-colors font-data"
             >
               Clear thread
             </button>

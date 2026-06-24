@@ -173,7 +173,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               type="button"
               onClick={onToggleTrend}
               className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                showTrend ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white bg-white/5'
+                showTrend ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
               }`}
             >
               Trendline
@@ -184,7 +184,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               type="button"
               onClick={onToggleForecast}
               className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                showForecast ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-500 hover:text-white bg-white/5'
+                showForecast ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
               }`}
             >
               Forecast
@@ -200,7 +200,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
                   className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                     selectedType === ct.id
                       ? 'bg-[#c8ff4d] text-[#0a0a08]'
-                      : 'text-gray-500 hover:text-white bg-white/5'
+                      : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
                   }`}
                 >
                   {ct.label}
@@ -211,7 +211,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
           <button
             type="button"
             onClick={exportPng}
-            className="px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-white bg-white/5 transition-colors"
+            className="px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-white bg-white/10 border border-white/10 transition-colors"
           >
             Export PNG
           </button>

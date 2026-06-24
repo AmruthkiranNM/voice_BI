@@ -148,7 +148,7 @@ export default function QueryInput({
         <button
           type="button"
           onClick={() => setShowAdvanced(v => !v)}
-          className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+          className="text-xs text-gray-400 hover:text-white transition-colors"
         >
           {showAdvanced ? 'Hide settings' : 'Settings'}
         </button>
@@ -156,7 +156,7 @@ export default function QueryInput({
           <button
             type="button"
             onClick={() => setShowHistory(v => !v)}
-            className="text-xs text-gray-600 hover:text-gray-400 transition-colors"
+            className="text-xs text-gray-400 hover:text-white transition-colors"
           >
             {showHistory ? 'Hide recent' : `Recent (${history.length})`}
           </button>

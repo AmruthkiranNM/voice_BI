@@ -158,7 +158,7 @@ export default function DatasetUpload({ onUploadSuccess }) {
           <button
             type="button"
             onClick={() => setShowPreview(v => !v)}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors font-data"
+            className="text-xs text-gray-400 hover:text-white transition-colors font-data"
           >
             {showPreview ? '− Hide preview' : '+ Preview data'}
           </button>
