@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSpeechOutput } from '../hooks/useVoice';
+import RichText from './RichText';
 
 export default function InsightPanel({ insight, autoSpeak = false }) {
   const { speak, stop, isSpeaking, isSupported } = useSpeechOutput();
@@ -25,18 +26,7 @@ export default function InsightPanel({ insight, autoSpeak = false }) {
           </button>
         )}
       </div>
-      <p className="text-sm sm:text-base text-gray-300 leading-relaxed">
-        {highlightNumbers(insight)}
-      </p>
+      <RichText text={insight} className="text-sm sm:text-base text-gray-300" />
     </div>
-  );
-}
-
-function highlightNumbers(text) {
-  const parts = text.split(/(\$?[\d,]+\.?\d*%?)/g);
-  return parts.map((part, i) =>
-    /^\$?[\d,]+\.?\d*%?$/.test(part)
-      ? <span key={i} className="font-data font-semibold text-[#c8ff4d]">{part}</span>
-      : part
   );
 }

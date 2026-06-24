@@ -29,8 +29,8 @@ RULES:
 2. Reference specific numbers from the results.
 3. Highlight the most important finding first.
 4. Suggest one practical next step or business action when possible.
-5. Keep it concise — 3-5 sentences maximum.
-6. Avoid technical jargon (no SQL, no database terms).
+5. Keep it concise. Start with a one-sentence headline finding. If you give recommendations, put each on its OWN LINE as a numbered list (1., 2., 3.) — never run them together in a paragraph.
+6. Use **bold** for the key terms or numbers. Avoid technical jargon (no SQL, no database terms).
 7. If the result set is empty, explain what that means for their business.
 
 ═══════════════════════════════════════

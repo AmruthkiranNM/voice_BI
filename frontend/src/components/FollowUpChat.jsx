@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { sendChatMessage } from '../services/api';
 import { useVoiceInput, useSpeechOutput } from '../hooks/useVoice';
+import RichText from './RichText';
 
 /**
  * Conversational thread about the dataset, fully voice-capable.
@@ -137,7 +138,7 @@ export default function FollowUpChat({
                     : 'bg-black/30 border border-white/10 text-gray-200'
                 }`}
               >
-                {m.content}
+                {m.role === 'user' ? m.content : <RichText text={m.content} />}
               </div>
             </div>
           ))}

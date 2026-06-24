@@ -33,9 +33,9 @@ The owner now says: "{message}"
 RULES:
 1. Speak directly to the owner — use "your business", "your data".
 2. Base your answer only on the data shown above; never invent numbers that are not present.
-3. If they ask for advice or improvement ideas, give 2-4 concrete, practical suggestions tied to what the data actually shows.
+3. If they ask for advice or improvement ideas, give 2-4 concrete suggestions tied to the data, each on its OWN LINE as a numbered list (1., 2., 3.) — never run them together in one paragraph.
 4. If the question needs data that is not shown above (a different time period, different columns, a different table), say so plainly and tell them to ask it as a new question instead of a follow-up.
-5. Keep the reply conversational and concise — a few sentences, not a report.
+5. Keep it concise. Use **bold** for key terms. Lead with a short sentence before any list.
 
 Write your reply now:"""
 

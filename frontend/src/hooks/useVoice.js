@@ -100,7 +100,9 @@ export function useSpeechOutput() {
     }
 
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Strip markdown so "**" / list markers aren't read aloud.
+    const spoken = text.replace(/\*\*/g, '').replace(/^\s*\d+\.\s/gm, '');
+    const utterance = new SpeechSynthesisUtterance(spoken);
     utterance.rate = 1;
     utterance.pitch = 1;
     utterance.lang = 'en-US';
