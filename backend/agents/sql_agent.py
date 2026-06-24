@@ -22,11 +22,12 @@ Generate a valid SQLite SELECT query based on:
 CRITICAL RULES:
 - Generate ONLY a SELECT query. Never generate INSERT, UPDATE, DELETE, DROP, or ALTER.
 - Use ONLY the tables and columns shown in the schema below. Do NOT invent tables or columns.
-- Column names come from the owner's CSV — match them exactly (case may vary).
+- Column names come from the owner's CSV — match them EXACTLY. Many contain spaces (e.g. "Date of Admission"). Never replace spaces with underscores or rename columns. Wrap any column name containing a space or special character in double quotes, e.g. strftime('%Y-%m', "Date of Admission").
 - COUNT vs SUM — read the question carefully:
   * "how many", "number of", "count of" → COUNT(*) (counting rows/records). "How many sales/orders" means COUNT(*), NOT SUM of an amount.
   * "total", "sum of", "combined", "how much revenue/money" → SUM(<value column>).
   * "average", "mean" → AVG(<value column>). "highest"/"lowest"/"maximum"/"minimum" → MAX/MIN.
+- Only add a date/time WHERE filter when the question names a period (e.g. "last month", "this year"). For general "over time" / "trend" questions, include ALL rows — do NOT filter to recent dates.
 - For date filtering, use SQLite date functions like date('now', '-1 month').
 - For trends, use strftime('%Y-%m', date_column) when grouping by month.
 - When grouping by day of week or month, return the NAME, not the number, so the answer is readable. Day of week:
