@@ -1,0 +1,801 @@
+Order ID,Date,Product,Category,Price,Quantity,City,Payment Method
+10000,2024-01-13,Pizza,Main,15.0,3,Madrid,Card
+10001,2024-02-22,Salad,Main,9.5,1,Berlin,Card
+10002,2024-02-17,Burger,Main,12.0,2,Madrid,Online
+10003,2024-10-14,Burger,Main,12.0,2,Berlin,Card
+10004,2024-10-28,Ice Cream,Dessert,6.0,3,London,Card
+10005,2024-06-23,Soda,Beverage,2.5,3,Madrid,Card
+10006,2024-02-22,Coffee,Beverage,3.0,1,Berlin,Card
+10007,2024-06-25,Coffee,Beverage,3.0,3,London,Online
+10008,2024-10-01,Ice Cream,Dessert,6.0,1,Berlin,Card
+10009,2024-05-30,Cheesecake,Dessert,7.5,3,Madrid,Online
+10010,2024-01-24,Pizza,Main,15.0,2,Paris,Card
+10011,2024-02-21,Fries,Side,4.5,4,Paris,Cash
+10012,2024-03-24,Coffee,Beverage,3.0,3,Paris,Card
+10013,2024-12-25,Onion Rings,Side,5.0,1,Madrid,Online
+10014,2024-03-24,Fries,Side,4.5,4,Berlin,Cash
+10015,2024-04-22,Cheesecake,Dessert,7.5,3,London,Card
+10016,2024-06-10,Burger,Main,12.0,4,Paris,Card
+10017,2024-10-17,Fries,Side,4.5,3,Madrid,Online
+10018,2024-07-21,Ice Cream,Dessert,6.0,4,Madrid,Cash
+10019,2024-05-06,Salad,Main,9.5,3,Berlin,Online
+10020,2024-07-04,Soda,Beverage,2.5,2,Madrid,Online
+10021,2024-02-16,Ice Cream,Dessert,6.0,1,London,Card
+10022,2024-12-14,Salad,Main,9.5,4,London,Cash
+10023,2024-11-01,Soda,Beverage,2.5,4,Paris,Online
+10024,2024-12-14,Burger,Main,12.0,1,Paris,Online
+10025,2024-02-27,Coffee,Beverage,3.0,3,Berlin,Card
+10026,2024-01-02,Ice Cream,Dessert,6.0,3,Madrid,Online
+10027,2024-11-16,Pizza,Main,15.0,3,Madrid,Card
+10028,2024-03-23,Coffee,Beverage,3.0,1,Paris,Cash
+10029,2024-02-27,Burger,Main,12.0,3,Paris,Card
+10030,2024-05-03,Burger,Main,12.0,1,London,Online
+10031,2024-02-05,Ice Cream,Dessert,6.0,2,Madrid,Online
+10032,2024-10-08,Ice Cream,Dessert,6.0,2,Paris,Online
+10033,2024-04-18,Soda,Beverage,2.5,2,Paris,Cash
+10034,2024-08-12,Coffee,Beverage,3.0,4,London,Card
+10035,2024-02-02,Fries,Side,4.5,3,London,Online
+10036,2024-04-27,Cheesecake,Dessert,7.5,2,London,Card
+10037,2024-04-27,Burger,Main,12.0,1,London,Cash
+10038,2024-09-20,Pizza,Main,15.0,2,Paris,Online
+10039,2024-04-19,Ice Cream,Dessert,6.0,2,Berlin,Card
+10040,2024-07-27,Ice Cream,Dessert,6.0,2,London,Card
+10041,2024-06-30,Soda,Beverage,2.5,4,Berlin,Cash
+10042,2024-12-10,Burger,Main,12.0,1,London,Cash
+10043,2024-02-25,Coffee,Beverage,3.0,2,Madrid,Card
+10044,2024-08-17,Cheesecake,Dessert,7.5,2,Berlin,Card
+10045,2024-08-24,Onion Rings,Side,5.0,2,London,Cash
+10046,2024-02-20,Cheesecake,Dessert,7.5,1,London,Card
+10047,2024-03-26,Fries,Side,4.5,4,Berlin,Cash
+10048,2024-07-24,Fries,Side,4.5,1,Madrid,Cash
+10049,2024-07-18,Burger,Main,12.0,3,Berlin,Cash
+10050,2024-12-22,Soda,Beverage,2.5,4,Madrid,Card
+10051,2024-04-21,Onion Rings,Side,5.0,1,London,Online
+10052,2024-01-30,Coffee,Beverage,3.0,1,Berlin,Online
+10053,2024-03-21,Cheesecake,Dessert,7.5,1,London,Card
+10054,2024-10-31,Pizza,Main,15.0,1,Madrid,Cash
+10055,2024-10-18,Pizza,Main,15.0,2,London,Online
+10056,2024-08-02,Pizza,Main,15.0,3,Paris,Card
+10057,2024-05-02,Coffee,Beverage,3.0,3,Berlin,Card
+10058,2024-08-22,Onion Rings,Side,5.0,3,London,Card
+10059,2024-11-14,Ice Cream,Dessert,6.0,1,London,Online
+10060,2024-09-16,Fries,Side,4.5,3,Madrid,Cash
+10061,2024-05-05,Pizza,Main,15.0,3,Paris,Card
+10062,2024-10-05,Ice Cream,Dessert,6.0,3,London,Online
+10063,2024-06-02,Cheesecake,Dessert,7.5,1,Madrid,Cash
+10064,2024-02-24,Pizza,Main,15.0,2,Paris,Cash
+10065,2024-06-24,Fries,Side,4.5,2,Paris,Online
+10066,2024-05-08,Ice Cream,Dessert,6.0,1,London,Online
+10067,2024-05-21,Soda,Beverage,2.5,1,London,Cash
+10068,2024-11-22,Salad,Main,9.5,3,Madrid,Online
+10069,2024-10-09,Ice Cream,Dessert,6.0,4,London,Card
+10070,2024-12-19,Pizza,Main,15.0,2,London,Cash
+10071,2024-03-16,Cheesecake,Dessert,7.5,4,Madrid,Card
+10072,2024-07-05,Onion Rings,Side,5.0,1,Paris,Card
+10073,2024-12-07,Fries,Side,4.5,1,Paris,Online
+10074,2024-11-13,Soda,Beverage,2.5,2,Madrid,Card
+10075,2024-07-30,Salad,Main,9.5,1,Madrid,Online
+10076,2024-07-29,Coffee,Beverage,3.0,2,Paris,Card
+10077,2024-07-14,Pizza,Main,15.0,1,Berlin,Card
+10078,2024-08-23,Fries,Side,4.5,3,Paris,Card
+10079,2024-01-13,Fries,Side,4.5,2,Berlin,Cash
+10080,2024-02-05,Onion Rings,Side,5.0,3,Paris,Online
+10081,2024-07-23,Cheesecake,Dessert,7.5,3,London,Card
+10082,2024-04-01,Onion Rings,Side,5.0,3,London,Card
+10083,2024-06-25,Soda,Beverage,2.5,3,Berlin,Online
+10084,2024-02-29,Cheesecake,Dessert,7.5,4,Madrid,Cash
+10085,2024-12-28,Burger,Main,12.0,4,London,Online
+10086,2024-12-17,Cheesecake,Dessert,7.5,2,Paris,Cash
+10087,2024-12-06,Pizza,Main,15.0,3,Paris,Online
+10088,2024-06-02,Pizza,Main,15.0,3,Berlin,Cash
+10089,2024-12-22,Soda,Beverage,2.5,3,Madrid,Card
+10090,2024-12-06,Soda,Beverage,2.5,4,Madrid,Online
+10091,2024-07-26,Onion Rings,Side,5.0,1,Paris,Cash
+10092,2024-08-08,Fries,Side,4.5,3,Berlin,Cash
+10093,2024-12-11,Ice Cream,Dessert,6.0,2,Berlin,Online
+10094,2024-12-03,Salad,Main,9.5,1,Paris,Online
+10095,2024-02-17,Coffee,Beverage,3.0,2,Paris,Card
+10096,2024-03-16,Fries,Side,4.5,1,London,Card
+10097,2024-11-08,Ice Cream,Dessert,6.0,1,Berlin,Cash
+10098,2024-12-22,Fries,Side,4.5,4,Berlin,Cash
+10099,2024-03-16,Fries,Side,4.5,1,London,Cash
+10100,2024-03-31,Fries,Side,4.5,4,London,Online
+10101,2024-03-03,Fries,Side,4.5,4,Madrid,Cash
+10102,2024-10-13,Cheesecake,Dessert,7.5,3,Berlin,Online
+10103,2024-08-06,Cheesecake,Dessert,7.5,4,Madrid,Online
+10104,2024-08-18,Ice Cream,Dessert,6.0,3,Madrid,Online
+10105,2024-09-23,Onion Rings,Side,5.0,4,Madrid,Cash
+10106,2024-02-09,Ice Cream,Dessert,6.0,3,Madrid,Cash
+10107,2024-06-12,Coffee,Beverage,3.0,1,Madrid,Card
+10108,2024-07-15,Fries,Side,4.5,2,Madrid,Card
+10109,2024-07-27,Soda,Beverage,2.5,3,Berlin,Cash
+10110,2024-04-15,Burger,Main,12.0,4,Berlin,Online
+10111,2024-10-21,Burger,Main,12.0,4,Berlin,Card
+10112,2024-06-01,Coffee,Beverage,3.0,4,Berlin,Online
+10113,2024-11-04,Cheesecake,Dessert,7.5,2,Berlin,Card
+10114,2024-08-11,Onion Rings,Side,5.0,4,London,Cash
+10115,2024-12-08,Coffee,Beverage,3.0,4,Madrid,Cash
+10116,2024-11-14,Salad,Main,9.5,1,Berlin,Online
+10117,2024-02-12,Burger,Main,12.0,4,Madrid,Cash
+10118,2024-01-26,Salad,Main,9.5,3,Berlin,Cash
+10119,2024-08-20,Fries,Side,4.5,3,Paris,Cash
+10120,2024-08-03,Onion Rings,Side,5.0,3,London,Cash
+10121,2024-10-03,Burger,Main,12.0,1,Paris,Card
+10122,2024-11-29,Pizza,Main,15.0,1,London,Card
+10123,2024-01-11,Fries,Side,4.5,2,Madrid,Card
+10124,2024-12-08,Ice Cream,Dessert,6.0,1,Madrid,Cash
+10125,2024-07-07,Onion Rings,Side,5.0,2,London,Card
+10126,2024-02-25,Onion Rings,Side,5.0,1,Paris,Online
+10127,2024-07-22,Soda,Beverage,2.5,2,London,Online
+10128,2024-02-22,Fries,Side,4.5,3,London,Online
+10129,2024-06-26,Burger,Main,12.0,4,Paris,Card
+10130,2024-11-27,Cheesecake,Dessert,7.5,3,London,Cash
+10131,2024-02-24,Ice Cream,Dessert,6.0,4,Paris,Online
+10132,2024-12-28,Ice Cream,Dessert,6.0,2,Berlin,Card
+10133,2024-11-29,Cheesecake,Dessert,7.5,3,Berlin,Cash
+10134,2024-10-30,Soda,Beverage,2.5,3,Paris,Card
+10135,2024-05-22,Pizza,Main,15.0,4,Madrid,Cash
+10136,2024-06-21,Soda,Beverage,2.5,1,Berlin,Cash
+10137,2024-09-06,Salad,Main,9.5,2,Paris,Cash
+10138,2024-05-23,Coffee,Beverage,3.0,3,London,Online
+10139,2024-02-13,Fries,Side,4.5,2,Berlin,Cash
+10140,2024-05-03,Cheesecake,Dessert,7.5,4,Berlin,Cash
+10141,2024-02-17,Burger,Main,12.0,3,Madrid,Cash
+10142,2024-06-05,Fries,Side,4.5,3,Berlin,Online
+10143,2024-06-25,Cheesecake,Dessert,7.5,4,Paris,Cash
+10144,2024-05-18,Ice Cream,Dessert,6.0,3,Paris,Card
+10145,2024-04-08,Pizza,Main,15.0,3,London,Online
+10146,2024-12-19,Cheesecake,Dessert,7.5,2,Madrid,Card
+10147,2024-05-21,Ice Cream,Dessert,6.0,3,London,Card
+10148,2024-04-26,Onion Rings,Side,5.0,3,Madrid,Cash
+10149,2024-12-28,Burger,Main,12.0,2,Paris,Card
+10150,2024-10-10,Burger,Main,12.0,3,Madrid,Online
+10151,2024-02-22,Ice Cream,Dessert,6.0,1,Paris,Cash
+10152,2024-08-13,Ice Cream,Dessert,6.0,3,Madrid,Card
+10153,2024-09-01,Onion Rings,Side,5.0,1,London,Cash
+10154,2024-02-07,Ice Cream,Dessert,6.0,1,Madrid,Card
+10155,2024-02-13,Onion Rings,Side,5.0,2,London,Online
+10156,2024-11-06,Soda,Beverage,2.5,2,Berlin,Cash
+10157,2024-06-01,Ice Cream,Dessert,6.0,4,Paris,Online
+10158,2024-11-08,Burger,Main,12.0,1,Madrid,Online
+10159,2024-05-15,Fries,Side,4.5,1,Madrid,Card
+10160,2024-10-09,Salad,Main,9.5,1,Madrid,Card
+10161,2024-08-18,Soda,Beverage,2.5,4,Paris,Card
+10162,2024-05-27,Fries,Side,4.5,3,Berlin,Card
+10163,2024-05-15,Fries,Side,4.5,2,Berlin,Card
+10164,2024-04-25,Cheesecake,Dessert,7.5,2,Paris,Card
+10165,2024-01-31,Pizza,Main,15.0,2,Paris,Online
+10166,2024-08-12,Onion Rings,Side,5.0,1,Berlin,Online
+10167,2024-12-24,Onion Rings,Side,5.0,4,Paris,Online
+10168,2024-09-09,Cheesecake,Dessert,7.5,4,London,Online
+10169,2024-08-09,Burger,Main,12.0,3,Paris,Card
+10170,2024-04-27,Pizza,Main,15.0,1,Paris,Online
+10171,2024-03-30,Burger,Main,12.0,4,Berlin,Cash
+10172,2024-10-26,Salad,Main,9.5,4,Berlin,Card
+10173,2024-06-27,Ice Cream,Dessert,6.0,4,Paris,Cash
+10174,2024-03-23,Pizza,Main,15.0,3,Berlin,Online
+10175,2024-05-27,Ice Cream,Dessert,6.0,4,London,Cash
+10176,2024-06-10,Pizza,Main,15.0,3,Paris,Card
+10177,2024-09-20,Soda,Beverage,2.5,1,Berlin,Cash
+10178,2024-04-06,Burger,Main,12.0,3,Berlin,Online
+10179,2024-01-27,Ice Cream,Dessert,6.0,2,Paris,Online
+10180,2024-05-27,Salad,Main,9.5,4,Berlin,Card
+10181,2024-11-18,Burger,Main,12.0,2,Madrid,Cash
+10182,2024-01-08,Cheesecake,Dessert,7.5,4,London,Card
+10183,2024-08-24,Pizza,Main,15.0,1,Madrid,Cash
+10184,2024-09-17,Onion Rings,Side,5.0,3,Berlin,Cash
+10185,2024-05-04,Ice Cream,Dessert,6.0,4,Madrid,Cash
+10186,2024-11-02,Fries,Side,4.5,2,London,Cash
+10187,2024-06-23,Soda,Beverage,2.5,3,London,Cash
+10188,2024-10-27,Onion Rings,Side,5.0,4,Madrid,Cash
+10189,2024-09-04,Cheesecake,Dessert,7.5,3,Paris,Online
+10190,2024-07-12,Cheesecake,Dessert,7.5,4,Paris,Card
+10191,2024-10-19,Fries,Side,4.5,4,Madrid,Cash
+10192,2024-06-11,Burger,Main,12.0,4,Berlin,Cash
+10193,2024-09-10,Salad,Main,9.5,1,Madrid,Online
+10194,2024-02-21,Coffee,Beverage,3.0,4,London,Online
+10195,2024-01-08,Ice Cream,Dessert,6.0,2,Berlin,Online
+10196,2024-02-08,Salad,Main,9.5,4,Paris,Cash
+10197,2024-11-28,Soda,Beverage,2.5,1,Paris,Online
+10198,2024-07-13,Cheesecake,Dessert,7.5,3,Berlin,Online
+10199,2024-11-12,Burger,Main,12.0,1,Madrid,Online
+10200,2024-04-26,Onion Rings,Side,5.0,1,Berlin,Card
+10201,2024-08-15,Pizza,Main,15.0,2,Paris,Card
+10202,2024-06-15,Burger,Main,12.0,1,Paris,Cash
+10203,2024-08-08,Coffee,Beverage,3.0,2,Madrid,Online
+10204,2024-10-16,Soda,Beverage,2.5,2,Madrid,Card
+10205,2024-11-08,Pizza,Main,15.0,4,Madrid,Cash
+10206,2024-04-28,Salad,Main,9.5,4,Paris,Cash
+10207,2024-12-07,Onion Rings,Side,5.0,1,Berlin,Cash
+10208,2024-03-21,Cheesecake,Dessert,7.5,1,Berlin,Cash
+10209,2024-11-23,Onion Rings,Side,5.0,4,Paris,Cash
+10210,2024-04-11,Onion Rings,Side,5.0,4,Berlin,Card
+10211,2024-07-14,Fries,Side,4.5,3,Paris,Online
+10212,2024-01-12,Onion Rings,Side,5.0,4,Paris,Card
+10213,2024-11-06,Burger,Main,12.0,4,Paris,Card
+10214,2024-04-22,Coffee,Beverage,3.0,2,Paris,Online
+10215,2024-11-17,Salad,Main,9.5,1,London,Cash
+10216,2024-01-18,Ice Cream,Dessert,6.0,3,Madrid,Card
+10217,2024-06-16,Onion Rings,Side,5.0,4,Madrid,Card
+10218,2024-10-03,Salad,Main,9.5,3,Paris,Card
+10219,2024-09-03,Onion Rings,Side,5.0,3,Paris,Card
+10220,2024-02-08,Ice Cream,Dessert,6.0,2,Madrid,Online
+10221,2024-10-12,Soda,Beverage,2.5,3,London,Cash
+10222,2024-05-15,Burger,Main,12.0,1,Berlin,Cash
+10223,2024-10-26,Onion Rings,Side,5.0,4,Paris,Card
+10224,2024-08-29,Fries,Side,4.5,1,Paris,Online
+10225,2024-11-27,Fries,Side,4.5,1,Berlin,Online
+10226,2024-11-28,Onion Rings,Side,5.0,4,London,Card
+10227,2024-01-20,Burger,Main,12.0,3,Berlin,Card
+10228,2024-04-30,Pizza,Main,15.0,2,Berlin,Cash
+10229,2024-12-09,Coffee,Beverage,3.0,4,Madrid,Cash
+10230,2024-09-07,Pizza,Main,15.0,4,Paris,Card
+10231,2024-04-21,Coffee,Beverage,3.0,4,Berlin,Card
+10232,2024-02-20,Coffee,Beverage,3.0,3,Paris,Card
+10233,2024-05-21,Soda,Beverage,2.5,2,London,Cash
+10234,2024-12-05,Pizza,Main,15.0,2,London,Card
+10235,2024-05-04,Coffee,Beverage,3.0,2,Madrid,Card
+10236,2024-04-16,Cheesecake,Dessert,7.5,2,Madrid,Cash
+10237,2024-11-01,Salad,Main,9.5,1,Paris,Card
+10238,2024-10-03,Salad,Main,9.5,3,Madrid,Card
+10239,2024-03-08,Burger,Main,12.0,1,Paris,Card
+10240,2024-01-09,Coffee,Beverage,3.0,2,Paris,Card
+10241,2024-08-03,Salad,Main,9.5,1,London,Cash
+10242,2024-07-04,Ice Cream,Dessert,6.0,1,Berlin,Online
+10243,2024-11-10,Fries,Side,4.5,1,Paris,Cash
+10244,2024-02-01,Burger,Main,12.0,4,Berlin,Cash
+10245,2024-09-08,Pizza,Main,15.0,4,London,Card
+10246,2024-11-07,Coffee,Beverage,3.0,2,London,Card
+10247,2024-11-15,Onion Rings,Side,5.0,3,Berlin,Online
+10248,2024-05-30,Cheesecake,Dessert,7.5,4,Berlin,Card
+10249,2024-12-01,Pizza,Main,15.0,2,Berlin,Cash
+10250,2024-07-30,Fries,Side,4.5,3,Berlin,Cash
+10251,2024-02-18,Soda,Beverage,2.5,3,Berlin,Cash
+10252,2024-07-10,Onion Rings,Side,5.0,2,Berlin,Card
+10253,2024-02-13,Pizza,Main,15.0,1,Berlin,Card
+10254,2024-03-07,Coffee,Beverage,3.0,1,Paris,Online
+10255,2024-07-29,Pizza,Main,15.0,3,Berlin,Online
+10256,2024-05-27,Burger,Main,12.0,3,Paris,Card
+10257,2024-04-18,Cheesecake,Dessert,7.5,2,Berlin,Card
+10258,2024-06-28,Pizza,Main,15.0,3,London,Cash
+10259,2024-08-07,Fries,Side,4.5,1,Paris,Card
+10260,2024-05-19,Salad,Main,9.5,3,Paris,Cash
+10261,2024-04-02,Burger,Main,12.0,2,Berlin,Card
+10262,2024-11-20,Salad,Main,9.5,1,London,Online
+10263,2024-04-20,Cheesecake,Dessert,7.5,4,Berlin,Cash
+10264,2024-03-21,Coffee,Beverage,3.0,3,Paris,Online
+10265,2024-10-17,Coffee,Beverage,3.0,1,London,Card
+10266,2024-11-12,Salad,Main,9.5,1,London,Cash
+10267,2024-12-04,Ice Cream,Dessert,6.0,4,Berlin,Online
+10268,2024-07-31,Ice Cream,Dessert,6.0,3,Madrid,Online
+10269,2024-06-25,Pizza,Main,15.0,4,London,Cash
+10270,2024-09-26,Ice Cream,Dessert,6.0,3,London,Card
+10271,2024-11-02,Soda,Beverage,2.5,1,London,Card
+10272,2024-04-18,Onion Rings,Side,5.0,2,Paris,Cash
+10273,2024-03-02,Coffee,Beverage,3.0,1,Berlin,Online
+10274,2024-03-30,Soda,Beverage,2.5,2,Berlin,Online
+10275,2024-09-13,Fries,Side,4.5,3,London,Cash
+10276,2024-08-11,Burger,Main,12.0,1,Berlin,Card
+10277,2024-10-21,Coffee,Beverage,3.0,4,Berlin,Online
+10278,2024-05-28,Soda,Beverage,2.5,1,Berlin,Card
+10279,2024-03-28,Coffee,Beverage,3.0,4,Paris,Card
+10280,2024-02-24,Soda,Beverage,2.5,2,Berlin,Online
+10281,2024-09-25,Soda,Beverage,2.5,1,Berlin,Cash
+10282,2024-04-23,Coffee,Beverage,3.0,3,Madrid,Card
+10283,2024-11-20,Cheesecake,Dessert,7.5,1,Madrid,Cash
+10284,2024-11-26,Coffee,Beverage,3.0,2,Madrid,Card
+10285,2024-05-11,Salad,Main,9.5,2,Madrid,Online
+10286,2024-12-01,Salad,Main,9.5,1,Madrid,Online
+10287,2024-08-25,Ice Cream,Dessert,6.0,4,Paris,Online
+10288,2024-03-18,Coffee,Beverage,3.0,4,London,Cash
+10289,2024-11-19,Ice Cream,Dessert,6.0,3,Paris,Online
+10290,2024-06-29,Burger,Main,12.0,1,Paris,Cash
+10291,2024-01-20,Ice Cream,Dessert,6.0,1,Paris,Cash
+10292,2024-11-26,Pizza,Main,15.0,1,Berlin,Cash
+10293,2024-01-22,Cheesecake,Dessert,7.5,4,Madrid,Cash
+10294,2024-09-13,Ice Cream,Dessert,6.0,2,London,Cash
+10295,2024-06-24,Pizza,Main,15.0,1,Madrid,Card
+10296,2024-12-28,Fries,Side,4.5,4,Berlin,Online
+10297,2024-11-08,Cheesecake,Dessert,7.5,2,Paris,Cash
+10298,2024-07-17,Onion Rings,Side,5.0,4,Paris,Online
+10299,2024-11-19,Burger,Main,12.0,3,London,Cash
+10300,2024-10-12,Pizza,Main,15.0,4,Paris,Cash
+10301,2024-06-19,Salad,Main,9.5,1,Madrid,Cash
+10302,2024-12-01,Onion Rings,Side,5.0,4,Madrid,Online
+10303,2024-06-07,Pizza,Main,15.0,4,Paris,Card
+10304,2024-02-17,Cheesecake,Dessert,7.5,4,Paris,Card
+10305,2024-06-07,Coffee,Beverage,3.0,2,Madrid,Cash
+10306,2024-04-08,Ice Cream,Dessert,6.0,2,Madrid,Card
+10307,2024-05-31,Pizza,Main,15.0,1,London,Online
+10308,2024-11-12,Coffee,Beverage,3.0,2,Berlin,Card
+10309,2024-04-02,Salad,Main,9.5,2,Berlin,Card
+10310,2024-07-05,Soda,Beverage,2.5,2,Berlin,Online
+10311,2024-08-17,Onion Rings,Side,5.0,2,Madrid,Cash
+10312,2024-04-09,Ice Cream,Dessert,6.0,3,Berlin,Cash
+10313,2024-07-14,Onion Rings,Side,5.0,4,Madrid,Card
+10314,2024-05-08,Salad,Main,9.5,1,Berlin,Cash
+10315,2024-02-22,Cheesecake,Dessert,7.5,1,Paris,Card
+10316,2024-05-19,Salad,Main,9.5,4,Madrid,Cash
+10317,2024-04-23,Pizza,Main,15.0,4,Paris,Card
+10318,2024-01-28,Soda,Beverage,2.5,4,Paris,Card
+10319,2024-02-11,Soda,Beverage,2.5,3,Madrid,Card
+10320,2024-02-20,Coffee,Beverage,3.0,3,Madrid,Card
+10321,2024-05-26,Burger,Main,12.0,4,Madrid,Online
+10322,2024-08-17,Ice Cream,Dessert,6.0,1,London,Card
+10323,2024-04-20,Onion Rings,Side,5.0,2,Berlin,Card
+10324,2024-05-01,Onion Rings,Side,5.0,3,London,Card
+10325,2024-08-02,Fries,Side,4.5,4,London,Card
+10326,2024-11-01,Ice Cream,Dessert,6.0,1,Madrid,Online
+10327,2024-05-29,Salad,Main,9.5,4,London,Online
+10328,2024-05-03,Coffee,Beverage,3.0,4,Madrid,Online
+10329,2024-09-25,Pizza,Main,15.0,3,London,Online
+10330,2024-09-16,Cheesecake,Dessert,7.5,1,Berlin,Cash
+10331,2024-11-21,Burger,Main,12.0,4,Paris,Cash
+10332,2024-07-01,Burger,Main,12.0,1,Paris,Card
+10333,2024-10-24,Pizza,Main,15.0,3,Madrid,Card
+10334,2024-10-06,Coffee,Beverage,3.0,3,Madrid,Online
+10335,2024-12-22,Ice Cream,Dessert,6.0,4,Madrid,Card
+10336,2024-08-22,Pizza,Main,15.0,1,Paris,Card
+10337,2024-04-12,Burger,Main,12.0,1,Paris,Cash
+10338,2024-07-22,Cheesecake,Dessert,7.5,4,Paris,Card
+10339,2024-05-26,Fries,Side,4.5,3,London,Online
+10340,2024-05-19,Coffee,Beverage,3.0,1,Paris,Cash
+10341,2024-08-13,Soda,Beverage,2.5,4,Paris,Card
+10342,2024-12-20,Ice Cream,Dessert,6.0,4,Paris,Online
+10343,2024-02-12,Onion Rings,Side,5.0,4,London,Cash
+10344,2024-10-06,Salad,Main,9.5,3,Paris,Card
+10345,2024-06-16,Pizza,Main,15.0,3,Paris,Cash
+10346,2024-03-26,Soda,Beverage,2.5,4,Paris,Cash
+10347,2024-06-29,Burger,Main,12.0,4,Paris,Online
+10348,2024-02-08,Burger,Main,12.0,4,Paris,Online
+10349,2024-01-16,Salad,Main,9.5,2,Berlin,Card
+10350,2024-02-04,Salad,Main,9.5,2,Paris,Cash
+10351,2024-10-17,Soda,Beverage,2.5,1,Madrid,Online
+10352,2024-07-08,Ice Cream,Dessert,6.0,3,Berlin,Card
+10353,2024-09-28,Salad,Main,9.5,3,Berlin,Cash
+10354,2024-05-07,Onion Rings,Side,5.0,1,London,Online
+10355,2024-09-12,Salad,Main,9.5,4,London,Cash
+10356,2024-12-26,Onion Rings,Side,5.0,4,Madrid,Online
+10357,2024-12-21,Onion Rings,Side,5.0,4,Madrid,Card
+10358,2024-02-07,Salad,Main,9.5,4,Madrid,Online
+10359,2024-02-14,Ice Cream,Dessert,6.0,3,Paris,Online
+10360,2024-10-08,Pizza,Main,15.0,3,Paris,Card
+10361,2024-07-04,Salad,Main,9.5,2,London,Card
+10362,2024-05-01,Salad,Main,9.5,4,London,Cash
+10363,2024-10-20,Cheesecake,Dessert,7.5,3,Berlin,Online
+10364,2024-11-09,Salad,Main,9.5,1,London,Cash
+10365,2024-09-02,Soda,Beverage,2.5,4,Berlin,Online
+10366,2024-03-05,Pizza,Main,15.0,3,London,Cash
+10367,2024-12-14,Ice Cream,Dessert,6.0,3,Madrid,Online
+10368,2024-03-07,Salad,Main,9.5,4,London,Card
+10369,2024-03-19,Cheesecake,Dessert,7.5,3,Madrid,Card
+10370,2024-12-29,Coffee,Beverage,3.0,2,Paris,Online
+10371,2024-02-10,Onion Rings,Side,5.0,3,Madrid,Online
+10372,2024-05-20,Cheesecake,Dessert,7.5,2,Paris,Online
+10373,2024-02-17,Cheesecake,Dessert,7.5,2,Madrid,Card
+10374,2024-10-15,Coffee,Beverage,3.0,1,London,Card
+10375,2024-11-24,Burger,Main,12.0,3,Madrid,Online
+10376,2024-11-12,Soda,Beverage,2.5,1,Berlin,Online
+10377,2024-05-28,Cheesecake,Dessert,7.5,3,Berlin,Card
+10378,2024-06-01,Soda,Beverage,2.5,4,London,Online
+10379,2024-03-21,Burger,Main,12.0,4,Berlin,Cash
+10380,2024-04-14,Ice Cream,Dessert,6.0,3,Madrid,Cash
+10381,2024-06-25,Coffee,Beverage,3.0,4,Madrid,Cash
+10382,2024-10-14,Cheesecake,Dessert,7.5,1,Paris,Card
+10383,2024-03-03,Ice Cream,Dessert,6.0,3,Berlin,Card
+10384,2024-02-19,Salad,Main,9.5,1,Paris,Cash
+10385,2024-05-07,Soda,Beverage,2.5,2,Paris,Online
+10386,2024-04-07,Coffee,Beverage,3.0,2,Berlin,Online
+10387,2024-09-12,Ice Cream,Dessert,6.0,3,Berlin,Card
+10388,2024-07-20,Pizza,Main,15.0,4,Madrid,Card
+10389,2024-01-25,Coffee,Beverage,3.0,1,Paris,Cash
+10390,2024-05-26,Ice Cream,Dessert,6.0,1,London,Cash
+10391,2024-05-15,Salad,Main,9.5,3,Berlin,Cash
+10392,2024-07-24,Burger,Main,12.0,1,Madrid,Cash
+10393,2024-05-27,Cheesecake,Dessert,7.5,1,Berlin,Online
+10394,2024-10-08,Ice Cream,Dessert,6.0,3,London,Card
+10395,2024-07-20,Pizza,Main,15.0,3,Paris,Online
+10396,2024-03-14,Coffee,Beverage,3.0,2,Berlin,Online
+10397,2024-01-24,Burger,Main,12.0,1,Madrid,Online
+10398,2024-08-30,Coffee,Beverage,3.0,4,Madrid,Online
+10399,2024-03-12,Cheesecake,Dessert,7.5,3,Paris,Card
+10400,2024-11-11,Soda,Beverage,2.5,3,Paris,Online
+10401,2024-09-29,Cheesecake,Dessert,7.5,4,Paris,Cash
+10402,2024-07-07,Burger,Main,12.0,3,London,Cash
+10403,2024-12-18,Onion Rings,Side,5.0,1,Berlin,Cash
+10404,2024-01-27,Fries,Side,4.5,4,Madrid,Online
+10405,2024-03-16,Soda,Beverage,2.5,2,London,Online
+10406,2024-04-07,Pizza,Main,15.0,1,Berlin,Cash
+10407,2024-03-18,Soda,Beverage,2.5,4,Madrid,Cash
+10408,2024-11-09,Cheesecake,Dessert,7.5,4,London,Online
+10409,2024-09-22,Salad,Main,9.5,2,Paris,Online
+10410,2024-09-26,Ice Cream,Dessert,6.0,4,Paris,Card
+10411,2024-09-29,Ice Cream,Dessert,6.0,3,Paris,Online
+10412,2024-11-08,Onion Rings,Side,5.0,4,Madrid,Card
+10413,2024-10-12,Onion Rings,Side,5.0,3,Madrid,Cash
+10414,2024-12-26,Onion Rings,Side,5.0,2,Berlin,Cash
+10415,2024-06-27,Ice Cream,Dessert,6.0,3,Paris,Card
+10416,2024-07-13,Cheesecake,Dessert,7.5,4,Paris,Card
+10417,2024-01-22,Onion Rings,Side,5.0,3,London,Cash
+10418,2024-12-01,Ice Cream,Dessert,6.0,3,Berlin,Card
+10419,2024-10-02,Fries,Side,4.5,3,Paris,Card
+10420,2024-11-11,Pizza,Main,15.0,2,Madrid,Card
+10421,2024-04-25,Cheesecake,Dessert,7.5,2,London,Card
+10422,2024-06-18,Soda,Beverage,2.5,4,London,Online
+10423,2024-01-03,Salad,Main,9.5,2,Berlin,Online
+10424,2024-09-01,Ice Cream,Dessert,6.0,2,Paris,Cash
+10425,2024-11-26,Onion Rings,Side,5.0,1,London,Online
+10426,2024-09-30,Fries,Side,4.5,1,Madrid,Cash
+10427,2024-01-19,Salad,Main,9.5,4,Berlin,Card
+10428,2024-01-20,Onion Rings,Side,5.0,1,Paris,Online
+10429,2024-06-20,Pizza,Main,15.0,3,Berlin,Online
+10430,2024-09-25,Cheesecake,Dessert,7.5,4,Madrid,Online
+10431,2024-05-19,Ice Cream,Dessert,6.0,2,London,Cash
+10432,2024-08-22,Salad,Main,9.5,3,Madrid,Card
+10433,2024-05-31,Coffee,Beverage,3.0,2,Madrid,Online
+10434,2024-08-06,Soda,Beverage,2.5,3,London,Cash
+10435,2024-04-04,Pizza,Main,15.0,2,Berlin,Cash
+10436,2024-01-04,Fries,Side,4.5,3,Berlin,Card
+10437,2024-05-16,Ice Cream,Dessert,6.0,3,Paris,Online
+10438,2024-05-13,Burger,Main,12.0,3,Madrid,Card
+10439,2024-08-26,Pizza,Main,15.0,3,Madrid,Cash
+10440,2024-12-26,Cheesecake,Dessert,7.5,3,London,Online
+10441,2024-07-07,Onion Rings,Side,5.0,2,Madrid,Card
+10442,2024-03-19,Ice Cream,Dessert,6.0,4,Paris,Cash
+10443,2024-08-29,Cheesecake,Dessert,7.5,2,Madrid,Online
+10444,2024-09-26,Pizza,Main,15.0,4,Paris,Card
+10445,2024-02-01,Pizza,Main,15.0,2,Madrid,Card
+10446,2024-09-23,Coffee,Beverage,3.0,4,London,Online
+10447,2024-10-25,Fries,Side,4.5,4,London,Online
+10448,2024-01-29,Ice Cream,Dessert,6.0,4,Madrid,Online
+10449,2024-08-21,Soda,Beverage,2.5,1,Berlin,Online
+10450,2024-01-12,Onion Rings,Side,5.0,4,Paris,Card
+10451,2024-10-23,Fries,Side,4.5,1,London,Cash
+10452,2024-12-24,Coffee,Beverage,3.0,1,London,Card
+10453,2024-01-17,Ice Cream,Dessert,6.0,3,Berlin,Card
+10454,2024-11-24,Salad,Main,9.5,4,Paris,Cash
+10455,2024-07-12,Ice Cream,Dessert,6.0,4,London,Online
+10456,2024-03-09,Cheesecake,Dessert,7.5,3,London,Card
+10457,2024-07-20,Cheesecake,Dessert,7.5,2,Madrid,Card
+10458,2024-06-01,Burger,Main,12.0,4,Berlin,Online
+10459,2024-04-27,Soda,Beverage,2.5,2,Berlin,Cash
+10460,2024-05-21,Salad,Main,9.5,2,London,Card
+10461,2024-11-10,Soda,Beverage,2.5,1,Madrid,Card
+10462,2024-02-21,Pizza,Main,15.0,1,Berlin,Online
+10463,2024-05-05,Burger,Main,12.0,1,Berlin,Cash
+10464,2024-10-03,Fries,Side,4.5,2,London,Card
+10465,2024-05-28,Cheesecake,Dessert,7.5,2,Paris,Online
+10466,2024-05-01,Coffee,Beverage,3.0,3,Madrid,Online
+10467,2024-04-23,Cheesecake,Dessert,7.5,4,Paris,Cash
+10468,2024-10-12,Burger,Main,12.0,2,Berlin,Online
+10469,2024-01-25,Ice Cream,Dessert,6.0,3,Berlin,Online
+10470,2024-12-22,Coffee,Beverage,3.0,4,Berlin,Card
+10471,2024-07-11,Onion Rings,Side,5.0,2,Berlin,Card
+10472,2024-06-02,Fries,Side,4.5,2,Berlin,Card
+10473,2024-07-30,Cheesecake,Dessert,7.5,4,Madrid,Cash
+10474,2024-05-10,Fries,Side,4.5,2,Paris,Online
+10475,2024-08-18,Pizza,Main,15.0,3,London,Online
+10476,2024-01-27,Fries,Side,4.5,3,Berlin,Online
+10477,2024-02-07,Burger,Main,12.0,2,Madrid,Cash
+10478,2024-06-19,Fries,Side,4.5,3,London,Card
+10479,2024-03-01,Fries,Side,4.5,4,Madrid,Online
+10480,2024-07-22,Fries,Side,4.5,2,Paris,Cash
+10481,2024-08-26,Soda,Beverage,2.5,3,Paris,Cash
+10482,2024-09-19,Coffee,Beverage,3.0,4,Berlin,Card
+10483,2024-06-12,Ice Cream,Dessert,6.0,2,Paris,Cash
+10484,2024-01-24,Soda,Beverage,2.5,2,Madrid,Card
+10485,2024-10-10,Onion Rings,Side,5.0,4,Paris,Card
+10486,2024-06-17,Fries,Side,4.5,2,Berlin,Online
+10487,2024-09-12,Fries,Side,4.5,3,Paris,Cash
+10488,2024-08-23,Ice Cream,Dessert,6.0,2,Paris,Card
+10489,2024-10-06,Salad,Main,9.5,4,Madrid,Online
+10490,2024-09-25,Burger,Main,12.0,1,London,Online
+10491,2024-01-04,Burger,Main,12.0,4,Madrid,Online
+10492,2024-02-04,Fries,Side,4.5,2,London,Card
+10493,2024-08-21,Cheesecake,Dessert,7.5,3,London,Online
+10494,2024-12-03,Ice Cream,Dessert,6.0,4,London,Card
+10495,2024-10-09,Cheesecake,Dessert,7.5,4,London,Card
+10496,2024-05-20,Cheesecake,Dessert,7.5,3,London,Online
+10497,2024-04-01,Soda,Beverage,2.5,1,London,Online
+10498,2024-05-03,Salad,Main,9.5,2,Paris,Cash
+10499,2024-07-22,Onion Rings,Side,5.0,1,Paris,Cash
+10500,2024-10-16,Ice Cream,Dessert,6.0,2,Madrid,Cash
+10501,2024-11-30,Pizza,Main,15.0,1,London,Cash
+10502,2024-07-12,Soda,Beverage,2.5,4,London,Online
+10503,2024-12-25,Burger,Main,12.0,2,London,Cash
+10504,2024-11-26,Soda,Beverage,2.5,3,London,Online
+10505,2024-04-27,Burger,Main,12.0,2,Berlin,Cash
+10506,2024-02-08,Burger,Main,12.0,3,London,Card
+10507,2024-01-09,Coffee,Beverage,3.0,2,Madrid,Online
+10508,2024-02-09,Soda,Beverage,2.5,3,Madrid,Online
+10509,2024-10-17,Fries,Side,4.5,4,Paris,Cash
+10510,2024-12-18,Salad,Main,9.5,1,Paris,Card
+10511,2024-08-11,Pizza,Main,15.0,2,London,Cash
+10512,2024-06-16,Soda,Beverage,2.5,1,Paris,Cash
+10513,2024-04-26,Ice Cream,Dessert,6.0,3,Berlin,Cash
+10514,2024-12-14,Salad,Main,9.5,4,London,Online
+10515,2024-05-06,Onion Rings,Side,5.0,1,London,Cash
+10516,2024-07-13,Salad,Main,9.5,2,Berlin,Cash
+10517,2024-02-24,Coffee,Beverage,3.0,1,London,Cash
+10518,2024-07-03,Ice Cream,Dessert,6.0,3,London,Card
+10519,2024-04-05,Pizza,Main,15.0,4,Berlin,Online
+10520,2024-09-19,Cheesecake,Dessert,7.5,4,London,Card
+10521,2024-06-30,Pizza,Main,15.0,1,Paris,Cash
+10522,2024-05-29,Burger,Main,12.0,4,Berlin,Card
+10523,2024-05-04,Cheesecake,Dessert,7.5,2,Berlin,Card
+10524,2024-05-17,Salad,Main,9.5,3,Paris,Cash
+10525,2024-02-02,Salad,Main,9.5,2,Berlin,Cash
+10526,2024-06-02,Soda,Beverage,2.5,4,London,Cash
+10527,2024-05-06,Onion Rings,Side,5.0,4,Madrid,Cash
+10528,2024-03-10,Pizza,Main,15.0,3,London,Cash
+10529,2024-11-13,Coffee,Beverage,3.0,4,Paris,Cash
+10530,2024-08-08,Coffee,Beverage,3.0,2,Paris,Cash
+10531,2024-09-02,Fries,Side,4.5,3,Madrid,Cash
+10532,2024-05-29,Coffee,Beverage,3.0,4,Madrid,Cash
+10533,2024-05-23,Soda,Beverage,2.5,4,Paris,Card
+10534,2024-10-30,Fries,Side,4.5,2,London,Online
+10535,2024-12-28,Ice Cream,Dessert,6.0,2,Berlin,Cash
+10536,2024-07-28,Pizza,Main,15.0,4,Madrid,Online
+10537,2024-05-03,Onion Rings,Side,5.0,3,Madrid,Online
+10538,2024-07-12,Soda,Beverage,2.5,1,Berlin,Online
+10539,2024-10-25,Ice Cream,Dessert,6.0,4,Berlin,Online
+10540,2024-07-03,Burger,Main,12.0,1,London,Card
+10541,2024-03-26,Coffee,Beverage,3.0,1,Berlin,Cash
+10542,2024-02-24,Soda,Beverage,2.5,1,London,Cash
+10543,2024-09-18,Fries,Side,4.5,2,Berlin,Cash
+10544,2024-08-25,Soda,Beverage,2.5,2,Paris,Card
+10545,2024-02-23,Ice Cream,Dessert,6.0,3,Berlin,Card
+10546,2024-03-13,Pizza,Main,15.0,3,Paris,Cash
+10547,2024-04-15,Ice Cream,Dessert,6.0,4,Paris,Cash
+10548,2024-08-12,Pizza,Main,15.0,4,Paris,Card
+10549,2024-01-23,Onion Rings,Side,5.0,1,London,Cash
+10550,2024-12-12,Pizza,Main,15.0,2,Madrid,Online
+10551,2024-10-09,Salad,Main,9.5,2,Paris,Online
+10552,2024-08-24,Soda,Beverage,2.5,2,Berlin,Online
+10553,2024-04-05,Salad,Main,9.5,4,Berlin,Card
+10554,2024-08-18,Fries,Side,4.5,4,Berlin,Card
+10555,2024-04-15,Fries,Side,4.5,3,London,Online
+10556,2024-10-01,Pizza,Main,15.0,2,Paris,Cash
+10557,2024-08-22,Fries,Side,4.5,1,Paris,Online
+10558,2024-09-27,Ice Cream,Dessert,6.0,3,Berlin,Online
+10559,2024-10-27,Soda,Beverage,2.5,1,Paris,Cash
+10560,2024-11-12,Ice Cream,Dessert,6.0,2,Paris,Online
+10561,2024-12-10,Pizza,Main,15.0,2,Paris,Card
+10562,2024-06-05,Fries,Side,4.5,1,Madrid,Cash
+10563,2024-09-18,Salad,Main,9.5,4,Berlin,Online
+10564,2024-10-21,Salad,Main,9.5,4,Berlin,Card
+10565,2024-11-21,Ice Cream,Dessert,6.0,2,Madrid,Cash
+10566,2024-03-12,Onion Rings,Side,5.0,2,Paris,Cash
+10567,2024-07-02,Burger,Main,12.0,1,Berlin,Card
+10568,2024-07-15,Fries,Side,4.5,4,Berlin,Online
+10569,2024-07-31,Ice Cream,Dessert,6.0,4,Berlin,Card
+10570,2024-10-16,Pizza,Main,15.0,1,Madrid,Cash
+10571,2024-05-20,Burger,Main,12.0,2,Paris,Card
+10572,2024-10-16,Ice Cream,Dessert,6.0,4,London,Online
+10573,2024-05-17,Pizza,Main,15.0,3,London,Online
+10574,2024-10-06,Ice Cream,Dessert,6.0,2,Berlin,Card
+10575,2024-06-01,Fries,Side,4.5,1,Berlin,Cash
+10576,2024-02-14,Coffee,Beverage,3.0,4,London,Card
+10577,2024-10-28,Fries,Side,4.5,3,Berlin,Card
+10578,2024-04-15,Salad,Main,9.5,2,London,Online
+10579,2024-09-29,Coffee,Beverage,3.0,3,Madrid,Cash
+10580,2024-05-28,Onion Rings,Side,5.0,3,London,Card
+10581,2024-01-31,Soda,Beverage,2.5,3,Madrid,Online
+10582,2024-05-07,Salad,Main,9.5,2,Paris,Card
+10583,2024-09-07,Soda,Beverage,2.5,2,Paris,Online
+10584,2024-07-11,Soda,Beverage,2.5,4,London,Online
+10585,2024-07-25,Pizza,Main,15.0,3,Paris,Cash
+10586,2024-06-16,Ice Cream,Dessert,6.0,1,London,Online
+10587,2024-11-21,Ice Cream,Dessert,6.0,3,London,Online
+10588,2024-04-21,Soda,Beverage,2.5,4,Madrid,Cash
+10589,2024-06-14,Onion Rings,Side,5.0,3,Paris,Online
+10590,2024-10-16,Salad,Main,9.5,4,Paris,Online
+10591,2024-01-24,Burger,Main,12.0,1,Berlin,Card
+10592,2024-03-21,Pizza,Main,15.0,4,Berlin,Card
+10593,2024-04-13,Soda,Beverage,2.5,2,Paris,Card
+10594,2024-02-17,Onion Rings,Side,5.0,3,Paris,Card
+10595,2024-12-06,Coffee,Beverage,3.0,2,London,Cash
+10596,2024-12-24,Onion Rings,Side,5.0,2,Berlin,Online
+10597,2024-12-26,Pizza,Main,15.0,1,London,Card
+10598,2024-02-09,Ice Cream,Dessert,6.0,2,Madrid,Online
+10599,2024-01-05,Ice Cream,Dessert,6.0,1,Paris,Card
+10600,2024-12-21,Soda,Beverage,2.5,2,Berlin,Card
+10601,2024-07-15,Fries,Side,4.5,1,London,Card
+10602,2024-07-07,Coffee,Beverage,3.0,3,Madrid,Cash
+10603,2024-11-24,Salad,Main,9.5,2,London,Online
+10604,2024-11-08,Burger,Main,12.0,2,Berlin,Cash
+10605,2024-11-17,Fries,Side,4.5,2,Berlin,Online
+10606,2024-04-21,Ice Cream,Dessert,6.0,1,London,Card
+10607,2024-10-28,Pizza,Main,15.0,4,Paris,Cash
+10608,2024-03-12,Coffee,Beverage,3.0,2,Paris,Online
+10609,2024-05-07,Pizza,Main,15.0,3,London,Online
+10610,2024-04-15,Onion Rings,Side,5.0,2,Berlin,Cash
+10611,2024-05-02,Burger,Main,12.0,4,Berlin,Card
+10612,2024-09-12,Fries,Side,4.5,1,London,Cash
+10613,2024-03-08,Coffee,Beverage,3.0,4,Berlin,Cash
+10614,2024-12-15,Cheesecake,Dessert,7.5,2,Berlin,Card
+10615,2024-10-27,Burger,Main,12.0,1,London,Cash
+10616,2024-01-21,Fries,Side,4.5,1,Berlin,Online
+10617,2024-11-17,Onion Rings,Side,5.0,4,Berlin,Online
+10618,2024-02-12,Soda,Beverage,2.5,2,Paris,Card
+10619,2024-02-10,Onion Rings,Side,5.0,2,Madrid,Online
+10620,2024-07-19,Coffee,Beverage,3.0,1,Paris,Online
+10621,2024-05-02,Soda,Beverage,2.5,1,Madrid,Card
+10622,2024-02-29,Soda,Beverage,2.5,4,London,Cash
+10623,2024-03-02,Salad,Main,9.5,1,Madrid,Online
+10624,2024-03-24,Burger,Main,12.0,4,Paris,Online
+10625,2024-05-12,Cheesecake,Dessert,7.5,2,Paris,Card
+10626,2024-03-01,Onion Rings,Side,5.0,1,Paris,Cash
+10627,2024-09-25,Onion Rings,Side,5.0,1,Paris,Online
+10628,2024-09-11,Pizza,Main,15.0,4,Paris,Card
+10629,2024-10-17,Ice Cream,Dessert,6.0,2,Paris,Card
+10630,2024-02-22,Onion Rings,Side,5.0,1,Madrid,Online
+10631,2024-01-02,Cheesecake,Dessert,7.5,1,London,Card
+10632,2024-08-29,Burger,Main,12.0,3,Berlin,Card
+10633,2024-01-19,Salad,Main,9.5,4,Madrid,Cash
+10634,2024-08-01,Fries,Side,4.5,3,Paris,Card
+10635,2024-03-02,Coffee,Beverage,3.0,1,Madrid,Card
+10636,2024-01-24,Cheesecake,Dessert,7.5,4,London,Cash
+10637,2024-06-08,Onion Rings,Side,5.0,3,London,Online
+10638,2024-01-05,Ice Cream,Dessert,6.0,3,Madrid,Cash
+10639,2024-11-14,Onion Rings,Side,5.0,2,Berlin,Cash
+10640,2024-04-10,Ice Cream,Dessert,6.0,2,Madrid,Card
+10641,2024-01-13,Soda,Beverage,2.5,2,Paris,Online
+10642,2024-06-20,Burger,Main,12.0,1,Berlin,Online
+10643,2024-02-23,Onion Rings,Side,5.0,2,Madrid,Cash
+10644,2024-01-31,Ice Cream,Dessert,6.0,2,Paris,Card
+10645,2024-04-28,Burger,Main,12.0,4,Paris,Cash
+10646,2024-10-24,Pizza,Main,15.0,1,Madrid,Online
+10647,2024-02-08,Soda,Beverage,2.5,1,Berlin,Online
+10648,2024-05-01,Salad,Main,9.5,3,Paris,Cash
+10649,2024-12-24,Soda,Beverage,2.5,3,Paris,Cash
+10650,2024-04-29,Onion Rings,Side,5.0,1,Madrid,Card
+10651,2024-03-20,Pizza,Main,15.0,1,Madrid,Cash
+10652,2024-06-09,Ice Cream,Dessert,6.0,4,London,Online
+10653,2024-04-16,Coffee,Beverage,3.0,4,Paris,Cash
+10654,2024-03-02,Onion Rings,Side,5.0,1,Madrid,Online
+10655,2024-12-26,Onion Rings,Side,5.0,1,Madrid,Cash
+10656,2024-02-16,Salad,Main,9.5,2,Paris,Cash
+10657,2024-01-26,Cheesecake,Dessert,7.5,3,Paris,Card
+10658,2024-07-26,Burger,Main,12.0,4,Madrid,Card
+10659,2024-02-22,Ice Cream,Dessert,6.0,2,London,Card
+10660,2024-04-23,Burger,Main,12.0,2,Madrid,Cash
+10661,2024-12-17,Coffee,Beverage,3.0,1,Paris,Card
+10662,2024-02-03,Burger,Main,12.0,2,Berlin,Card
+10663,2024-06-18,Pizza,Main,15.0,1,London,Cash
+10664,2024-03-27,Burger,Main,12.0,4,Berlin,Cash
+10665,2024-07-14,Burger,Main,12.0,4,Madrid,Cash
+10666,2024-04-05,Fries,Side,4.5,3,Paris,Cash
+10667,2024-01-18,Salad,Main,9.5,2,Paris,Cash
+10668,2024-10-08,Soda,Beverage,2.5,4,London,Card
+10669,2024-07-15,Onion Rings,Side,5.0,2,Berlin,Card
+10670,2024-05-07,Cheesecake,Dessert,7.5,1,Berlin,Online
+10671,2024-09-02,Coffee,Beverage,3.0,4,Paris,Online
+10672,2024-06-13,Cheesecake,Dessert,7.5,4,Paris,Card
+10673,2024-06-12,Burger,Main,12.0,2,London,Cash
+10674,2024-08-29,Burger,Main,12.0,3,Madrid,Card
+10675,2024-05-06,Pizza,Main,15.0,2,Paris,Online
+10676,2024-04-22,Burger,Main,12.0,4,Paris,Card
+10677,2024-05-01,Salad,Main,9.5,3,Paris,Online
+10678,2024-12-26,Burger,Main,12.0,3,Madrid,Online
+10679,2024-09-09,Fries,Side,4.5,3,Madrid,Cash
+10680,2024-02-16,Burger,Main,12.0,1,Madrid,Online
+10681,2024-01-11,Fries,Side,4.5,4,London,Cash
+10682,2024-03-07,Fries,Side,4.5,3,Madrid,Cash
+10683,2024-01-12,Burger,Main,12.0,2,Madrid,Card
+10684,2024-07-05,Cheesecake,Dessert,7.5,1,Paris,Online
+10685,2024-10-27,Soda,Beverage,2.5,1,Paris,Cash
+10686,2024-03-10,Coffee,Beverage,3.0,2,Berlin,Online
+10687,2024-11-28,Ice Cream,Dessert,6.0,3,Madrid,Online
+10688,2024-12-21,Cheesecake,Dessert,7.5,3,Madrid,Online
+10689,2024-07-12,Salad,Main,9.5,3,Paris,Card
+10690,2024-01-01,Salad,Main,9.5,4,London,Card
+10691,2024-11-09,Coffee,Beverage,3.0,2,London,Cash
+10692,2024-06-18,Salad,Main,9.5,1,Madrid,Cash
+10693,2024-03-26,Coffee,Beverage,3.0,1,Paris,Cash
+10694,2024-05-15,Burger,Main,12.0,2,Madrid,Online
+10695,2024-06-28,Pizza,Main,15.0,3,London,Online
+10696,2024-01-25,Burger,Main,12.0,4,Berlin,Online
+10697,2024-03-26,Soda,Beverage,2.5,4,Berlin,Cash
+10698,2024-10-06,Coffee,Beverage,3.0,4,London,Cash
+10699,2024-03-24,Fries,Side,4.5,4,London,Card
+10700,2024-01-11,Onion Rings,Side,5.0,3,Paris,Card
+10701,2024-06-24,Pizza,Main,15.0,2,Berlin,Card
+10702,2024-10-07,Pizza,Main,15.0,1,Paris,Online
+10703,2024-12-26,Ice Cream,Dessert,6.0,1,Berlin,Online
+10704,2024-11-06,Salad,Main,9.5,4,Madrid,Card
+10705,2024-06-18,Pizza,Main,15.0,2,Madrid,Cash
+10706,2024-10-03,Cheesecake,Dessert,7.5,3,Paris,Cash
+10707,2024-02-19,Fries,Side,4.5,1,Berlin,Online
+10708,2024-09-08,Cheesecake,Dessert,7.5,2,London,Cash
+10709,2024-08-06,Burger,Main,12.0,1,Paris,Online
+10710,2024-04-12,Ice Cream,Dessert,6.0,1,London,Card
+10711,2024-11-22,Salad,Main,9.5,3,London,Cash
+10712,2024-06-06,Pizza,Main,15.0,4,Berlin,Cash
+10713,2024-02-16,Onion Rings,Side,5.0,4,Madrid,Cash
+10714,2024-07-08,Soda,Beverage,2.5,2,Berlin,Card
+10715,2024-08-13,Onion Rings,Side,5.0,4,Paris,Card
+10716,2024-10-15,Onion Rings,Side,5.0,1,Madrid,Online
+10717,2024-02-13,Pizza,Main,15.0,3,Berlin,Online
+10718,2024-10-10,Fries,Side,4.5,1,Berlin,Online
+10719,2024-10-01,Soda,Beverage,2.5,4,Madrid,Cash
+10720,2024-02-10,Onion Rings,Side,5.0,4,London,Online
+10721,2024-10-19,Cheesecake,Dessert,7.5,2,London,Cash
+10722,2024-03-26,Salad,Main,9.5,2,Madrid,Card
+10723,2024-08-04,Burger,Main,12.0,1,Berlin,Card
+10724,2024-10-31,Salad,Main,9.5,3,Paris,Online
+10725,2024-02-14,Pizza,Main,15.0,4,Berlin,Online
+10726,2024-05-21,Coffee,Beverage,3.0,4,London,Online
+10727,2024-08-02,Cheesecake,Dessert,7.5,1,Berlin,Card
+10728,2024-10-17,Salad,Main,9.5,1,London,Online
+10729,2024-05-26,Pizza,Main,15.0,3,Berlin,Cash
+10730,2024-12-01,Soda,Beverage,2.5,4,Berlin,Card
+10731,2024-05-21,Salad,Main,9.5,4,Madrid,Online
+10732,2024-01-20,Soda,Beverage,2.5,4,Paris,Online
+10733,2024-01-26,Fries,Side,4.5,4,Paris,Cash
+10734,2024-06-21,Burger,Main,12.0,3,Paris,Cash
+10735,2024-12-22,Ice Cream,Dessert,6.0,1,Madrid,Card
+10736,2024-08-14,Onion Rings,Side,5.0,3,Paris,Online
+10737,2024-11-05,Soda,Beverage,2.5,1,Madrid,Cash
+10738,2024-07-27,Fries,Side,4.5,4,Paris,Card
+10739,2024-03-22,Cheesecake,Dessert,7.5,1,Paris,Online
+10740,2024-07-25,Cheesecake,Dessert,7.5,2,London,Card
+10741,2024-04-12,Fries,Side,4.5,1,Madrid,Card
+10742,2024-01-26,Ice Cream,Dessert,6.0,3,Madrid,Cash
+10743,2024-08-25,Coffee,Beverage,3.0,4,London,Online
+10744,2024-05-03,Burger,Main,12.0,3,Berlin,Online
+10745,2024-03-31,Ice Cream,Dessert,6.0,4,Paris,Cash
+10746,2024-05-12,Salad,Main,9.5,1,Paris,Card
+10747,2024-01-26,Soda,Beverage,2.5,2,Madrid,Card
+10748,2024-12-12,Fries,Side,4.5,2,Paris,Online
+10749,2024-09-19,Soda,Beverage,2.5,1,London,Cash
+10750,2024-11-27,Salad,Main,9.5,2,London,Card
+10751,2024-11-07,Onion Rings,Side,5.0,3,Paris,Cash
+10752,2024-06-27,Soda,Beverage,2.5,4,Paris,Card
+10753,2024-06-03,Ice Cream,Dessert,6.0,4,London,Card
+10754,2024-12-05,Cheesecake,Dessert,7.5,3,Paris,Cash
+10755,2024-09-03,Pizza,Main,15.0,1,Paris,Cash
+10756,2024-05-21,Coffee,Beverage,3.0,3,Paris,Card
+10757,2024-09-21,Salad,Main,9.5,2,London,Online
+10758,2024-12-04,Soda,Beverage,2.5,3,Madrid,Online
+10759,2024-12-01,Burger,Main,12.0,4,Paris,Cash
+10760,2024-07-26,Soda,Beverage,2.5,4,London,Online
+10761,2024-06-24,Fries,Side,4.5,2,Berlin,Online
+10762,2024-09-16,Coffee,Beverage,3.0,3,Madrid,Online
+10763,2024-04-02,Cheesecake,Dessert,7.5,3,London,Cash
+10764,2024-05-12,Salad,Main,9.5,2,Paris,Online
+10765,2024-04-23,Pizza,Main,15.0,3,Madrid,Online
+10766,2024-08-03,Onion Rings,Side,5.0,3,Paris,Cash
+10767,2024-08-25,Onion Rings,Side,5.0,1,Berlin,Card
+10768,2024-08-29,Pizza,Main,15.0,2,London,Online
+10769,2024-09-28,Soda,Beverage,2.5,3,Berlin,Card
+10770,2024-03-11,Salad,Main,9.5,2,Paris,Cash
+10771,2024-03-14,Ice Cream,Dessert,6.0,3,Madrid,Card
+10772,2024-06-19,Ice Cream,Dessert,6.0,2,Paris,Online
+10773,2024-01-03,Burger,Main,12.0,4,Paris,Card
+10774,2024-10-22,Salad,Main,9.5,2,Berlin,Card
+10775,2024-11-10,Salad,Main,9.5,4,Berlin,Cash
+10776,2024-09-01,Soda,Beverage,2.5,4,London,Card
+10777,2024-04-12,Cheesecake,Dessert,7.5,3,London,Cash
+10778,2024-04-07,Cheesecake,Dessert,7.5,1,London,Online
+10779,2024-04-25,Fries,Side,4.5,3,Paris,Card
+10780,2024-07-15,Pizza,Main,15.0,3,Madrid,Card
+10781,2024-06-01,Burger,Main,12.0,3,Berlin,Online
+10782,2024-11-01,Cheesecake,Dessert,7.5,3,Berlin,Online
+10783,2024-06-24,Salad,Main,9.5,4,Paris,Card
+10784,2024-07-25,Salad,Main,9.5,1,Madrid,Card
+10785,2024-04-18,Salad,Main,9.5,1,Madrid,Card
+10786,2024-12-30,Coffee,Beverage,3.0,1,Berlin,Online
+10787,2024-09-30,Onion Rings,Side,5.0,1,London,Online
+10788,2024-11-30,Pizza,Main,15.0,1,London,Online
+10789,2024-08-01,Pizza,Main,15.0,4,Berlin,Card
+10790,2024-05-09,Cheesecake,Dessert,7.5,4,Madrid,Card
+10791,2024-06-03,Burger,Main,12.0,4,London,Online
+10792,2024-05-18,Cheesecake,Dessert,7.5,2,Berlin,Card
+10793,2024-11-12,Cheesecake,Dessert,7.5,1,Paris,Card
+10794,2024-09-11,Pizza,Main,15.0,2,Madrid,Cash
+10795,2024-04-13,Cheesecake,Dessert,7.5,3,Berlin,Cash
+10796,2024-01-21,Salad,Main,9.5,4,Madrid,Online
+10797,2024-06-18,Ice Cream,Dessert,6.0,2,London,Card
+10798,2024-02-26,Pizza,Main,15.0,4,Madrid,Card
+10799,2024-02-08,Cheesecake,Dessert,7.5,1,Paris,Online

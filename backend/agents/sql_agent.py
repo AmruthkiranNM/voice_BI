@@ -29,6 +29,8 @@ CRITICAL RULES:
   * "average", "mean" → AVG(<value column>). "highest"/"lowest"/"maximum"/"minimum" → MAX/MIN.
 - For date filtering, use SQLite date functions like date('now', '-1 month').
 - For trends, use strftime('%Y-%m', date_column) when grouping by month.
+- When grouping by day of week or month, return the NAME, not the number, so the answer is readable. Day of week:
+  CASE strftime('%w', date_column) WHEN '0' THEN 'Sunday' WHEN '1' THEN 'Monday' WHEN '2' THEN 'Tuesday' WHEN '3' THEN 'Wednesday' WHEN '4' THEN 'Thursday' WHEN '5' THEN 'Friday' ELSE 'Saturday' END AS day_of_week
 - For COMPARISONS (vs, compare, growth, difference, best vs worst):
   * Use GROUP BY for side-by-side category comparisons.
   * For time comparisons, filter two periods with CASE WHEN or separate subqueries.
