@@ -10,6 +10,7 @@ Includes retry logic for SQL generation failures and comprehensive logging.
 """
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -176,6 +177,31 @@ def process_query(
 
             exec_result = execution.run(sql)
             if exec_result["success"]:
+                # ── Zero-row guard (deterministic fix) ────────────────────
+                # The small LLM often ignores textual retry feedback and keeps
+                # generating the same bad SQL.  Instead of asking it again,
+                # we deterministically strip the spurious WHERE date clause
+                # and re-execute — no new LLM call required.
+                if exec_result["row_count"] == 0:
+                    zero_diag = _diagnose_zero_rows(sql, query)
+                    if zero_diag:
+                        fixed_sql = _strip_spurious_date_filter(sql)
+                        if fixed_sql:
+                            logger.warning(
+                                "[Orchestrator] 0 rows with date filter — "
+                                "auto-fixing SQL by removing date WHERE clause."
+                            )
+                            fixed_result = execution.run(fixed_sql)
+                            if fixed_result["success"] and fixed_result["row_count"] > 0:
+                                sql = fixed_sql
+                                exec_result = fixed_result
+                                log_step("Execution Agent", "completed_auto_fixed", {
+                                    "row_count": exec_result["row_count"],
+                                    "note": "Removed spurious date WHERE filter",
+                                })
+                                break
+                        # Deterministic fix didn't help — fall through to complete
+
                 log_step("Execution Agent", "completed", {
                     "row_count": exec_result.get("row_count"),
                     "execution_time_ms": exec_result.get("execution_time_ms"),
@@ -282,6 +308,102 @@ def process_query(
         )
     finally:
         config.OLLAMA_MODEL = original_model
+
+
+def _strip_spurious_date_filter(sql: str) -> str | None:
+    """
+    Deterministically remove a spurious date WHERE clause from SQL.
+
+    Handles the most common LLM pattern:
+        WHERE col BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'
+        WHERE "col" BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'
+
+    Returns the cleaned SQL string if a filter was removed, else None.
+    """
+    DATE_RE = re.compile(
+        # Optional AND-connected conditions before/after — covers:
+        # WHERE date_col BETWEEN ...                         (sole condition)
+        # WHERE date_col BETWEEN ... AND other_cond          (date first)
+        # WHERE other_cond AND date_col BETWEEN ...          (date last)
+        r"""
+        # Sole WHERE: just the date BETWEEN clause
+        (?P<sole>
+            \s+WHERE\s+
+            (?:"[^"]+"|\w+)     # column name (quoted or bare)
+            \s+BETWEEN\s+
+            '[0-9]{4}-[0-9]{2}-[0-9]{2}'
+            \s+AND\s+
+            '[0-9]{4}-[0-9]{2}-[0-9]{2}'
+            (?=\s*(?:GROUP|ORDER|LIMIT|HAVING|$|;))
+        )
+        """,
+        re.IGNORECASE | re.VERBOSE | re.DOTALL,
+    )
+
+    stripped = DATE_RE.sub("", sql).strip()
+
+    # Normalise double semicolons or orphan GROUP/ORDER that lost their WHERE
+    stripped = re.sub(r';;+', ';', stripped)
+
+    if stripped != sql.strip():
+        if not stripped.endswith(';'):
+            stripped += ';'
+        return stripped
+
+    return None
+
+
+def _diagnose_zero_rows(sql: str, query: str) -> str | None:
+    """
+    Inspect SQL that ran successfully but returned 0 rows.
+    Returns a human-readable diagnosis to feed back to the SQL agent,
+    or None when the 0-row result appears genuinely correct.
+
+    Strategy: check the *user's raw query text* for time expressions.
+    Never rely on the planner's plan.filters.time_range — that field
+    can itself be hallucinated by the LLM.
+    """
+    # Words/phrases that mean the user explicitly requested a time period
+    TIME_KEYWORDS = (
+        "last month", "this month", "last year", "this year",
+        "last week", "this week", "last quarter", "this quarter",
+        "yesterday", "today", "ytd", "year to date", "month to date",
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+        "jan ", "feb ", "mar ", "apr ", "jun ", "jul ", "aug ",
+        "sep ", "oct ", "nov ", "dec ",
+        "q1", "q2", "q3", "q4",
+        "2019", "2020", "2021", "2022", "2023", "2024", "2025",
+        "recent", "latest", "current",
+    )
+    user_asked_for_time = any(kw in query.lower() for kw in TIME_KEYWORDS)
+
+    if not user_asked_for_time:
+        # Detect a BETWEEN date range or bare date literal in WHERE
+        date_filter_re = re.compile(
+            r"BETWEEN\s+'\d{4}-\d{2}-\d{2}'\s+AND\s+'\d{4}-\d{2}-\d{2}'"
+            r"|WHERE[^;]*['\"]\d{4}-\d{2}-\d{2}['\"]"
+            r"|LIKE\s+'\d{4}%'",
+            re.IGNORECASE | re.DOTALL,
+        )
+        if date_filter_re.search(sql):
+            return (
+                "The query returned 0 rows because you added a date/year filter "
+                "that the user did NOT ask for. The user's question has no time range. "
+                "REMOVE ALL WHERE filters on date columns and re-generate the SQL to "
+                "return ALL rows, then GROUP or aggregate as needed."
+            )
+
+    # Detect bare 'name' column that likely does not exist
+    if re.search(r'\bSELECT\b.*?\bname\b', sql, re.IGNORECASE | re.DOTALL):
+        return (
+            "The query returned 0 rows. You may have used a column called 'name' "
+            "which does not exist in this table. Check the DATABASE SCHEMA section "
+            "carefully and use ONLY the exact column names listed there. Column names "
+            'may contain spaces (e.g. "insurance provider") — always wrap them in double quotes.'
+        )
+
+    return None
 
 
 def _error_response(
