@@ -314,38 +314,36 @@ def _strip_spurious_date_filter(sql: str) -> str | None:
     """
     Deterministically remove a spurious date WHERE clause from SQL.
 
-    Handles the most common LLM pattern:
-        WHERE col BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'
-        WHERE "col" BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'
+    Handles the most common LLM patterns:
+        - WHERE col BETWEEN '...' AND '...'
+        - WHERE col >= '...'
+        - WHERE col >= DATE('now', '-1 year')
 
     Returns the cleaned SQL string if a filter was removed, else None.
     """
-    DATE_RE = re.compile(
-        # Optional AND-connected conditions before/after — covers:
-        # WHERE date_col BETWEEN ...                         (sole condition)
-        # WHERE date_col BETWEEN ... AND other_cond          (date first)
-        # WHERE other_cond AND date_col BETWEEN ...          (date last)
-        r"""
-        # Sole WHERE: just the date BETWEEN clause
-        (?P<sole>
-            \s+WHERE\s+
-            (?:"[^"]+"|\w+)     # column name (quoted or bare)
-            \s+BETWEEN\s+
-            '[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            \s+AND\s+
-            '[0-9]{4}-[0-9]{2}-[0-9]{2}'
-            (?=\s*(?:GROUP|ORDER|LIMIT|HAVING|$|;))
-        )
-        """,
-        re.IGNORECASE | re.VERBOSE | re.DOTALL,
-    )
+    patterns = [
+        # BETWEEN with string literals or DATE()
+        r"\s+WHERE\s+(?:\"[^\"]+\"|\w+)\s+BETWEEN\s+(?:'[^']+'|DATE\([^)]*\))\s+AND\s+(?:'[^']+'|DATE\([^)]*\))(?=\s*(?:GROUP|ORDER|LIMIT|HAVING|$|;))",
+        # Operators >=, <=, >, <, = with string literal or DATE()
+        r"\s+WHERE\s+(?:\"[^\"]+\"|\w+)\s+(?:>=|<=|>|<|=)\s+(?:'[^']+'|DATE\([^)]*\))(?=\s*(?:GROUP|ORDER|LIMIT|HAVING|$|;))",
+        # SQLite DATE/DATETIME/STRFTIME general function matches
+        r"\s+WHERE\s+(?:\"[^\"]+\"|\w+)\s+(?:>=|<=|>|<|=)\s+(?:DATE|DATETIME|STRFTIME|CURRENT_DATE|CURRENT_TIMESTAMP)\b[^;]*?(?=\s*(?:GROUP|ORDER|LIMIT|HAVING|$|;))"
+    ]
 
-    stripped = DATE_RE.sub("", sql).strip()
+    sql_no_comments = re.sub(r'--.*$', '', sql, flags=re.MULTILINE)
+    sql_no_comments = re.sub(r'/\*.*?\*/', '', sql_no_comments, flags=re.DOTALL)
+
+    stripped = sql_no_comments
+    for p in patterns:
+        regex = re.compile(p, re.IGNORECASE | re.DOTALL)
+        stripped = regex.sub("", stripped)
+    
+    stripped = stripped.strip()
 
     # Normalise double semicolons or orphan GROUP/ORDER that lost their WHERE
     stripped = re.sub(r';;+', ';', stripped)
 
-    if stripped != sql.strip():
+    if stripped != sql_no_comments.strip():
         if not stripped.endswith(';'):
             stripped += ';'
         return stripped
@@ -379,10 +377,11 @@ def _diagnose_zero_rows(sql: str, query: str) -> str | None:
     user_asked_for_time = any(kw in query.lower() for kw in TIME_KEYWORDS)
 
     if not user_asked_for_time:
-        # Detect a BETWEEN date range or bare date literal in WHERE
+        # Detect a BETWEEN date range, bare date literal, or SQLite date function in WHERE
         date_filter_re = re.compile(
             r"BETWEEN\s+'\d{4}-\d{2}-\d{2}'\s+AND\s+'\d{4}-\d{2}-\d{2}'"
             r"|WHERE[^;]*['\"]\d{4}-\d{2}-\d{2}['\"]"
+            r"|WHERE[^;]*(?:DATE|DATETIME|STRFTIME|CURRENT_DATE|CURRENT_TIMESTAMP)\b"
             r"|LIKE\s+'\d{4}%'",
             re.IGNORECASE | re.DOTALL,
         )

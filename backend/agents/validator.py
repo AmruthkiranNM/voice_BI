@@ -170,6 +170,11 @@ def _extract_tables_from_sql(sql: str) -> list[str]:
     Extract table names referenced in FROM and JOIN clauses.
     Uses regex-based extraction.
     """
+    # Remove SQL comments before extraction to avoid false positives
+    # e.g. "-- Assuming the question is asking for conditions from last year"
+    sql_no_comments = re.sub(r'--.*$', '', sql, flags=re.MULTILINE)
+    sql_no_comments = re.sub(r'/\*.*?\*/', '', sql_no_comments, flags=re.DOTALL)
+    
     tables = set()
 
     # Match FROM <table> and JOIN <table>
@@ -179,7 +184,7 @@ def _extract_tables_from_sql(sql: str) -> list[str]:
     ]
 
     for pattern in patterns:
-        matches = re.findall(pattern, sql, re.IGNORECASE)
+        matches = re.findall(pattern, sql_no_comments, re.IGNORECASE)
         tables.update(matches)
 
     # Remove SQL keywords that might be falsely matched

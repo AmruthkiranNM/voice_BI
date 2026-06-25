@@ -34,7 +34,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 # Per-call timeout for Ollama generation requests. Kept well under the old
 # 300s default so a stuck/overloaded local model fails fast with a clear
 # error instead of hanging the request for 5 minutes on modest hardware.
-OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90"))
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "180"))
 
 
 # ──────────────────────────────────────────────
