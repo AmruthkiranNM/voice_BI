@@ -32,9 +32,9 @@ The owner now says: "{message}"
 
 RULES:
 1. Speak directly to the owner — use "your business", "your data".
-2. Base your answer only on the data shown above; never invent numbers that are not present.
-3. If they ask for advice or improvement ideas, give 2-4 concrete suggestions tied to the data, each on its OWN LINE as a numbered list (1., 2., 3.) — never run them together in one paragraph.
-4. If the question needs data that is not shown above (a different time period, different columns, a different table), say so plainly and tell them to ask it as a new question instead of a follow-up.
+2. If the user asks WHY something happened (e.g. "why are they leaving?"), or asks for data/columns NOT shown above, YOU MUST output exactly this text: [RUN_NEW_QUERY] and nothing else.
+3. If you can answer using ONLY the data above, give 2-4 concrete suggestions tied to the data.
+4. Do NOT repeat the exact same response you gave previously. If the user repeats their question, acknowledge it and provide a different perspective.
 5. Keep it concise. Use **bold** for key terms. Lead with a short sentence before any list.
 
 Write your reply now:"""
@@ -77,8 +77,46 @@ def run(
     )
 
     logger.info("[Chat Agent] Follow-up: %s", message[:80])
-    reply = call_llm(prompt, expect_json=False)
-    return reply.strip()
+    
+    msg_lower = message.lower()
+    analytical_keywords = (
+        "why", "how many", "count", "total", "average", "avg", 
+        "show me", "which ", "compare", "vs ", "versus", "what is"
+    )
+    needs_new_query = any(kw in msg_lower for kw in analytical_keywords)
+    
+    reply = ""
+    if not needs_new_query:
+        reply = call_llm(prompt, expect_json=False).strip()
+        if "[RUN_NEW_QUERY]" in reply.upper() or reply.upper() == "[RUN_NEW_QUERY]":
+            needs_new_query = True
+
+    if needs_new_query:
+        logger.info("[Chat Agent] Follow-up requires new analytics, routing to orchestrator...")
+        from agents.orchestrator import process_query
+        
+        if "why" in msg_lower:
+            combined_query = f"Analyze the data to explain the reasons why. Original context: '{context.get('query')}'. Follow-up question: {message}"
+        else:
+            combined_query = f"Original context: '{context.get('query')}'. Follow-up question: {message}"
+            
+        try:
+            new_result = process_query(combined_query, fast_mode=False, skip_insight=False)
+            if new_result["success"] and new_result["insight"]:
+                return f"I ran a new analysis to answer your question:\n\n{new_result['insight']}"
+            elif new_result["success"]:
+                rows = new_result["result"].get("rows", [])
+                if rows:
+                    return f"I ran a new analysis. Here are the top findings:\n\n" + _format_results(rows, max_rows=5)
+                else:
+                    return "I ran a new analysis, but found no relevant data to answer this."
+            else:
+                return f"I tried to run a deeper analysis, but encountered an error: {new_result.get('error')}"
+        except Exception as e:
+            logger.error(f"Error running follow-up analytics: {e}")
+            return "I need more data to answer this, but my analytical query failed. Please try asking as a new search."
+
+    return reply
 
 
 def _format_results(rows: list[dict], max_rows: int = 15) -> str:

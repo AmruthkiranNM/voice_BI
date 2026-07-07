@@ -68,6 +68,15 @@ _THEME_KEYWORDS: list[tuple[str, str, dict[str, int]]] = [
         "campaign": 4, "conversion": 4, "impression": 4, "subscriber": 4,
         "click": 2, "lead": 2,
     }),
+    ("Banking & Financial Services", "banking", {
+        "balance": 4, "credit": 4, "loan": 4, "mortgage": 4, "deposit": 4,
+        "withdrawal": 4, "transaction": 3, "exited": 4, "churn": 4, "tenure": 3,
+        "account": 3, "card": 3,
+    }),
+    ("Software & SaaS", "saas", {
+        "subscription": 4, "mrr": 4, "arr": 4, "plan": 3, "tier": 3,
+        "renewal": 4, "churn": 3, "usage": 3, "license": 3,
+    }),
 ]
 
 _MIN_THEME_SCORE = 3
@@ -92,6 +101,8 @@ _THEME_ANCHORS: dict[str, str] = {
     "healthcare": "Healthcare and clinic data: patients, doctors, diagnoses, treatments, prescriptions, hospital and appointments.",
     "hospitality": "Hospitality and travel data: hotels, room bookings, guests, reservations and check-in details.",
     "marketing": "Marketing and customer engagement data: campaigns, conversions, impressions, clicks, leads and subscribers.",
+    "banking": "Banking and financial services data: accounts, balances, credit scores, loans, deposits, credit cards, transactions, and customer churn or exited status.",
+    "saas": "Software as a service (SaaS) and subscription data: active users, churn rate, monthly recurring revenue (MRR), renewals, plans, and software licenses.",
 }
 
 # Lazily-computed cache of anchor embeddings.
@@ -246,7 +257,11 @@ def _fallback_business_type(
     """Honest label when industry keywords are ambiguous."""
     cols_joined = " ".join(c.lower() for c in column_names)
 
-    if any(k in cols_joined for k in ("salary", "payroll", "employee")):
+    hr_strong = any(k in cols_joined for k in ("payroll", "employee", "headcount", "workforce", "hire"))
+    has_salary = "salary" in cols_joined
+    has_customer_signals = any(k in cols_joined for k in ("estimated", "customer", "balance", "exited", "credit", "churn"))
+    
+    if hr_strong or (has_salary and not has_customer_signals):
         return "HR & Workforce", "hr", 0.3
     if any(k in cols_joined for k in ("patient", "doctor", "clinic")):
         return "Healthcare & Clinic", "healthcare", 0.3
