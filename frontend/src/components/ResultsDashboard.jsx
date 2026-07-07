@@ -92,11 +92,11 @@ export default function ResultsDashboard({
 
       {/* ── Secondary row: Dataset Summary + Stats ─────────── */}
       <div className="bi-secondary-row">
-        <div className="bi-dataset-col">
+        <div className="bi-dataset-col" style={{ minWidth: 0 }}>
           <DatasetSummary datasetInfo={datasetInfo} />
         </div>
         {result?.rows?.length > 0 && (
-          <div className="bi-stats-col">
+          <div className="bi-stats-col" style={{ minWidth: 0 }}>
             <SecondaryChartOrStats result={result} intent={intent} />
           </div>
         )}

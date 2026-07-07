@@ -144,6 +144,242 @@ export function recommendChartType(result, intent, query = '') {
   return { type: 'bar', confidence: 0.6, reason: 'Default bar chart' };
 }
 
+/* ═══════════════════════════════════════════════════════════
+   DATA-AWARE CHART COMPATIBILITY
+   Returns { [chartTypeId]: { enabled, recommended, reason } }
+═══════════════════════════════════════════════════════════ */
+
+export function getChartCompatibility(result, intent, query = '') {
+  const info = inspectData(result);
+  const rec = recommendChartType(result, intent, query);
+
+  const compat = {};
+  for (const ct of ALL_CHART_TYPES) {
+    compat[ct.id] = { enabled: false, recommended: false, reason: '' };
+  }
+
+  if (!info) {
+    // No data — disable everything
+    for (const id of Object.keys(compat)) {
+      compat[id].reason = 'No data available to visualize.';
+    }
+    return compat;
+  }
+
+  const { rowCount, numericCount, isTimeSeries, isFewRows, hasMultiMetrics } = info;
+  const hasData = rowCount >= 1 && numericCount >= 1;
+
+  for (const ct of ALL_CHART_TYPES) {
+    const id = ct.id;
+    if (!hasData) {
+      compat[id].reason = 'No numeric data available.';
+      continue;
+    }
+
+    switch (id) {
+      // ── Bar family ──
+      case 'bar':
+      case 'horizontalBar':
+        compat[id].enabled = true;
+        compat[id].reason = rowCount > 8
+          ? 'Good for ranking many items.'
+          : 'Good for comparing categories.';
+        break;
+
+      case 'groupedBar':
+        if (numericCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Compares multiple metrics side by side.';
+        } else {
+          compat[id].reason = 'Requires at least 2 numeric columns.';
+        }
+        break;
+
+      case 'stackedBar':
+        if (numericCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows composition across categories.';
+        } else {
+          compat[id].reason = 'Requires at least 2 numeric columns.';
+        }
+        break;
+
+      // ── Line family ──
+      case 'line':
+        compat[id].enabled = rowCount >= 2;
+        compat[id].reason = rowCount >= 2
+          ? 'Good for trends and sequences.'
+          : 'Requires at least 2 data points.';
+        break;
+
+      case 'multiLine':
+        if (numericCount >= 2 && rowCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Compares trends across metrics.';
+        } else {
+          compat[id].reason = numericCount < 2
+            ? 'Requires at least 2 numeric columns.'
+            : 'Requires at least 2 data points.';
+        }
+        break;
+
+      case 'area':
+        compat[id].enabled = rowCount >= 2;
+        compat[id].reason = rowCount >= 2
+          ? 'Shows trends with magnitude.'
+          : 'Requires at least 2 data points.';
+        break;
+
+      case 'stackedArea':
+        if (numericCount >= 2 && rowCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows composition change over time.';
+        } else {
+          compat[id].reason = numericCount < 2
+            ? 'Requires at least 2 numeric columns.'
+            : 'Requires at least 2 data points.';
+        }
+        break;
+
+      case 'cumulative':
+        compat[id].enabled = rowCount >= 2;
+        compat[id].reason = rowCount >= 2
+          ? 'Shows running total over sequence.'
+          : 'Requires at least 2 data points.';
+        break;
+
+      // ── Part-of-whole ──
+      case 'donut':
+      case 'pie':
+        if (rowCount > 20) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Too many categories for ideal display. Consider Horizontal Bar or Treemap.';
+        } else if (rowCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows proportion of each category.';
+        } else {
+          compat[id].reason = 'Requires at least 2 categories.';
+        }
+        break;
+
+      case 'treemap':
+        compat[id].enabled = rowCount >= 2;
+        compat[id].reason = rowCount >= 2
+          ? 'Shows hierarchical composition by area.'
+          : 'Requires at least 2 categories.';
+        break;
+
+      case 'funnel':
+        compat[id].enabled = rowCount >= 2 && rowCount <= 12;
+        compat[id].reason = rowCount < 2
+          ? 'Requires at least 2 stages.'
+          : rowCount > 12
+            ? 'Too many items for a funnel. Try Horizontal Bar.'
+            : 'Shows stages or sequential filtering.';
+        break;
+
+      // ── Advanced ──
+      case 'scatter':
+        if (numericCount >= 2) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows correlation between two numeric dimensions.';
+        } else {
+          compat[id].reason = 'Not suitable — requires at least 2 numeric columns.';
+        }
+        break;
+
+      case 'bubble':
+        if (numericCount >= 3) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows three numeric dimensions.';
+        } else {
+          compat[id].reason = `Not suitable — requires 3 numeric columns, found ${numericCount}.`;
+        }
+        break;
+
+      case 'radar':
+        if (rowCount >= 3 && rowCount <= 12) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows multi-dimensional profile.';
+        } else {
+          compat[id].reason = rowCount < 3
+            ? 'Requires at least 3 categories for radial axes.'
+            : 'Too many categories for readable radar. Try Bar.';
+        }
+        break;
+
+      case 'heatmap':
+        if (numericCount >= 2 && rowCount >= 3) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Matrix view of metric values.';
+        } else {
+          compat[id].reason = numericCount < 2
+            ? 'Requires at least 2 numeric columns.'
+            : 'Requires at least 3 rows.';
+        }
+        break;
+
+      case 'waterfall':
+        compat[id].enabled = rowCount >= 2;
+        compat[id].reason = rowCount >= 2
+          ? 'Shows incremental positive/negative changes.'
+          : 'Requires at least 2 data points.';
+        break;
+
+      case 'gauge':
+        if (rowCount === 1 && numericCount >= 1) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows single value on a gauge.';
+        } else {
+          compat[id].reason = rowCount !== 1
+            ? 'Gauge requires exactly 1 row of data.'
+            : 'Requires at least 1 numeric column.';
+        }
+        break;
+
+      case 'kpiCard':
+        if (rowCount <= 3 && numericCount >= 1) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows key metrics as cards.';
+        } else {
+          compat[id].reason = 'Best for 1–3 rows of aggregated metrics.';
+        }
+        break;
+
+      default:
+        compat[id].enabled = true;
+        compat[id].reason = '';
+    }
+  }
+
+  // Mark the recommended type
+  if (rec.type && compat[rec.type]) {
+    compat[rec.type].recommended = true;
+  }
+
+  return compat;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Suggest alternatives when a chart type is unsupported
+═══════════════════════════════════════════════════════════ */
+export function suggestAlternatives(result, intent, query = '') {
+  const compat = getChartCompatibility(result, intent, query);
+  const rec = recommendChartType(result, intent, query);
+
+  const alternatives = ALL_CHART_TYPES
+    .filter(ct => compat[ct.id]?.enabled && ct.id !== 'kpiCard')
+    .slice(0, 4)
+    .map(ct => ct.label);
+
+  return {
+    recommended: rec.type,
+    recommendedLabel: ALL_CHART_TYPES.find(t => t.id === rec.type)?.label || rec.type,
+    alternatives,
+  };
+}
+
+
 export const CHART_TYPE_GROUPS = [
   {
     label: 'Bar',
@@ -161,6 +397,7 @@ export const CHART_TYPE_GROUPS = [
       { id: 'multiLine', label: 'Multi-Line' },
       { id: 'area', label: 'Area' },
       { id: 'stackedArea', label: 'Stacked Area' },
+      { id: 'cumulative', label: 'Cumulative' },
     ],
   },
   {
