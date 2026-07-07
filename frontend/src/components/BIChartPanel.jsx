@@ -287,31 +287,33 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       </div>
 
       {/* ── Chart Type Toolbar ── */}
-      <div className="bi-chart-toolbar">
-        {PRIMARY_TYPES.map(typeId => {
-          const ct = ALL_CHART_TYPES.find(t => t.id === typeId);
-          if (!ct) return null;
-          const compat = compatibility[typeId];
-          const Icon = TYPE_ICONS[typeId] || TbChartBar;
-          const isActive = effectiveType === typeId;
-          const isRecommended = compat?.recommended;
-          const isDisabled = compat && !compat.enabled;
-          return (
-            <button
-              key={typeId}
-              title={isDisabled ? `Not suitable for the current result data. ${compat.reason}` : ct.label}
-              onClick={() => !isDisabled && handleTypeSelect(typeId)}
-              className={`bi-chart-type-btn ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''} ${isRecommended ? 'recommended' : ''}`}
-              disabled={isDisabled}
-            >
-              <Icon size={14} />
-              <span className="bi-type-label">{ct.label}</span>
-              {isRecommended && <span className="bi-rec-dot" title="Recommended for this data" />}
-            </button>
-          );
-        })}
+      <div className="bi-chart-toolbar-wrap">
+        <div className="bi-chart-toolbar-scroll">
+          {PRIMARY_TYPES.map(typeId => {
+            const ct = ALL_CHART_TYPES.find(t => t.id === typeId);
+            if (!ct) return null;
+            const compat = compatibility[typeId];
+            const Icon = TYPE_ICONS[typeId] || TbChartBar;
+            const isActive = effectiveType === typeId;
+            const isRecommended = compat?.recommended;
+            const isDisabled = compat && !compat.enabled;
+            return (
+              <button
+                key={typeId}
+                title={isDisabled ? `Not suitable for the current result data. ${compat.reason}` : ct.label}
+                onClick={() => !isDisabled && handleTypeSelect(typeId)}
+                className={`bi-chart-type-btn ${isActive ? 'active' : ''} ${isDisabled ? 'disabled' : ''} ${isRecommended ? 'recommended' : ''}`}
+                disabled={isDisabled}
+              >
+                <Icon size={14} />
+                <span className="bi-type-label">{ct.label}</span>
+                {isRecommended && <span className="bi-rec-dot" title="Recommended for this data" />}
+              </button>
+            );
+          })}
+        </div>
 
-        {/* More menu */}
+        {/* More menu — sits outside the scrollable area */}
         <div className="bi-more-wrap" ref={moreMenuRef}>
           <button
             className={`bi-chart-type-btn ${showMore ? 'active' : ''} ${ADVANCED_TYPES.includes(effectiveType) ? 'has-active' : ''}`}
