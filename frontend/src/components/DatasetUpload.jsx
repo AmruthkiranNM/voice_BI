@@ -91,7 +91,7 @@ export default function DatasetUpload({ onUploadSuccess }) {
     try {
       const result = await uploadDataset(file);
       setLastUpload(result);
-      setShowPreview(false);
+      setShowPreview(true);
       onUploadSuccess?.(result);
     } catch (err) {
       setError(err.message);

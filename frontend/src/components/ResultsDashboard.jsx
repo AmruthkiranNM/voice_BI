@@ -92,6 +92,20 @@ export default function ResultsDashboard({
         </div>
       </div>
 
+      {/* ── Follow-Up Chat ────────────────────────────────── */}
+      <div className="no-print mt-8 mb-8">
+        <FollowUpChat
+          query={query}
+          sql={sql}
+          result={result}
+          insight={insight}
+          model={settings.model}
+          messages={chatMessages}
+          onMessagesChange={onChatMessagesChange}
+          autoSpeak={settings.speakInsight}
+        />
+      </div>
+
       {/* ── Primary Chart (full width) ─────────────────────── */}
       {hasChart && (
         <BIChartPanel result={result} intent={intent} query={query || ''} />
@@ -112,19 +126,6 @@ export default function ResultsDashboard({
       {/* ── Data Table (full width) ────────────────────────── */}
       <ResultTable result={result} fullWidth />
 
-      {/* ── Follow-Up Chat ────────────────────────────────── */}
-      <div className="no-print mt-8">
-        <FollowUpChat
-          query={query}
-          sql={sql}
-          result={result}
-          insight={insight}
-          model={settings.model}
-          messages={chatMessages}
-          onMessagesChange={onChatMessagesChange}
-          autoSpeak={settings.speakInsight}
-        />
-      </div>
 
       {/* ── Technical Details ─────────────────────────────── */}
       <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />

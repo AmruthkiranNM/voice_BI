@@ -148,7 +148,7 @@ export default function App() {
               <div className="animate-in space-y-8">
                 
                 {/* AI Command Center */}
-                <div className="glass-panel p-1 rounded-2xl sticky top-0 z-20 shadow-2xl shadow-black/50">
+                <div className="glass-panel p-1 rounded-2xl shadow-2xl shadow-black/50 mb-8">
                   <div className="bg-[#18181b] rounded-xl p-4 sm:p-5 border border-white/5">
                     {datasetInfo.has_data ? (
                       <QueryInput
