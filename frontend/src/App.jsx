@@ -9,6 +9,7 @@ import QueryInput, { DEFAULT_SETTINGS } from './components/QueryInput';
 import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
 import ResultsDashboard from './components/ResultsDashboard';
+import DataQuality from './components/DataQuality';
 
 export default function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -177,37 +178,44 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Show Data Preview before any query is run */}
-                {!hasResults && datasetInfo.preview_rows?.length > 0 && (
-                  <div className="glass-panel p-6 rounded-2xl border border-white/5 bg-black/20 animate-in">
-                    <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
-                      <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-blue-400" xmlns="http://www.w3.org/2000/svg"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path><path d="M8 11h8v7h-8z"></path><path d="M8 15h8"></path><path d="M11 11v7"></path></svg>
-                      Data Preview <span className="text-zinc-500 font-normal text-xs ml-1">({datasetInfo.rowCount} rows total)</span>
-                    </h3>
-                    <div className="overflow-x-auto max-h-64 scrollbar-thin rounded-lg border border-white/10 bg-[#09090b]">
-                      <table className="w-full text-xs text-left whitespace-nowrap">
-                        <thead className="sticky top-0 bg-[#18181b] text-zinc-400 border-b border-white/10 z-10 shadow-sm">
-                          <tr>
-                            {datasetInfo.columns.map(col => (
-                              <th key={col} className="px-4 py-3 font-medium uppercase tracking-wider text-[10px]">
-                                {col.replace(/_/g, ' ')}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5 text-zinc-300">
-                          {datasetInfo.preview_rows.slice(0, 8).map((row, i) => (
-                            <tr key={i} className="hover:bg-white/5 transition-colors">
-                              {datasetInfo.columns.map(col => (
-                                <td key={col} className="px-4 py-2.5 truncate max-w-[200px]">
-                                  {row[col] ?? <span className="text-zinc-600">—</span>}
-                                </td>
+                {/* Show Data Preview and Quality before any query is run */}
+                {!hasResults && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {datasetInfo.dataQuality && (
+                      <DataQuality quality={datasetInfo.dataQuality} />
+                    )}
+                    {datasetInfo.preview_rows?.length > 0 && (
+                      <div className="glass-panel p-6 rounded-2xl border border-white/5 bg-black/20 animate-in">
+                        <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
+                          <svg stroke="currentColor" fill="none" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-blue-400" xmlns="http://www.w3.org/2000/svg"><path d="M14 3v4a1 1 0 0 0 1 1h4"></path><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path><path d="M8 11h8v7h-8z"></path><path d="M8 15h8"></path><path d="M11 11v7"></path></svg>
+                          Data Preview <span className="text-zinc-500 font-normal text-xs ml-1">({datasetInfo.rowCount} rows total)</span>
+                        </h3>
+                        <div className="overflow-x-auto max-h-64 scrollbar-thin rounded-lg border border-white/10 bg-[#09090b]">
+                          <table className="w-full text-xs text-left whitespace-nowrap">
+                            <thead className="sticky top-0 bg-[#18181b] text-zinc-400 border-b border-white/10 z-10 shadow-sm">
+                              <tr>
+                                {datasetInfo.columns.map(col => (
+                                  <th key={col} className="px-4 py-3 font-medium uppercase tracking-wider text-[10px]">
+                                    {col.replace(/_/g, ' ')}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 text-zinc-300">
+                              {datasetInfo.preview_rows.slice(0, 8).map((row, i) => (
+                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                  {datasetInfo.columns.map(col => (
+                                    <td key={col} className="px-4 py-2.5 truncate max-w-[200px]">
+                                      {row[col] ?? <span className="text-zinc-600">—</span>}
+                                    </td>
+                                  ))}
+                                </tr>
                               ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
