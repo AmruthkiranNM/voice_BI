@@ -1,20 +1,26 @@
-/** Compute summary statistics from a query result for the results dashboard. */
+import { resolveVisualizationSpec } from './semanticClassifier';
 
-export function analyzeResult(result) {
+/** Compute summary statistics from a query result for the results dashboard. */
+export function analyzeResult(result, intent = '', query = '') {
   if (!result?.rows?.length || !result?.columns?.length) return null;
 
+  const spec = resolveVisualizationSpec(result, intent, query);
   const { columns, rows } = result;
-  const numericCols = columns.filter(col =>
+  
+  // Filter out non-numeric columns, and strictly exclude identifiers based on spec
+  let numericCols = columns.filter(col =>
     rows.some(r => {
       const v = r[col];
       return v != null && v !== '' && !Number.isNaN(Number(v));
     }),
   );
 
-  const labelCol =
-    columns.find(c => !numericCols.includes(c)) ||
-    columns.find(c => rows.some(r => typeof r[c] === 'string' || isNaN(Number(r[c])))) ||
-    columns[0];
+  if (spec && spec.excludedFields) {
+    numericCols = numericCols.filter(c => !spec.excludedFields.includes(c));
+  }
+
+  // Use the semantic dimension as the label column, or fallback
+  const labelCol = spec?.dimension || columns[0];
 
   const numericStats = numericCols.map(col => {
     const values = rows.map(r => Number(r[col])).filter(v => !Number.isNaN(v));
@@ -31,8 +37,8 @@ export function analyzeResult(result) {
   });
 
   let topEntry = null;
-  if (labelCol && numericCols[0] && rows.length > 0) {
-    const valueCol = numericCols[0];
+  if (labelCol && numericCols.length > 0 && rows.length > 0) {
+    const valueCol = spec?.primaryMeasure || numericCols[0];
     const sorted = [...rows].sort(
       (a, b) => Number(b[valueCol]) - Number(a[valueCol]),
     );
@@ -238,7 +244,7 @@ export function nextLabels(labels, periods = 3) {
 export function buildCallouts(result) {
   if (!result?.rows?.length || !result?.columns?.length) return [];
   const { rows } = result;
-  const analysis = analyzeResult(result);
+  const analysis = analyzeResult(result, '', '');
   const callouts = [];
 
   const comparison = periodComparison(result);

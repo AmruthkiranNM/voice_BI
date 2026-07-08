@@ -13,8 +13,8 @@ const INSIGHT_ICONS = {
   neutral: '📊',
 };
 
-export default function BIInsightsPanel({ result }) {
-  const analysis = useMemo(() => analyzeResult(result), [result]);
+export default function BIInsightsPanel({ result, intent = '', query = '' }) {
+  const analysis = useMemo(() => analyzeResult(result, intent, query), [result, intent, query]);
   const callouts = useMemo(() => buildCallouts(result), [result]);
   const trend = useMemo(() => periodComparison(result), [result]);
   const [expanded, setExpanded] = useState(true);

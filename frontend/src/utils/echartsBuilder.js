@@ -596,16 +596,29 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
   }
 }
 
-/** Prepare labels and datasets from raw result */
-export function prepareChartData(result) {
+/** Prepare labels and datasets from raw result and optional semantic spec */
+export function prepareChartData(result, spec = null) {
   const { columns = [], rows = [] } = result || {};
   if (!columns.length || !rows.length) return null;
 
-  const numericCols = columns.filter(c =>
-    rows.some(r => r[c] != null && r[c] !== '' && !Number.isNaN(Number(r[c]))),
-  );
-  const labelCols = columns.filter(c => !numericCols.includes(c));
-  const labelCol = labelCols[0] || columns[0];
+  let labelCol;
+  let numericCols = [];
+
+  if (spec) {
+    labelCol = spec.dimension || columns[0];
+    if (spec.primaryMeasure) numericCols.push(spec.primaryMeasure);
+    if (spec.secondaryMeasures) numericCols.push(...spec.secondaryMeasures);
+    // If somehow there are no measures in spec, fallback to checking columns
+    if (numericCols.length === 0) {
+      numericCols = columns.filter(c => c !== labelCol && rows.some(r => r[c] != null && !Number.isNaN(Number(r[c]))));
+    }
+  } else {
+    numericCols = columns.filter(c =>
+      rows.some(r => r[c] != null && r[c] !== '' && !Number.isNaN(Number(r[c]))),
+    );
+    const labelCols = columns.filter(c => !numericCols.includes(c));
+    labelCol = labelCols[0] || columns[0];
+  }
 
   if (!numericCols.length) return null;
 
@@ -613,7 +626,7 @@ export function prepareChartData(result) {
   const DATE_COL_NAMES = /date|month|year|week|quarter|period|time|day/i;
   const isTime =
     rows.some(r => TIME_PATTERN.test(String(r[labelCol] ?? ''))) ||
-    columns.some(c => DATE_COL_NAMES.test(c));
+    DATE_COL_NAMES.test(labelCol);
 
   let displayRows = isTime
     ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol])))

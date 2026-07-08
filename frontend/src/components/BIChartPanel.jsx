@@ -11,6 +11,7 @@ import {
 } from 'react-icons/tb';
 import { recommendChartType, getChartCompatibility, suggestAlternatives, CHART_TYPE_GROUPS, ALL_CHART_TYPES } from '../utils/chartRecommender';
 import { buildEChartsOption, prepareChartData } from '../utils/echartsBuilder';
+import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 import { analyzeResult, formatStatValue } from '../utils/resultAnalytics';
 
 /* ═══════════════════════════════════════════════════════════
@@ -52,14 +53,34 @@ const TOP_N_OPTIONS = [
 ];
 
 export default function BIChartPanel({ result, intent, query = '' }) {
-  const chartData = useMemo(() => prepareChartData(result), [result]);
-  const recommendation = useMemo(
-    () => recommendChartType(result, intent, query),
-    [result, intent, query],
+  const spec = useMemo(
+    () => resolveVisualizationSpec(result, intent, query),
+    [result, intent, query]
   );
+
+  const semanticResult = useMemo(() => {
+    if (!spec || !result) return result;
+    const allowedColumns = [];
+    if (spec.dimension) allowedColumns.push(spec.dimension);
+    if (spec.primaryMeasure) allowedColumns.push(spec.primaryMeasure);
+    if (spec.secondaryMeasures) allowedColumns.push(...spec.secondaryMeasures);
+    
+    return {
+      columns: allowedColumns,
+      rows: result.rows
+    };
+  }, [spec, result]);
+
+  const chartData = useMemo(() => prepareChartData(semanticResult, spec), [semanticResult, spec]);
+  
+  const recommendation = useMemo(
+    () => ({ type: spec?.recommendedChart || 'bar' }),
+    [spec]
+  );
+  
   const compatibility = useMemo(
-    () => getChartCompatibility(result, intent, query),
-    [result, intent, query],
+    () => getChartCompatibility(semanticResult, intent, query),
+    [semanticResult, intent, query],
   );
 
   const [activeType, setActiveType] = useState(null);

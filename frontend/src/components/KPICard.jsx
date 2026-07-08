@@ -123,9 +123,9 @@ function KPICardItem({ kpi, index, trend, sparkData, isTop, isBottom }) {
   );
 }
 
-export default function KPICard({ result }) {
+export default function KPICard({ result, intent = '', query = '' }) {
   const kpis = detectKpiMetrics(result);
-  const analysis = useMemo(() => analyzeResult(result), [result]);
+  const analysis = useMemo(() => analyzeResult(result, intent, query), [result, intent, query]);
   const trend = useMemo(() => periodComparison(result), [result]);
 
   if (!kpis?.length) return null;

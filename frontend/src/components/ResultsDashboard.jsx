@@ -71,7 +71,7 @@ export default function ResultsDashboard({
       <Timeline agentLogs={response?.agent_logs} />
 
       {/* ── KPI Cards ─────────────────────────────────────── */}
-      {kpis && <KPICard result={result} />}
+      {kpis && <KPICard result={result} intent={intent} query={query} />}
 
       {/* ── Top Section: AI Answer + Insights ─────────────── */}
       <div className="bi-top-section">
@@ -88,7 +88,7 @@ export default function ResultsDashboard({
 
         {/* Insights panel (right, 40%) */}
         <div className="bi-insights-col">
-          <BIInsightsPanel result={result} />
+          <BIInsightsPanel result={result} intent={intent} query={query} />
         </div>
       </div>
 
@@ -117,8 +117,9 @@ export default function ResultsDashboard({
           <DatasetSummary datasetInfo={datasetInfo} />
         </div>
         {result?.rows?.length > 0 && (
-          <div className="bi-stats-col" style={{ minWidth: 0 }}>
-            <SecondaryChartOrStats result={result} intent={intent} />
+          <div className="bi-stats-col animate-in" style={{ animationDelay: '150ms' }}>
+            <KPICard result={result} intent={intent} query={query} />
+            <BIInsightsPanel result={result} intent={intent} query={query} />
           </div>
         )}
       </div>
