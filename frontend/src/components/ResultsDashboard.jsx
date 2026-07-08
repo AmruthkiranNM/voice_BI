@@ -8,6 +8,7 @@ import FollowUpChat from './FollowUpChat';
 import AnomalyCallouts from './AnomalyCallouts';
 import Timeline from './Timeline';
 import BIInsightsPanel from './BIInsightsPanel';
+import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 
 export default function ResultsDashboard({
   response,
@@ -117,9 +118,8 @@ export default function ResultsDashboard({
           <DatasetSummary datasetInfo={datasetInfo} />
         </div>
         {result?.rows?.length > 0 && (
-          <div className="bi-stats-col animate-in" style={{ animationDelay: '150ms' }}>
-            <KPICard result={result} intent={intent} query={query} />
-            <BIInsightsPanel result={result} intent={intent} query={query} />
+          <div className="bi-stats-col" style={{ minWidth: 0 }}>
+            <SecondaryChartOrStats result={result} intent={intent} query={query} />
           </div>
         )}
       </div>
@@ -136,9 +136,14 @@ export default function ResultsDashboard({
 }
 
 /** Secondary mini-chart showing distribution stats */
-function SecondaryChartOrStats({ result, intent }) {
+function SecondaryChartOrStats({ result, intent, query }) {
   const { columns = [], rows = [] } = result || {};
-  const numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c]))));
+  const spec = resolveVisualizationSpec(result, intent, query);
+  let numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c]))));
+  
+  if (spec && spec.excludedFields) {
+    numericCols = numericCols.filter(c => !spec.excludedFields.includes(c));
+  }
 
   if (!numericCols.length) return null;
 
