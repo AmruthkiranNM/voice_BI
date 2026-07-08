@@ -32,6 +32,7 @@ class ChatRequest(BaseModel):
     insight: str | None = Field(default=None, description="The insight text originally generated for this result")
     history: list[ChatTurn] = Field(default_factory=list, description="Prior turns in this follow-up thread")
     model: str | None = Field(default=None, description="Optional Ollama model override")
+    table_name: str | None = Field(default=None, description="The active dataset table name")
 
 
 class ChatResponse(BaseModel):
@@ -53,13 +54,16 @@ def handle_chat(request: ChatRequest):
         config.OLLAMA_MODEL = request.model
 
     try:
-        reply = chat_agent.run(
+        from agents import followup_orchestrator
+        
+        reply = followup_orchestrator.run_followup(
             message=request.message,
             context={
                 "query": request.query,
                 "sql": request.sql,
                 "result": request.result,
                 "insight": request.insight,
+                "table_name": request.table_name,
             },
             history=[turn.model_dump() for turn in request.history],
         )

@@ -101,6 +101,7 @@ export default function ResultsDashboard({
           result={result}
           insight={insight}
           model={settings.model}
+          tableName={datasetInfo?.tableName}
           messages={chatMessages}
           onMessagesChange={onChatMessagesChange}
           autoSpeak={settings.speakInsight}

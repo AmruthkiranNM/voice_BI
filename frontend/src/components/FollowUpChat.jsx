@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export default function FollowUpChat({
-  query, sql, result, insight, model,
+  query, sql, result, insight, model, tableName,
   messages, onMessagesChange, autoSpeak
 }) {
   const [input, setInput] = useState('');
@@ -36,20 +36,22 @@ export default function FollowUpChat({
 
     try {
       const response = await sendChatMessage(text, {
-        originalQuery: query,
+        query,
         sql,
-        dataSummary: result?.insight,
+        result,
+        insight: insight || result?.insight,
         history: newMsgs.slice(-5),
         model,
+        tableName,
       });
 
-      const aiMsg = { role: 'assistant', content: response.message };
+      const aiMsg = { role: 'assistant', content: response.reply };
       onMessagesChange([...newMsgs, aiMsg]);
 
       // Speak AI response if autoSpeak is enabled
       if (autoSpeak && window.speechSynthesis) {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(response.message);
+        const utterance = new SpeechSynthesisUtterance(response.reply);
         utterance.rate = 1.05;
         window.speechSynthesis.speak(utterance);
       }

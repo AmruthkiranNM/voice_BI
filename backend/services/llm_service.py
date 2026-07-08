@@ -46,7 +46,8 @@ def _call_ollama(prompt: str, expect_json: bool = False) -> str:
     }
     
     if expect_json:
-        data["format"] = "json"
+        # data["format"] = "json"  # Disabled: Causes HTTP 500 Internal Server Error on some Ollama versions/models
+        pass
         
     req = urllib.request.Request(
         url,

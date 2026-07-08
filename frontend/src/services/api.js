@@ -33,7 +33,16 @@ export async function submitQuery(query, options = {}) {
     return data;
   } catch (error) {
     if (error.response) {
-      throw new Error(error.response.data?.detail || `Server error: ${error.response.status}`, { cause: error });
+      const detail = error.response.data?.detail;
+      let errMsg = `Server error: ${error.response.status}`;
+      if (typeof detail === 'string') {
+        errMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errMsg = `Validation failed: ${detail.map(d => `${d.loc?.join('.') || 'field'}: ${d.msg}`).join(' | ')}`;
+      } else if (typeof detail === 'object' && detail !== null) {
+        errMsg = JSON.stringify(detail);
+      }
+      throw new Error(errMsg, { cause: error });
     }
     if (error.request) {
       throw new Error('Cannot reach backend. Is it running on port 8000?', { cause: error });
@@ -62,7 +71,7 @@ export async function uploadDataset(file) {
 }
 
 /** Ask a conversational follow-up about an existing query result */
-export async function sendChatMessage(message, { query, sql, result, insight, history = [], model = null } = {}) {
+export async function sendChatMessage(message, { query, sql, result, insight, history = [], model = null, tableName = null } = {}) {
   try {
     const { data } = await api.post('/chat', {
       message,
@@ -72,11 +81,21 @@ export async function sendChatMessage(message, { query, sql, result, insight, hi
       insight: insight || null,
       history: history.map(h => ({ role: h.role, content: h.content })),
       model: model || null,
+      table_name: tableName || null,
     });
     return data;
   } catch (error) {
     if (error.response) {
-      throw new Error(error.response.data?.detail || `Server error: ${error.response.status}`, { cause: error });
+      const detail = error.response.data?.detail;
+      let errMsg = `Server error: ${error.response.status}`;
+      if (typeof detail === 'string') {
+        errMsg = detail;
+      } else if (Array.isArray(detail)) {
+        errMsg = `Validation failed: ${detail.map(d => `${d.loc?.join('.') || 'field'}: ${d.msg}`).join(' | ')}`;
+      } else if (typeof detail === 'object' && detail !== null) {
+        errMsg = JSON.stringify(detail);
+      }
+      throw new Error(errMsg, { cause: error });
     }
     if (error.request) {
       throw new Error('Cannot reach backend. Is it running on port 8000?', { cause: error });
