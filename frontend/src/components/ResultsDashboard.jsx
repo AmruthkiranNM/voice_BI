@@ -32,12 +32,13 @@ export default function ResultsDashboard({
     <section className="bi-dashboard animate-in">
 
       {/* ── Query header bar ─────────────────────────────── */}
-      <div className="bi-query-bar">
-        <div className="min-w-0">
-          <p className="bi-query-eyebrow">Your question</p>
+      <div className="bi-query-bar relative overflow-hidden group">
+        <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        <div className="min-w-0 relative z-10">
+          <p className="bi-query-eyebrow">Analysis Context</p>
           <p className="bi-query-text">{query}</p>
         </div>
-        <div className="bi-query-meta">
+        <div className="bi-query-meta relative z-10">
           {intent && (
             <span className="bi-meta-tag">{intent}</span>
           )}
@@ -45,17 +46,23 @@ export default function ResultsDashboard({
             <span className="bi-meta-tag">{result.row_count.toLocaleString()} rows</span>
           )}
           {pipelineTime != null && (
-            <span className="bi-meta-tag">{pipelineTime.toFixed(2)}s</span>
+            <span className="bi-meta-tag flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
+              {pipelineTime.toFixed(2)}s
+            </span>
           )}
           {metadata?.cache_hit && (
-            <span className="bi-meta-tag accent">⚡ cached</span>
+            <span className="bi-meta-tag accent flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+              Cached
+            </span>
           )}
           <button
             type="button"
             onClick={() => window.print()}
             className="no-print bi-export-btn"
           >
-            Export Report
+            Export PDF
           </button>
         </div>
       </div>
@@ -105,11 +112,8 @@ export default function ResultsDashboard({
       {/* ── Data Table (full width) ────────────────────────── */}
       <ResultTable result={result} fullWidth />
 
-      {/* ── Technical Details ─────────────────────────────── */}
-      <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />
-
       {/* ── Follow-Up Chat ────────────────────────────────── */}
-      <div className="no-print">
+      <div className="no-print mt-8">
         <FollowUpChat
           query={query}
           sql={sql}
@@ -121,6 +125,10 @@ export default function ResultsDashboard({
           autoSpeak={settings.speakInsight}
         />
       </div>
+
+      {/* ── Technical Details ─────────────────────────────── */}
+      <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />
+
     </section>
   );
 }
@@ -148,24 +156,26 @@ function SecondaryChartOrStats({ result, intent }) {
   };
 
   return (
-    <div className="panel-card h-full">
-      <h3 className="text-xs font-mono uppercase tracking-widest text-gray-500 mb-4">Numeric Summary</h3>
-      <div className="space-y-4">
-        {stats.map(s => (
-          <div key={s.col} className="bi-stat-block">
-            <p className="bi-stat-block-label">{s.col}</p>
-            <div className="bi-stat-block-grid">
-              <StatMini label="Total" val={fmt(s.sum)} accent />
-              <StatMini label="Average" val={fmt(s.avg)} />
-              <StatMini label="High" val={fmt(s.max)} />
-              <StatMini label="Low" val={fmt(s.min)} />
+    <div className="panel-card h-full flex flex-col justify-between">
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-5">Numeric Summary</h3>
+        <div className="space-y-5">
+          {stats.map(s => (
+            <div key={s.col} className="bi-stat-block">
+              <p className="bi-stat-block-label truncate">{s.col}</p>
+              <div className="bi-stat-block-grid">
+                <StatMini label="Total" val={fmt(s.sum)} accent />
+                <StatMini label="Average" val={fmt(s.avg)} />
+                <StatMini label="High" val={fmt(s.max)} />
+                <StatMini label="Low" val={fmt(s.min)} />
+              </div>
+              {/* mini progress bar showing avg/max ratio */}
+              <div className="bi-stat-bar-wrap mt-2">
+                <div className="bi-stat-bar" style={{ width: `${Math.min(100, (s.avg / s.max) * 100)}%` }} />
+              </div>
             </div>
-            {/* mini progress bar showing avg/max ratio */}
-            <div className="bi-stat-bar-wrap">
-              <div className="bi-stat-bar" style={{ width: `${Math.min(100, (s.avg / s.max) * 100)}%` }} />
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -173,9 +183,9 @@ function SecondaryChartOrStats({ result, intent }) {
 
 function StatMini({ label, val, accent }) {
   return (
-    <div>
-      <p className="text-[10px] text-gray-600 uppercase tracking-wide">{label}</p>
-      <p className={`text-sm font-semibold font-mono ${accent ? 'text-[#c8ff4d]' : 'text-white'}`}>{val}</p>
+    <div className="bg-white/[0.02] rounded-md p-2 border border-white/5">
+      <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mb-0.5">{label}</p>
+      <p className={`text-sm font-semibold font-mono ${accent ? 'text-blue-400' : 'text-zinc-100'}`}>{val}</p>
     </div>
   );
 }

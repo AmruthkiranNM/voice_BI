@@ -1,22 +1,22 @@
 /**
  * biPalette.js
  * Professional BI color palette — consistent, no random assignment.
- * Inspired by Power BI / Fabric default theme with a lime accent overlay.
+ * Modern enterprise aesthetic (blues, purples, teals, and complementary colors).
  */
 
 export const BI_COLORS = [
-  '#c8ff4d', // lime accent (primary)
-  '#5eead4', // teal
-  '#60a5fa', // blue
-  '#f59e0b', // amber
-  '#a78bfa', // violet
-  '#f87171', // red
-  '#34d399', // emerald
-  '#fb923c', // orange
-  '#38bdf8', // sky
-  '#e879f9', // fuchsia
-  '#4ade80', // green
-  '#facc15', // yellow
+  '#3b82f6', // blue-500 (primary)
+  '#8b5cf6', // violet-500
+  '#10b981', // emerald-500
+  '#f59e0b', // amber-500
+  '#0ea5e9', // sky-500
+  '#ec4899', // pink-500
+  '#14b8a6', // teal-500
+  '#f43f5e', // rose-500
+  '#6366f1', // indigo-500
+  '#84cc16', // lime-500
+  '#a855f7', // purple-500
+  '#eab308', // yellow-500
 ];
 
 export const BI_COLORS_MUTED = BI_COLORS.map(c => c + '55'); // 33% opacity hex
@@ -43,26 +43,26 @@ export function getPalette(count) {
 
 /** ECharts-compatible rich tooltip theme */
 export const ECHARTS_TOOLTIP_STYLE = {
-  backgroundColor: 'rgba(13,13,11,0.96)',
-  borderColor: 'rgba(200,255,77,0.25)',
+  backgroundColor: 'rgba(24,24,27,0.96)', /* zinc-900 */
+  borderColor: 'rgba(59,130,246,0.3)',    /* blue-500 */
   borderWidth: 1,
-  textStyle: { color: '#f2f2ee', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
+  textStyle: { color: '#f4f4f5', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
   padding: [10, 14],
-  extraCssText: 'box-shadow: 0 8px 32px rgba(0,0,0,0.5); border-radius: 6px;',
+  extraCssText: 'box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); border-radius: 8px;',
 };
 
 export const ECHARTS_AXIS_STYLE = {
   axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
   axisTick: { show: false },
-  axisLabel: { color: '#9ca3af', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+  axisLabel: { color: '#a1a1aa', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
   splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)', type: 'dashed' } },
-  nameTextStyle: { color: '#6b7280', fontSize: 11 },
+  nameTextStyle: { color: '#71717a', fontSize: 11 },
 };
 
 export const ECHARTS_LEGEND_STYLE = {
-  textStyle: { color: '#9ca3af', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
+  textStyle: { color: '#a1a1aa', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
   itemWidth: 10,
   itemHeight: 10,
   icon: 'roundRect',
-  pageTextStyle: { color: '#9ca3af' },
+  pageTextStyle: { color: '#a1a1aa' },
 };

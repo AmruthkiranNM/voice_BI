@@ -1,24 +1,34 @@
 import { useState, useRef, useCallback } from 'react';
 import { uploadDataset } from '../services/api';
+import { TbCloudUpload, TbFileSpreadsheet, TbCheck, TbAlertCircle } from 'react-icons/tb';
 
 function DataQuality({ report }) {
   if (!report) return null;
   const { score, issues } = report;
-  const color = score >= 85 ? 'text-[#c8ff4d]' : score >= 60 ? 'text-amber-400' : 'text-red-400';
+  const colorClass = score >= 85 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' 
+                   : score >= 60 ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' 
+                   : 'text-red-400 bg-red-400/10 border-red-400/20';
 
   return (
-    <div className="border-l-2 border-white/20 bg-black/20 px-3 py-2 space-y-1.5">
+    <div className="mt-4 p-4 rounded-lg bg-white/[0.02] border border-white/5 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400 font-medium">Data quality</span>
-        <span className={`text-sm font-data font-semibold ${color}`}>{score}/100</span>
+        <span className="text-sm font-medium text-zinc-400">Data Quality Score</span>
+        <div className={`px-2.5 py-1 rounded-full border text-xs font-bold ${colorClass}`}>
+          {score}/100
+        </div>
       </div>
       {issues.length > 0 && (
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {issues.slice(0, 3).map((issue, i) => (
-            <li key={i} className="text-xs text-gray-500 leading-snug">• {issue.message}</li>
+            <li key={i} className="text-xs text-zinc-500 flex items-start gap-2">
+              <TbAlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500/70" />
+              <span className="leading-snug">{issue.message}</span>
+            </li>
           ))}
           {issues.length > 3 && (
-            <li className="text-xs text-gray-600">+ {issues.length - 3} more</li>
+            <li className="text-xs text-zinc-600 pl-5 pt-1 font-medium">
+              +{issues.length - 3} more issues detected
+            </li>
           )}
         </ul>
       )}
@@ -31,27 +41,31 @@ function DataPreview({ upload }) {
   const columns = upload.columns || Object.keys(upload.preview_rows[0]);
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-white/5 bg-black/20 max-h-40 mt-4">
-      <table className="w-full text-xs text-left">
-        <thead className="text-gray-500 border-b border-white/5">
-          <tr>
-            {columns.map(col => (
-              <th key={col} className="px-3 py-2 font-medium whitespace-nowrap">
-                {col.replace(/_/g, ' ')}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/5 text-gray-400">
-          {upload.preview_rows.slice(0, 5).map((row, i) => (
-            <tr key={i}>
+    <div className="mt-4 rounded-lg border border-white/10 bg-black/40 overflow-hidden">
+      <div className="overflow-x-auto max-h-48 scrollbar-thin">
+        <table className="w-full text-xs text-left whitespace-nowrap">
+          <thead className="sticky top-0 bg-[#18181b] text-zinc-400 border-b border-white/10 z-10">
+            <tr>
               {columns.map(col => (
-                <td key={col} className="px-3 py-1.5 whitespace-nowrap">{row[col] ?? '—'}</td>
+                <th key={col} className="px-4 py-2.5 font-medium uppercase tracking-wider text-[10px]">
+                  {col.replace(/_/g, ' ')}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-white/5 text-zinc-300">
+            {upload.preview_rows.slice(0, 5).map((row, i) => (
+              <tr key={i} className="hover:bg-white/5 transition-colors">
+                {columns.map(col => (
+                  <td key={col} className="px-4 py-2 truncate max-w-[200px]">
+                    {row[col] ?? <span className="text-zinc-600">—</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -88,85 +102,114 @@ export default function DatasetUpload({ onUploadSuccess }) {
   }, [onUploadSuccess]);
 
   const businessType = lastUpload?.domain?.business_type || lastUpload?.domain?.label;
-  const typeConfidence = lastUpload?.domain?.confidence ?? 0;
-  const typeLabel = typeConfidence >= 0.25 ? 'Detected data type:' : 'Data profile:';
 
   return (
-    <section
-      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setIsDragging(false);
-        processFile(e.dataTransfer.files[0]);
-      }}
-      className={`border p-5 sm:p-6 transition-colors ${
-        isDragging
-          ? 'border-[#c8ff4d]/50 bg-[#c8ff4d]/[0.04]'
-          : lastUpload
-            ? 'border-[#c8ff4d]/25 bg-[#c8ff4d]/[0.02]'
-            : 'border-white/10 bg-white/[0.02]'
-      }`}
-    >
+    <section className="w-full">
       {!lastUpload ? (
-        <div className="text-center space-y-4 py-4">
-          <svg className="mx-auto" width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 4v11M7 10l5 5 5-5M4 19h16" stroke="#c8ff4d" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <div>
-            <p className="text-white font-medium">Drop your CSV here</p>
-            <p className="text-gray-500 text-sm mt-1">Sales, inventory, payroll — any business spreadsheet</p>
-          </div>
-          <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
-          >
-            {isUploading ? 'Uploading…' : 'Choose file'}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[#c8ff4d] text-xs font-data uppercase tracking-wide">Data loaded</p>
-              <p className="text-white font-semibold mt-1 truncate">{lastUpload.table_name?.replace(/_/g, ' ')}</p>
-              <p className="text-gray-500 text-sm mt-0.5 font-data">
-                {lastUpload.row_count?.toLocaleString()} rows · {lastUpload.columns?.length} columns
+        <div
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setIsDragging(false);
+            processFile(e.dataTransfer.files[0]);
+          }}
+          className={`
+            relative group flex flex-col items-center justify-center w-full h-64 sm:h-72
+            rounded-2xl border-2 border-dashed transition-all duration-300 ease-in-out
+            ${isDragging 
+              ? 'border-blue-500 bg-blue-500/10' 
+              : 'border-zinc-700 hover:border-blue-500/50 hover:bg-white/[0.02] bg-white/[0.01]'
+            }
+          `}
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+          
+          <div className="relative z-10 flex flex-col items-center text-center space-y-4 px-6">
+            <div className={`
+              p-4 rounded-full transition-transform duration-300 
+              ${isDragging ? 'scale-110 bg-blue-500/20' : 'bg-white/5 group-hover:scale-110'}
+            `}>
+              <TbCloudUpload className={`w-8 h-8 ${isDragging ? 'text-blue-400' : 'text-zinc-400 group-hover:text-blue-400'}`} />
+            </div>
+            
+            <div>
+              <p className="text-lg font-medium text-zinc-100">
+                Drag and drop your dataset
+              </p>
+              <p className="text-sm text-zinc-500 mt-1 max-w-sm">
+                Supported formats: CSV. File size limit: 50MB.
               </p>
             </div>
+
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
+            
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="text-xs text-gray-400 hover:text-white shrink-0 px-3 py-1.5 border border-white/10 hover:border-white/25 transition-colors"
+              className="btn-primary px-6 py-2.5 text-sm rounded-full disabled:opacity-50 mt-2"
             >
-              Replace
+              {isUploading ? 'Uploading...' : 'Browse files'}
             </button>
           </div>
-
-          {businessType && (
-            <div className="flex items-center gap-2 px-3 py-2 border-l-2 border-[#c8ff4d]/60 bg-black/20">
-              <span className="text-gray-400 text-xs font-medium">{typeLabel}</span>
-              <span className="text-white text-sm font-semibold">{businessType}</span>
+        </div>
+      ) : (
+        <div className="glass-panel p-6 sm:p-8 rounded-2xl">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
+            <div className="flex gap-4">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0 h-fit">
+                <TbFileSpreadsheet className="w-6 h-6 text-blue-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-lg font-semibold text-zinc-100 truncate">{lastUpload.table_name?.replace(/_/g, ' ')}</h3>
+                  <TbCheck className="w-4 h-4 text-emerald-400" />
+                </div>
+                <p className="text-sm text-zinc-500 font-data">
+                  {lastUpload.row_count?.toLocaleString()} rows • {lastUpload.columns?.length} columns
+                </p>
+                {businessType && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-medium text-zinc-300">
+                    <span>Domain:</span>
+                    <span className="text-blue-400">{businessType}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+            
+            <div className="flex shrink-0">
+              <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-all w-full sm:w-auto"
+              >
+                Replace Dataset
+              </button>
+            </div>
+          </div>
 
           <DataQuality report={lastUpload.data_quality} />
 
-          <button
-            type="button"
-            onClick={() => setShowPreview(v => !v)}
-            className="text-xs text-gray-400 hover:text-white transition-colors font-data"
-          >
-            {showPreview ? '− Hide preview' : '+ Preview data'}
-          </button>
-          {showPreview && <DataPreview upload={lastUpload} />}
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => setShowPreview(v => !v)}
+              className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+            >
+              {showPreview ? 'Hide Preview' : 'Show Data Preview'}
+            </button>
+            {showPreview && <DataPreview upload={lastUpload} />}
+          </div>
         </div>
       )}
 
-      {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+      {error && (
+        <div className="mt-4 p-4 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-3 text-red-400 text-sm">
+          <TbAlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <p>{error}</p>
+        </div>
+      )}
     </section>
   );
 }

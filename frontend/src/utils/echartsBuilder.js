@@ -71,7 +71,7 @@ const richTooltip = (labels, datasets) => ({
           <span style="color:#9ca3af;font-size:11px;">${p.seriesName}</span>
           <span style="margin-left:auto;font-weight:600;color:#f2f2ee;">${fmtValueFull(val, colName)}</span>
           ${pct != null ? `<span style="color:#6b7280;font-size:10px;">${pct}%</span>` : ''}
-          <span style="color:${diff >= 0 ? '#c8ff4d' : '#f87171'};font-size:10px;">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}% avg</span>
+          <span style="color:${diff >= 0 ? '#3b82f6' : '#f87171'};font-size:10px;">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}% avg</span>
         </div>`;
     }).join('');
     return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:#f2f2ee;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">${name}</div>${rows}</div>`;
@@ -93,7 +93,7 @@ const itemTooltip = (datasets) => ({
     return `<div style="min-width:200px;">
       <div style="font-weight:600;color:#f2f2ee;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">${p.name}</div>
       <div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9ca3af;">Value</span><span style="font-weight:600;color:#f2f2ee;">${fmtValueFull(val, colName)}</span></div>
-      ${pct != null ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9ca3af;">Share</span><span style="color:#c8ff4d;">${pct}%</span></div>` : ''}
+      ${pct != null ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9ca3af;">Share</span><span style="color:#3b82f6;">${pct}%</span></div>` : ''}
       ${rank ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9ca3af;">Rank</span><span style="color:#60a5fa;">#${rank} of ${allVals.length}</span></div>` : ''}
     </div>`;
   },
@@ -124,7 +124,7 @@ function chartTitle(text, subtext = '') {
 
 const dataZoom = [
   { type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true },
-  { type: 'slider', height: 20, bottom: 4, fillerColor: 'rgba(200,255,77,0.08)', borderColor: 'rgba(255,255,255,0.08)', handleStyle: { color: '#c8ff4d' }, textStyle: { color: '#6b7280' } },
+  { type: 'slider', height: 20, bottom: 4, fillerColor: 'rgba(59,130,246,0.08)', borderColor: 'rgba(255,255,255,0.08)', handleStyle: { color: '#3b82f6' }, textStyle: { color: '#6b7280' } },
 ];
 
 const animationConfig = { animation: true, animationDuration: 600, animationEasing: 'cubicOut', animationDurationUpdate: 400, animationEasingUpdate: 'cubicInOut' };
@@ -164,7 +164,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       restore: { title: 'Reset' },
     },
     iconStyle: { color: '#6b7280', borderColor: 'transparent' },
-    emphasis: { iconStyle: { color: '#c8ff4d' } },
+    emphasis: { iconStyle: { color: '#3b82f6' } },
   };
 
   switch (type) {
@@ -195,7 +195,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         toolbox, grid: { left: 16, right: 16, top: 56, bottom: 16, containLabel: true },
         xAxis: { type: 'value', ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, name: primaryMetric, nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: '#6b7280', fontSize: 11 } },
         yAxis: { type: 'category', data: [...labels].reverse(), ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, width: 120, overflow: 'truncate' }, name: labelColName, nameTextStyle: { color: '#6b7280', fontSize: 11 } },
-        dataZoom: labels.length > 10 ? [{ type: 'inside', yAxisIndex: 0 }, { type: 'slider', yAxisIndex: 0, width: 16, right: 0, fillerColor: 'rgba(200,255,77,0.08)', borderColor: 'rgba(255,255,255,0.08)' }] : [],
+        dataZoom: labels.length > 10 ? [{ type: 'inside', yAxisIndex: 0 }, { type: 'slider', yAxisIndex: 0, width: 16, right: 0, fillerColor: 'rgba(59,130,246,0.08)', borderColor: 'rgba(255,255,255,0.08)' }] : [],
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'bar', data: [...ds.data].reverse(), barMaxWidth: 32,
           itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] },
@@ -253,7 +253,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           name: ds.label, type: 'line', data: ds.data, smooth: 0.4,
           symbol: 'circle', symbolSize: 5,
           lineStyle: { width: 2.5, color: colors[i] },
-          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#0a0a08' },
+          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#09090b' },
           emphasis: { scale: true, focus: 'series' },
           label: { show: extra.showLabels, position: 'top', color: '#9ca3af', fontSize: 9, formatter: p => fmt(p.value) },
         })),
@@ -317,7 +317,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           symbol: 'circle', symbolSize: 5,
           lineStyle: { width: 2.5, color: colors[i] },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: hexToRgba(colors[i], 0.25) }, { offset: 1, color: hexToRgba(colors[i], 0.02) }] } },
-          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#0a0a08' },
+          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#09090b' },
           emphasis: { scale: true, focus: 'series' },
           label: { show: extra.showLabels, position: 'top', color: '#9ca3af', fontSize: 9, formatter: p => fmt(p.value) },
         })),
@@ -401,9 +401,9 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
             scaleSize: 8,
             focus: 'self',
             blurScope: 'coordinateSystem',
-            itemStyle: { shadowBlur: 20, shadowColor: 'rgba(200,255,77,0.4)' },
+            itemStyle: { shadowBlur: 20, shadowColor: 'rgba(59,130,246,0.4)' },
           },
-          itemStyle: { borderColor: '#0a0a08', borderWidth: 2, borderRadius: 4 },
+          itemStyle: { borderColor: '#09090b', borderWidth: 2, borderRadius: 4 },
           animationType: 'scale',
           animationEasing: 'elasticOut',
         }],
@@ -423,9 +423,9 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           name: datasets[0]?.label || 'Value', type: 'treemap', data: tmData,
           top: 48,
           roam: false, nodeClick: 'zoomToNode',
-          label: { show: true, formatter: p => `${p.name}\n${fmt(p.value)}`, color: '#0a0a08', fontWeight: 600, fontSize: 11 },
-          itemStyle: { borderColor: '#0a0a08', borderWidth: 2, gapWidth: 3 },
-          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(200,255,77,0.4)' } },
+          label: { show: true, formatter: p => `${p.name}\n${fmt(p.value)}`, color: '#09090b', fontWeight: 600, fontSize: 11 },
+          itemStyle: { borderColor: '#09090b', borderWidth: 2, gapWidth: 3 },
+          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(59,130,246,0.4)' } },
           breadcrumb: { show: true, bottom: 4, height: 20, itemStyle: { color: '#1f2937', textStyle: { color: '#9ca3af' } } },
           levels: [{ color: colors, colorMappingBy: 'index' }],
         }],
@@ -517,8 +517,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         grid: { left: 80, right: 16, top: 56, bottom: 80, containLabel: true },
         xAxis: { type: 'category', data: labels.slice(0, 20), ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, rotate: 35 } },
         yAxis: { type: 'category', data: datasets.slice(0, 20).map(d => d.label), ...ECHARTS_AXIS_STYLE },
-        visualMap: { min: Math.min(...vals), max: Math.max(...vals), calculable: true, orient: 'horizontal', left: 'center', bottom: 4, inRange: { color: ['#1f2937', '#c8ff4d'] }, textStyle: { color: '#6b7280' } },
-        series: [{ type: 'heatmap', data: hmData, label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(200,255,77,0.3)' } } }],
+        visualMap: { min: Math.min(...vals), max: Math.max(...vals), calculable: true, orient: 'horizontal', left: 'center', bottom: 4, inRange: { color: ['#1f2937', '#3b82f6'] }, textStyle: { color: '#6b7280' } },
+        series: [{ type: 'heatmap', data: hmData, label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(59,130,246,0.3)' } } }],
         ...animationConfig,
       };
     }
@@ -534,9 +534,9 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         series: [{
           name: datasets[0]?.label || 'Value', type: 'funnel', data: fnData,
           left: '10%', width: '80%', top: 56, bottom: 20,
-          label: { show: true, position: 'inside', color: '#0a0a08', fontWeight: 600, fontSize: 11, formatter: p => `${p.name}\n${fmt(p.value)}` },
+          label: { show: true, position: 'inside', color: '#09090b', fontWeight: 600, fontSize: 11, formatter: p => `${p.name}\n${fmt(p.value)}` },
           emphasis: { label: { fontSize: 13 } },
-          itemStyle: { borderColor: '#0a0a08', borderWidth: 2 },
+          itemStyle: { borderColor: '#09090b', borderWidth: 2 },
         }],
         ...animationConfig,
       };
@@ -579,7 +579,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           radius: '75%',
           center: ['50%', '58%'],
           data: [{ value: gVal, name: labels[0] || 'Value' }],
-          axisLine: { lineStyle: { width: 18, color: [[0.3, '#f87171'], [0.7, '#f59e0b'], [1, '#c8ff4d']] } },
+          axisLine: { lineStyle: { width: 18, color: [[0.3, '#f87171'], [0.7, '#f59e0b'], [1, '#3b82f6']] } },
           pointer: { itemStyle: { color: '#f2f2ee' } },
           axisTick: { show: false }, splitLine: { show: false },
           axisLabel: { color: '#6b7280', fontSize: 10, formatter: v => fmt(v) },

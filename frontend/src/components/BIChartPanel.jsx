@@ -175,7 +175,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
   const exportPng = useCallback(() => {
     const chart = chartRef.current?.getEchartsInstance();
     if (!chart) return;
-    const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#0a0a08' });
+    const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#09090b' });
     const a = document.createElement('a');
     a.href = url;
     a.download = 'chart.png';
@@ -222,7 +222,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       <div className="bi-chart-header">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500">Visualization</span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-[#c8ff4d]/10 text-[#c8ff4d] border border-[#c8ff4d]/20">
+          <span className="text-[10px] px-2 py-0.5 rounded bg-[#3b82f6]/10 text-[#3b82f6] border border-[#3b82f6]/20">
             {ALL_CHART_TYPES.find(t => t.id === effectiveType)?.label || effectiveType}
           </span>
           {compatibility[effectiveType]?.recommended && !activeType && (

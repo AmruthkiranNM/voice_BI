@@ -7,7 +7,7 @@
 function highlightNumbers(text, key) {
   return text.split(/(\$?[\d,]+\.?\d*%?)/g).map((p, i) =>
     /^\$?[\d,]+\.?\d*%?$/.test(p) && p.trim()
-      ? <span key={`${key}-${i}`} className="font-data font-semibold text-[#c8ff4d]">{p}</span>
+      ? <span key={`${key}-${i}`} className="font-data font-semibold text-[#3b82f6]">{p}</span>
       : p
   );
 }

@@ -87,7 +87,7 @@ export default function ResultTable({ result, fullWidth = false }) {
       return (
         <span>
           {s.slice(0, idx)}
-          <mark className="bg-[#c8ff4d]/30 text-white rounded">{s.slice(idx, idx + filter.length)}</mark>
+          <mark className="bg-[#3b82f6]/30 text-white rounded">{s.slice(idx, idx + filter.length)}</mark>
           {s.slice(idx + filter.length)}
         </span>
       );

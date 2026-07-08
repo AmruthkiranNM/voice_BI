@@ -24,7 +24,7 @@ export default function ResultStats({ result }) {
           <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-4">Number breakdown</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {numericStats.map(stat => (
-              <div key={stat.column} className="border-l-2 border-[#c8ff4d]/60 bg-black/20 p-4">
+              <div key={stat.column} className="border-l-2 border-[#3b82f6]/60 bg-black/20 p-4">
                 <p className="text-xs text-gray-500 capitalize mb-3">{stat.label}</p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <MiniStat label="Total" value={formatStatValue(stat.sum)} />
@@ -43,9 +43,9 @@ export default function ResultStats({ result }) {
 
 function StatCard({ label, value, small, highlight }) {
   return (
-    <div className="border-l-2 border-[#c8ff4d]/60 bg-black/20 px-4 py-3">
+    <div className="border-l-2 border-[#3b82f6]/60 bg-black/20 px-4 py-3">
       <p className="text-[11px] text-gray-500 mb-1">{label}</p>
-      <p className={`font-semibold text-white truncate ${small ? 'text-sm' : 'text-lg'} ${highlight ? 'text-[#c8ff4d]' : ''}`}>
+      <p className={`font-semibold text-white truncate ${small ? 'text-sm' : 'text-lg'} ${highlight ? 'text-[#3b82f6]' : ''}`}>
         {value}
       </p>
     </div>

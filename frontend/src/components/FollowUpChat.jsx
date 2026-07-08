@@ -1,198 +1,157 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { sendChatMessage } from '../services/api';
-import { useVoiceInput, useSpeechOutput } from '../hooks/useVoice';
-import RichText from './RichText';
+import { TbMessageCircle, TbSend, TbRobot, TbUser, TbMicrophone } from 'react-icons/tb';
+import { useVoiceInput } from '../hooks/useVoice';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-/**
- * Conversational thread about the dataset, fully voice-capable.
- *
- * - Tap the mic to ask a follow-up by voice (live transcript shown).
- * - Replies are read aloud when speech output is enabled.
- * - Hands-free mode chains the loop: after a reply finishes speaking, the
- *   mic re-opens automatically for the next question — a true "talk to your
- *   data" conversation. Context always reflects the most recent query;
- *   messages are controlled by the parent so the thread survives new queries.
- */
 export default function FollowUpChat({
   query, sql, result, insight, model,
-  messages, onMessagesChange,
-  autoSpeak = false,
+  messages, onMessagesChange, autoSpeak
 }) {
-  const [draft, setDraft] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [error, setError] = useState(null);
-  const [handsFree, setHandsFree] = useState(false);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef(null);
-  const handsFreeRef = useRef(false);
-  const messagesRef = useRef(messages);
-  const startListeningRef = useRef(null);
 
-  useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-  const { speak, stop: stopSpeaking, isSpeaking, isSupported: speechSupported } = useSpeechOutput();
-
-  const submitMessage = useCallback(async (text) => {
-    const trimmed = text.trim();
-    if (!trimmed || isSending) return;
-
-    const nextMessages = [...messagesRef.current, { role: 'user', content: trimmed }];
-    onMessagesChange(nextMessages);
-    setDraft('');
-    setIsSending(true);
-    setError(null);
-
-    try {
-      const res = await sendChatMessage(trimmed, {
-        query, sql, result, insight, history: messagesRef.current, model,
-      });
-      if (res.success) {
-        onMessagesChange([...nextMessages, { role: 'assistant', content: res.reply }]);
-        // Speak the reply if hands-free or auto-speak is on; when hands-free,
-        // re-open the mic once speaking finishes to continue the conversation.
-        if (handsFreeRef.current || autoSpeak) {
-          speak(res.reply, {
-            onEnd: () => { if (handsFreeRef.current) startListeningRef.current?.(); },
-          });
-        }
-      } else {
-        setError(res.error || 'Could not get a reply.');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setIsSending(false);
+  // Auto-scroll to bottom of chat
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [isSending, query, sql, result, insight, model, onMessagesChange, autoSpeak, speak]);
+  }, [messages, isTyping]);
 
-  const { isListening, isSupported: voiceSupported, startListening, stopListening } = useVoiceInput({
-    onResult: (transcript) => { setDraft(transcript); submitMessage(transcript); },
-    onInterim: (t) => setDraft(t),
-    onError: (msg) => { setError(msg); setHandsFree(false); handsFreeRef.current = false; },
+  const { isListening, isSupported, startListening, stopListening } = useVoiceInput({
+    onResult: (t) => { setInput(t); handleSend(t); },
+    onInterim: setInput,
   });
 
-  useEffect(() => { startListeningRef.current = startListening; }, [startListening]);
+  const handleSend = async (overrideInput = null) => {
+    const text = (overrideInput || input).trim();
+    if (!text) return;
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
+    setInput('');
+    const newMsgs = [...messages, { role: 'user', content: text }];
+    onMessagesChange(newMsgs);
+    setIsTyping(true);
 
-  const toggleHandsFree = () => {
-    const next = !handsFree;
-    setHandsFree(next);
-    handsFreeRef.current = next;
-    if (next) {
-      startListening();
-    } else {
-      stopListening();
-      stopSpeaking();
+    try {
+      const response = await sendChatMessage(text, {
+        originalQuery: query,
+        sql,
+        dataSummary: result?.insight,
+        history: newMsgs.slice(-5),
+        model,
+      });
+
+      const aiMsg = { role: 'assistant', content: response.message };
+      onMessagesChange([...newMsgs, aiMsg]);
+
+      // Speak AI response if autoSpeak is enabled
+      if (autoSpeak && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(response.message);
+        utterance.rate = 1.05;
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      onMessagesChange([...newMsgs, { role: 'assistant', content: '❌ Sorry, I encountered an error: ' + err.message }]);
+    } finally {
+      setIsTyping(false);
     }
   };
 
-  const handleSend = (e) => {
-    e.preventDefault();
-    submitMessage(draft);
-  };
-
-  if (!result?.rows?.length) return null;
-
-  const status = isListening ? 'Listening…' : isSpeaking ? 'Speaking…' : isSending ? 'Thinking…' : null;
-
   return (
-    <div className="panel-card">
-      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-        <h3 className="text-xs font-data uppercase tracking-wide text-gray-500">Ask a follow-up</h3>
-        <div className="flex items-center gap-3">
-          {voiceSupported && speechSupported && (
-            <button
-              type="button"
-              onClick={toggleHandsFree}
-              className={`px-2.5 py-1 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                handsFree ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
-              }`}
-              title="Hands-free conversation: speak, hear the answer, then keep talking"
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${handsFree ? 'bg-[#0a0a08] animate-pulse' : 'bg-gray-500'}`} />
-              Hands-free
-            </button>
-          )}
-          {messages.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onMessagesChange([])}
-              className="text-xs text-gray-400 hover:text-red-400 transition-colors font-data"
-            >
-              Clear thread
-            </button>
-          )}
+    <div className="panel-card flex flex-col h-[500px] border-t-4 border-t-violet-500 shadow-xl shadow-violet-500/5 relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5 relative z-10">
+        <div className="p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
+          <TbMessageCircle className="w-5 h-5 text-violet-400" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-100 tracking-wide">AI Data Analyst</h3>
+          <p className="text-xs text-zinc-500">Ask follow-up questions about this result</p>
         </div>
       </div>
 
-      {messages.length > 0 && (
-        <div ref={scrollRef} className="space-y-3 mb-4 max-h-72 overflow-y-auto pr-1">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] px-3 py-2 text-sm leading-relaxed ${
-                  m.role === 'user'
-                    ? 'bg-[#c8ff4d] text-[#0a0a08] font-medium'
-                    : 'bg-black/30 border border-white/10 text-gray-200'
-                }`}
-              >
-                {m.role === 'user' ? m.content : <RichText text={m.content} />}
+      <div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 scrollbar-thin relative z-10" ref={scrollRef}>
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-3">
+            <TbRobot className="w-10 h-10 opacity-20" />
+            <p className="text-sm text-center max-w-xs">I understand the data shown above. Ask me to clarify, summarize, or extract deeper insights.</p>
+          </div>
+        ) : (
+          messages.map((msg, i) => (
+            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm
+                ${msg.role === 'user' ? 'bg-blue-600/20 border-blue-500/30' : 'bg-violet-600/20 border-violet-500/30'}
+              `}>
+                {msg.role === 'user' ? <TbUser className="w-4 h-4 text-blue-400" /> : <TbRobot className="w-4 h-4 text-violet-400" />}
+              </div>
+              <div className={`px-4 py-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm
+                ${msg.role === 'user' 
+                  ? 'bg-blue-600/10 border border-blue-500/20 text-zinc-200 rounded-tr-sm' 
+                  : 'bg-white/[0.03] border border-white/5 text-zinc-300 rounded-tl-sm font-light'}
+              `}>
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/10">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
-          {isSending && (
-            <div className="flex justify-start">
-              <div className="bg-black/30 border border-white/10 px-3 py-2 text-sm text-gray-500">
-                Thinking…
-              </div>
+          ))
+        )}
+        
+        {isTyping && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center shrink-0">
+              <TbRobot className="w-4 h-4 text-violet-400" />
             </div>
-          )}
-        </div>
-      )}
+            <div className="px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/5 rounded-tl-sm flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        )}
+      </div>
 
-      <form onSubmit={handleSend} className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 bg-white/[0.03] border border-white/10 px-3 py-2.5 focus-within:border-[#c8ff4d]/50 transition-colors">
-          <input
-            type="text"
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            placeholder={isListening ? 'Listening…' : 'e.g. "How can I improve my sales with this data?"'}
-            disabled={isSending}
-            className="flex-1 bg-transparent text-sm text-white placeholder:text-gray-600 outline-none disabled:opacity-50"
-          />
-          {voiceSupported && (
+      <div className="relative group z-10">
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
+        <div className="relative flex items-center bg-[#09090b] border border-white/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
+          {isSupported && (
             <button
-              type="button"
               onClick={isListening ? stopListening : startListening}
-              disabled={isSending}
-              title={isListening ? 'Stop' : 'Speak your question'}
-              className={`w-7 h-7 flex items-center justify-center shrink-0 transition-colors ${
-                isListening ? 'text-red-400' : 'text-gray-500 hover:text-[#c8ff4d]'
-              }`}
+              className={`p-3 transition-colors ${isListening ? 'text-red-400 bg-red-400/10' : 'text-zinc-500 hover:text-violet-400 hover:bg-violet-400/10'}`}
             >
-              {isListening ? (
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse" />
-              ) : (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.71V21h2v-3.29A7 7 0 0 0 19 11h-2Z" />
-                </svg>
-              )}
+              <TbMicrophone className="w-5 h-5" />
             </button>
           )}
+          
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            placeholder={isListening ? 'Listening...' : 'Ask a follow-up question...'}
+            className="flex-1 bg-transparent text-sm text-zinc-100 px-3 py-4 outline-none placeholder:text-zinc-600"
+            disabled={isTyping}
+          />
+          
+          <button
+            onClick={() => handleSend()}
+            disabled={!input.trim() || isTyping}
+            className="p-3 mr-1 my-1 rounded-lg bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-30 transition-colors shadow-sm"
+          >
+            <TbSend className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={!draft.trim() || isSending}
-          className="btn-primary px-4 py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
-        >
-          {isSending ? '…' : 'Send'}
-        </button>
-      </form>
-
-      {status && <p className="text-[#c8ff4d] text-xs mt-2 font-data">{status}</p>}
-      {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+      </div>
     </div>
   );
 }

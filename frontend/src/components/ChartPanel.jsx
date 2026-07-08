@@ -94,7 +94,7 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
         primaryValues[primaryValues.length - 1],
         ...forecast,
       ],
-      borderColor: '#c8ff4d',
+      borderColor: '#3b82f6',
       backgroundColor: 'transparent',
       borderWidth: 2,
       borderDash: [6, 4],
@@ -184,7 +184,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               type="button"
               onClick={onToggleForecast}
               className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                showForecast ? 'bg-[#c8ff4d] text-[#0a0a08]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
+                showForecast ? 'bg-[#3b82f6] text-[#09090b]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
               }`}
             >
               Forecast
@@ -199,7 +199,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
                   onClick={() => onTypeChange(ct.id)}
                   className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                     selectedType === ct.id
-                      ? 'bg-[#c8ff4d] text-[#0a0a08]'
+                      ? 'bg-[#3b82f6] text-[#09090b]'
                       : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
                   }`}
                 >

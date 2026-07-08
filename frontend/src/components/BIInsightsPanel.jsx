@@ -68,7 +68,7 @@ export default function BIInsightsPanel({ result }) {
       label: topEntry.label,
       value: formatStatValue(topEntry.value),
       sub: topEntry.valueColumn,
-      accent: '#c8ff4d',
+      accent: '#3b82f6',
       badge: 'Rank #1',
     });
   }
@@ -124,7 +124,7 @@ export default function BIInsightsPanel({ result }) {
       label: '',
       value: '',
       sub: c.text,
-      accent: c.type === 'positive' ? '#c8ff4d' : c.type === 'negative' ? '#f87171' : '#a78bfa',
+      accent: c.type === 'positive' ? '#3b82f6' : c.type === 'negative' ? '#f87171' : '#a78bfa',
       badge: null,
     });
   }

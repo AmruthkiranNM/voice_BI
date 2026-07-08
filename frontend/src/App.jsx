@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { submitQuery } from './services/api';
 import { useQueryHistory } from './hooks/useQueryHistory';
+import { TbMenu2 } from 'react-icons/tb';
 
+import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import QueryInput, { DEFAULT_SETTINGS } from './components/QueryInput';
 import ErrorPanel from './components/ErrorPanel';
@@ -16,6 +18,10 @@ export default function App() {
   const [datasetInfo, setDatasetInfo] = useState({ has_data: false, suggestions: [], domain: null });
   const [chatMessages, setChatMessages] = useState([]);
   const { history, addEntry, clearHistory, removeEntry } = useQueryHistory();
+  
+  // App Shell State
+  const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'dashboard'
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const handleUploadSuccess = useCallback((uploadResult) => {
     setDatasetInfo({
@@ -31,11 +37,13 @@ export default function App() {
     setResponse(null);
     setError(null);
     setChatMessages([]);
+    setCurrentView('dashboard');
   }, []);
 
   const handleSubmit = useCallback(async (query) => {
     if (!datasetInfo.has_data) {
       setError('Please upload your CSV file before asking questions.');
+      setCurrentView('upload');
       return;
     }
 
@@ -73,70 +81,130 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a08] text-gray-100 font-sans">
-      <div className="no-print">
-        <Header isProcessing={isLoading} />
-      </div>
+    <div className="flex h-screen bg-[#09090b] text-zinc-100 font-sans overflow-hidden">
+      
+      {/* Sidebar Navigation */}
+      <Sidebar 
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        isMobileOpen={isMobileOpen}
+        setIsMobileOpen={setIsMobileOpen}
+      />
 
-      <div className="flex flex-col lg:flex-row lg:items-start">
-        {/* Left column — chat / query */}
-        <aside className="no-print w-full lg:w-[360px] lg:shrink-0 border-b lg:border-b-0 lg:border-r border-white/8 lg:sticky lg:top-14 lg:h-[calc(100vh-3.5rem)] lg:overflow-y-auto px-4 sm:px-6 py-6">
-          <p className="text-xs font-data uppercase tracking-[0.2em] text-[#c8ff4d] mb-4">Ask a question</p>
-
-          {datasetInfo.has_data ? (
-            <QueryInput
-              onSubmit={handleSubmit}
-              isLoading={isLoading}
-              settings={settings}
-              onSettingsChange={setSettings}
-              suggestions={datasetInfo.suggestions}
-              businessType={datasetInfo.domain?.business_type || datasetInfo.domain?.label}
-              history={history}
-              onClearHistory={clearHistory}
-              onRemoveHistory={removeEntry}
-            />
-          ) : (
-            <div className="border border-white/10 bg-white/[0.02] px-4 py-5 text-sm text-gray-500">
-              Upload a spreadsheet to start asking questions.
+      {/* Main Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+        
+        {/* Top Header */}
+        <header className="h-16 flex items-center justify-between px-4 sm:px-8 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-md z-10 shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsMobileOpen(true)}
+              className="lg:hidden p-2 -ml-2 text-zinc-400 hover:text-white rounded-md"
+            >
+              <TbMenu2 className="w-5 h-5" />
+            </button>
+            <div className="text-sm font-medium text-zinc-300 capitalize tracking-wide flex items-center gap-2">
+              <span className="text-zinc-500 hidden sm:inline">Workspace /</span>
+              <span className="text-zinc-100">{currentView === 'upload' ? 'Data Source' : 'Analysis Dashboard'}</span>
             </div>
-          )}
+          </div>
+          <Header isProcessing={isLoading} />
+        </header>
 
-          {error && <div className="mt-4"><ErrorPanel error={error} /></div>}
-        </aside>
-
-        {/* Middle column — upload + live results */}
-        <main className="flex-1 min-w-0 px-4 sm:px-6 lg:px-10 py-6 space-y-6">
-          <div className="no-print space-y-6">
-            {!datasetInfo.has_data && !isLoading && (
-              <section className="text-center space-y-3 pt-6 pb-2">
-                <h2 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
-                  Ask your business data a question
-                </h2>
-                <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
-                  Upload a spreadsheet, then ask in plain English — by voice or text. SQL, charts, and a written answer, generated on this machine.
-                </p>
-              </section>
-            )}
-
-            <DatasetUpload onUploadSuccess={handleUploadSuccess} />
-
-            {isLoading && (
-              <div className="flex flex-col items-center gap-4 py-16">
-                <div className="w-10 h-10 border-3 border-[#c8ff4d]/20 border-t-[#c8ff4d] rounded-full animate-spin" />
-                <p className="text-sm text-gray-400">Working on your question…</p>
+        {/* Scrollable Content Area */}
+        <main className="flex-1 overflow-y-auto px-4 sm:px-8 py-8 relative">
+          
+          <div className="max-w-7xl mx-auto space-y-8 pb-12">
+            
+            {/* View: Data Source / Upload */}
+            {currentView === 'upload' && (
+              <div className="animate-in max-w-4xl mx-auto">
+                <div className="text-center space-y-4 pt-4 pb-8">
+                  <h1 className="text-3xl sm:text-4xl font-semibold text-white tracking-tight">
+                    Connect your data
+                  </h1>
+                  <p className="text-zinc-400 text-base max-w-lg mx-auto leading-relaxed">
+                    Upload your business spreadsheet to securely analyze trends, ask natural language questions, and generate instant BI dashboards.
+                  </p>
+                </div>
+                
+                <DatasetUpload onUploadSuccess={handleUploadSuccess} />
+                
+                {datasetInfo.has_data && (
+                  <div className="mt-8 text-center">
+                    <button 
+                      onClick={() => setCurrentView('dashboard')}
+                      className="btn-primary px-6 py-3 text-sm"
+                    >
+                      Go to Analysis Dashboard →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
-          </div>
 
-          {hasResults && !isLoading && (
-            <ResultsDashboard
-              response={response}
-              datasetInfo={datasetInfo}
-              settings={settings}
-              chatMessages={chatMessages}
-              onChatMessagesChange={setChatMessages}
-            />
-          )}
+            {/* View: Dashboard & Analysis */}
+            {currentView === 'dashboard' && (
+              <div className="animate-in space-y-8">
+                
+                {/* AI Command Center */}
+                <div className="glass-panel p-1 rounded-2xl sticky top-0 z-20 shadow-2xl shadow-black/50">
+                  <div className="bg-[#18181b] rounded-xl p-4 sm:p-5 border border-white/5">
+                    {datasetInfo.has_data ? (
+                      <QueryInput
+                        onSubmit={handleSubmit}
+                        isLoading={isLoading}
+                        settings={settings}
+                        onSettingsChange={setSettings}
+                        suggestions={!hasResults ? datasetInfo.suggestions : []}
+                        businessType={datasetInfo.domain?.business_type || datasetInfo.domain?.label}
+                        history={history}
+                        onClearHistory={clearHistory}
+                        onRemoveHistory={removeEntry}
+                      />
+                    ) : (
+                      <div className="text-center py-6 text-zinc-500 text-sm">
+                        Please connect a data source first.
+                        <button 
+                          onClick={() => setCurrentView('upload')}
+                          className="ml-2 text-blue-400 hover:text-blue-300 underline underline-offset-4"
+                        >
+                          Go to Data Source
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {error && <ErrorPanel error={error} />}
+
+                {isLoading && (
+                  <div className="flex flex-col items-center gap-6 py-20">
+                    <div className="relative w-12 h-12 flex items-center justify-center">
+                      <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                    </div>
+                    <div className="text-center space-y-2">
+                      <p className="text-sm font-medium text-blue-400 animate-pulse">AI is analyzing your data...</p>
+                      <p className="text-xs text-zinc-500">Generating insights and visualizations</p>
+                    </div>
+                  </div>
+                )}
+
+                {hasResults && !isLoading && (
+                  <ResultsDashboard
+                    response={response}
+                    datasetInfo={datasetInfo}
+                    settings={settings}
+                    chatMessages={chatMessages}
+                    onChatMessagesChange={setChatMessages}
+                  />
+                )}
+              </div>
+            )}
+            
+          </div>
         </main>
       </div>
     </div>

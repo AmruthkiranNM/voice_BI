@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../services/api';
+import { TbCloudCheck, TbCloudOff, TbCloudUpload } from 'react-icons/tb';
 
 export default function Header({ isProcessing }) {
   const [online, setOnline] = useState(false);
@@ -14,28 +15,19 @@ export default function Header({ isProcessing }) {
   const status = isProcessing ? 'working' : online ? 'ready' : 'offline';
 
   return (
-    <header className="sticky top-0 z-50 bg-[#0a0a08]/90 backdrop-blur-sm border-b border-white/8">
-      <div className="px-4 sm:px-6 lg:px-10 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <svg width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-            <rect width="32" height="32" rx="6" fill="#c8ff4d" />
-            <path d="M7 22V14M14 22V8M21 22V12M25 22V16" stroke="#0a0a08" strokeWidth="3" strokeLinecap="round" />
-          </svg>
-          <span className="font-semibold text-white text-sm sm:text-base tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-            Voice BI
-          </span>
-        </div>
-
-        <div className={`flex items-center gap-2 text-xs font-medium font-data uppercase tracking-wide ${
-          status === 'working' ? 'text-amber-400' : status === 'ready' ? 'text-[#c8ff4d]' : 'text-red-400'
-        }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${
-            status === 'working' ? 'bg-amber-400 animate-pulse'
-              : status === 'ready' ? 'bg-[#c8ff4d]' : 'bg-red-400'
-          }`} />
-          {status === 'working' ? 'Analyzing' : status === 'ready' ? 'Ready' : 'Offline'}
-        </div>
-      </div>
-    </header>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.02] border border-white/5">
+      {status === 'working' ? (
+        <TbCloudUpload className="w-4 h-4 text-blue-400 animate-pulse" />
+      ) : status === 'ready' ? (
+        <TbCloudCheck className="w-4 h-4 text-emerald-400" />
+      ) : (
+        <TbCloudOff className="w-4 h-4 text-red-400" />
+      )}
+      <span className={`text-[11px] font-medium uppercase tracking-wider ${
+        status === 'working' ? 'text-blue-400' : status === 'ready' ? 'text-emerald-400' : 'text-red-400'
+      }`}>
+        {status === 'working' ? 'Processing' : status === 'ready' ? 'Connected' : 'Offline'}
+      </span>
+    </div>
   );
 }
