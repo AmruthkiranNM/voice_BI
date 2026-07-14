@@ -27,8 +27,12 @@ CRITICAL RULES:
   * "how many", "number of", "count of" → COUNT(*) (counting rows/records). "How many sales/orders" means COUNT(*), NOT SUM of an amount.
   * "total", "sum of", "combined", "how much revenue/money" → SUM(<value column>).
   * "average", "mean" → AVG(<value column>). "highest"/"lowest"/"maximum"/"minimum" → MAX/MIN.
+- Before using AVG/SUM/MAX/MIN on a column, check its type in the schema below. NEVER aggregate a TEXT/VARCHAR column numerically — AVG() or SUM() on text silently returns 0, which is wrong. If the question asks for an "average"/"total" of a column that is actually categorical text (e.g. a size label like Small/Medium/Large, a Yes/No flag, a status), there is no numeric average — instead return a breakdown: SELECT <category_column>, COUNT(*) AS count ... GROUP BY <category_column> (combined with any other requested grouping, e.g. country).
 - Only add a date/time WHERE filter when the question names a period (e.g. "last month", "this year"). For general "over time" / "trend" questions, include ALL rows — do NOT filter to recent dates.
-- For date filtering, use SQLite date functions like date('now', '-1 month').
+- RELATIVE vs NAMED periods — do not confuse them:
+  * RELATIVE to today (e.g. "last month", "this year", "past 7 days") → filter with date('now', ...), e.g. date_column >= date('now', '-1 month').
+  * NAMED calendar periods with no year given (e.g. "in April", "the month of May", "in Q1") → these refer to the calendar month/quarter itself, NOT a rolling window from today. Filter with strftime('%m', date_column) = '04' (April = '04', May = '05', etc.), never date('now', ...). The data may be from any year — do not restrict by year unless one is stated.
+- For date filtering, use SQLite date functions like date('now', '-1 month') only for RELATIVE periods.
 - For trends, use strftime('%Y-%m', date_column) when grouping by month.
 - When grouping by day of week or month, return the NAME, not the number, so the answer is readable. Day of week:
   CASE strftime('%w', date_column) WHEN '0' THEN 'Sunday' WHEN '1' THEN 'Monday' WHEN '2' THEN 'Tuesday' WHEN '3' THEN 'Wednesday' WHEN '4' THEN 'Thursday' WHEN '5' THEN 'Friday' ELSE 'Saturday' END AS day_of_week
@@ -103,6 +107,7 @@ def run(
 
     sql = _clean_sql(call_llm(prompt, expect_json=False))
     sql = _repair_columns(sql, rag_context)
+    sql = _fix_text_aggregates(sql, rag_context)
     logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
     return sql
 
@@ -149,6 +154,39 @@ def _repair_columns(sql: str, rag_context: dict) -> str:
         return f'"{real}"' if real and real != inner else m.group(0)
 
     return token_re.sub(repl, sql)
+
+
+def _fix_text_aggregates(sql: str, rag_context: dict) -> str:
+    """
+    AVG()/SUM() on a TEXT column (e.g. a Small/Medium/Large size label) never
+    errors in SQLite — it silently evaluates to 0, producing a confident but
+    fabricated answer. Small local models keep doing this despite prompt
+    instructions, so swap the numeric aggregate for GROUP_CONCAT(DISTINCT ...),
+    which reports the actual categories instead of a lying zero.
+    """
+    import re
+    from services.database import get_table_schema, get_all_table_names
+
+    tables = (
+        [rag_context["pinned_table"]] if rag_context.get("pinned_table")
+        else rag_context.get("retrieved_tables") or get_all_table_names()
+    )
+    text_cols = {
+        c["column_name"]
+        for t in tables
+        for c in get_table_schema(t)
+        if (c.get("data_type") or "").upper() in ("TEXT", "VARCHAR", "CHAR", "STRING", "")
+    }
+    if not text_cols:
+        return sql
+
+    def repl(m):
+        func, col = m.group(1), m.group(2).strip('"[]')
+        if col in text_cols:
+            return f'GROUP_CONCAT(DISTINCT {m.group(2)})'
+        return m.group(0)
+
+    return re.sub(r'\b(AVG|SUM)\(\s*([\w."\[\]]+)\s*\)', repl, sql, flags=re.IGNORECASE)
 
 
 def _format_plan(plan: dict) -> str:

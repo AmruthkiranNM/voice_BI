@@ -70,6 +70,31 @@ def _sanitize_columns(columns) -> list[str]:
     return out
 
 
+def _normalize_date_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Rewrite date-like text columns (e.g. "2/24/2003 0:00", a US-format date
+    pandas parses fine) into ISO-8601 strings. SQLite's date functions
+    (strftime, date(), BETWEEN date(...)) only understand ISO-8601 and
+    silently return NULL on anything else — so without this, every
+    date-filtered or date-grouped query on such a column returns no rows.
+    Only columns pandas can confidently parse (>90% of non-null values) are
+    converted, so ordinary text/ID columns are left untouched.
+    """
+    for col in df.columns:
+        if not pd.api.types.is_string_dtype(df[col]):
+            continue
+        non_null = df[col].notna().sum()
+        if non_null == 0:
+            continue
+        parsed = pd.to_datetime(df[col], errors="coerce")
+        if parsed.notna().sum() / non_null < 0.9:
+            continue
+        has_time = (parsed.dt.time != pd.Timestamp("00:00:00").time()).any()
+        fmt = "%Y-%m-%d %H:%M:%S" if has_time else "%Y-%m-%d"
+        df[col] = parsed.dt.strftime(fmt).where(parsed.notna(), df[col])
+    return df
+
+
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a business CSV, create a queryable table, and rebuild the RAG index."""
@@ -101,6 +126,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail="CSV file is empty.")
 
         df.columns = _sanitize_columns(df.columns)
+        df = _normalize_date_columns(df)
 
         if len(df) > MAX_UPLOAD_ROWS:
             raise HTTPException(

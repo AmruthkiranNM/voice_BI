@@ -138,8 +138,10 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
   // Sort by dimension score
   const potentialDimensions = [...columnsProfile].sort((a, b) => b.dimensionScore - a.dimensionScore);
   
-  // Prefer a string or date dimension
-  primaryDimension = potentialDimensions.find(c => c.type === 'string' || c.temporalScore > 0.5);
+  // Prefer a date/temporal dimension over a plain string one — time belongs
+  // on the x-axis when both are present (e.g. "revenue by month and country").
+  primaryDimension = potentialDimensions.find(c => c.temporalScore > 0.5)
+    || potentialDimensions.find(c => c.type === 'string');
   
   // Fallback to identifier if absolutely no strings or dates exist
   if (!primaryDimension) {
@@ -180,6 +182,13 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
     primaryMeasure = secondaryMeasures.shift() || null;
   }
 
+  // A second string dimension (e.g. "country" alongside a "month" primary
+  // dimension) means the data is grouped two ways — plot it as one series
+  // per value of this column instead of silently dropping it.
+  const secondaryDimension = potentialDimensions.find(
+    c => c.type === 'string' && c.column !== primaryDimension.column,
+  );
+
   // Determine intent / chart
   // Use the existing logic but override with our clean semantic mappings
   // Create a mock "result" for chartRecommender that only includes the semantic columns
@@ -198,6 +207,7 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
   const spec = {
     intent: intent || 'auto',
     dimension: primaryDimension?.column,
+    secondaryDimension: secondaryDimension?.column,
     primaryMeasure: primaryMeasure?.column,
     secondaryMeasures: secondaryMeasures.map(m => m.column),
     excludedFields: excludedFields.map(m => m.column),

@@ -62,6 +62,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
     if (!spec || !result) return result;
     const allowedColumns = [];
     if (spec.dimension) allowedColumns.push(spec.dimension);
+    if (spec.secondaryDimension) allowedColumns.push(spec.secondaryDimension);
     if (spec.primaryMeasure) allowedColumns.push(spec.primaryMeasure);
     if (spec.secondaryMeasures) allowedColumns.push(...spec.secondaryMeasures);
     

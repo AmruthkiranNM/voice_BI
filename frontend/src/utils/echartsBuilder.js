@@ -628,6 +628,27 @@ export function prepareChartData(result, spec = null) {
     rows.some(r => TIME_PATTERN.test(String(r[labelCol] ?? ''))) ||
     DATE_COL_NAMES.test(labelCol);
 
+  // Two-dimension result (e.g. rows grouped by month AND country): pivot the
+  // secondary category into its own series instead of showing one bar per
+  // row with a repeated x-axis label.
+  const secondaryCol = spec?.secondaryDimension;
+  if (secondaryCol && columns.includes(secondaryCol)) {
+    const measureCol = numericCols[0];
+    const labels = [...new Set(rows.map(r => String(r[labelCol] ?? '')))].sort((a, b) =>
+      isTime ? a.localeCompare(b) : 0,
+    );
+    const categories = [...new Set(rows.map(r => String(r[secondaryCol] ?? '')))];
+    const datasets = categories.map(cat => ({
+      label: cat,
+      originalColumn: secondaryCol,
+      data: labels.map(l => {
+        const row = rows.find(r => String(r[labelCol] ?? '') === l && String(r[secondaryCol] ?? '') === cat);
+        return row ? Number(row[measureCol]) || 0 : 0;
+      }),
+    }));
+    return { labels, datasets, isTime, labelCol: labelCol.replace(/_/g, ' '), numericCols };
+  }
+
   let displayRows = isTime
     ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol])))
     : [...rows].sort((a, b) => Number(b[numericCols[0]]) - Number(a[numericCols[0]]));
