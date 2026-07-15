@@ -27,20 +27,29 @@ export default function RichText({ text, className = '' }) {
   const blocks = [];
   let list = null;
   for (const line of lines) {
-    const m = line.match(/^(?:\d+\.|[-*])\s+(.*)/);
-    if (m) { (list ||= []).push(m[1]); continue; }
-    if (list) { blocks.push({ type: 'list', items: list }); list = null; }
+    const m = line.match(/^(?:(\d+)\.|[-*])\s+(.*)/);
+    if (m) {
+      const ordered = m[1] !== undefined;
+      if (list && list.ordered !== ordered) { blocks.push(list); list = null; }
+      (list ||= { type: 'list', ordered, items: [] }).items.push(m[2]);
+      continue;
+    }
+    if (list) { blocks.push(list); list = null; }
     blocks.push({ type: 'p', text: line });
   }
-  if (list) blocks.push({ type: 'list', items: list });
+  if (list) blocks.push(list);
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {blocks.map((b, i) =>
-        b.type === 'list'
-          ? <ol key={i} className="list-decimal list-inside space-y-1">{b.items.map((it, j) => <li key={j}>{inline(it, `${i}-${j}`)}</li>)}</ol>
-          : <p key={i} className="leading-relaxed">{inline(b.text, i)}</p>
-      )}
+      {blocks.map((b, i) => {
+        if (b.type !== 'list') return <p key={i} className="leading-relaxed">{inline(b.text, i)}</p>;
+        const ListTag = b.ordered ? 'ol' : 'ul';
+        return (
+          <ListTag key={i} className={`${b.ordered ? 'list-decimal' : 'list-disc'} list-inside space-y-1`}>
+            {b.items.map((it, j) => <li key={j}>{inline(it, `${i}-${j}`)}</li>)}
+          </ListTag>
+        );
+      })}
     </div>
   );
 }

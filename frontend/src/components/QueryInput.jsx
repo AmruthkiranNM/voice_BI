@@ -118,7 +118,7 @@ export default function QueryInput({
             <button
               type="submit"
               disabled={!query.trim() || isLoading}
-              className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl disabled:opacity-30 disabled:hover:bg-blue-600 transition-colors shadow-inner flex items-center justify-center"
+              className="p-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors shadow-inner flex items-center justify-center"
             >
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>

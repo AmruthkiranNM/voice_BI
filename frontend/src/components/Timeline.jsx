@@ -26,7 +26,7 @@ export default function Timeline({ agentLogs }) {
 
   return (
     <div className="panel-card">
-      <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-5">Pipeline trace</h3>
+      <h3 className="text-xs font-data uppercase tracking-wide text-zinc-500 mb-5">Pipeline trace</h3>
 
       <div className="flex items-start w-full overflow-x-auto pb-1 gap-0">
         {STEPS.map((step, i) => {
@@ -40,21 +40,21 @@ export default function Timeline({ agentLogs }) {
                 <div
                   className={`w-9 h-9 flex items-center justify-center text-xs font-data font-semibold border ${
                     wasSkipped
-                      ? 'border-white/10 text-gray-600 bg-white/[0.02]'
+                      ? 'border-white/10 text-zinc-600 bg-white/[0.02]'
                       : done
                         ? 'border-[#3b82f6]/50 bg-[#3b82f6]/10 text-[#3b82f6]'
-                        : 'border-white/10 bg-black/20 text-gray-600'
+                        : 'border-white/10 bg-black/20 text-zinc-600'
                   }`}
                 >
                   {i + 1}
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <span className={`text-[10px] font-data uppercase tracking-wide text-center ${
-                    wasSkipped ? 'text-gray-600' : done ? 'text-gray-200' : 'text-gray-600'
+                    wasSkipped ? 'text-zinc-600' : done ? 'text-zinc-200' : 'text-zinc-600'
                   }`}>
                     {step.label}
                   </span>
-                  <span className="text-[9px] text-gray-600 font-data">
+                  <span className="text-[9px] text-zinc-600 font-data">
                     {wasSkipped ? 'skipped' : time != null ? `${time.toFixed(0)}ms` : '—'}
                   </span>
                 </div>

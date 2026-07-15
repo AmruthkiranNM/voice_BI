@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { sendChatMessage } from '../services/api';
-import { TbMessageCircle, TbSend, TbRobot, TbUser, TbMicrophone } from 'react-icons/tb';
+import { TbMessageCircle, TbSend, TbRobot, TbUser, TbMicrophone, TbAlertCircle } from 'react-icons/tb';
 import { useVoiceInput } from '../hooks/useVoice';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -56,7 +56,7 @@ export default function FollowUpChat({
         window.speechSynthesis.speak(utterance);
       }
     } catch (err) {
-      onMessagesChange([...newMsgs, { role: 'assistant', content: '❌ Sorry, I encountered an error: ' + err.message }]);
+      onMessagesChange([...newMsgs, { role: 'assistant', content: 'Sorry, I encountered an error: ' + err.message, isError: true }]);
     } finally {
       setIsTyping(false);
     }
@@ -86,14 +86,16 @@ export default function FollowUpChat({
           messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm
-                ${msg.role === 'user' ? 'bg-blue-600/20 border-blue-500/30' : 'bg-violet-600/20 border-violet-500/30'}
+                ${msg.role === 'user' ? 'bg-blue-600/20 border-blue-500/30' : msg.isError ? 'bg-red-500/20 border-red-500/30' : 'bg-violet-600/20 border-violet-500/30'}
               `}>
-                {msg.role === 'user' ? <TbUser className="w-4 h-4 text-blue-400" /> : <TbRobot className="w-4 h-4 text-violet-400" />}
+                {msg.role === 'user' ? <TbUser className="w-4 h-4 text-blue-400" /> : msg.isError ? <TbAlertCircle className="w-4 h-4 text-red-400" /> : <TbRobot className="w-4 h-4 text-violet-400" />}
               </div>
               <div className={`px-4 py-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm
-                ${msg.role === 'user' 
-                  ? 'bg-blue-600/10 border border-blue-500/20 text-zinc-200 rounded-tr-sm' 
-                  : 'bg-white/[0.03] border border-white/5 text-zinc-300 rounded-tl-sm font-light'}
+                ${msg.role === 'user'
+                  ? 'bg-blue-600/10 border border-blue-500/20 text-zinc-200 rounded-tr-sm'
+                  : msg.isError
+                    ? 'bg-red-500/10 border border-red-500/20 text-red-300 rounded-tl-sm font-light'
+                    : 'bg-white/[0.03] border border-white/5 text-zinc-300 rounded-tl-sm font-light'}
               `}>
                 {msg.role === 'user' ? (
                   msg.content

@@ -12,13 +12,13 @@ export default function AnomalyCallouts({ result }) {
 
   return (
     <div className="panel-card">
-      <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-4">Worth noting</h3>
+      <h3 className="text-xs font-data uppercase tracking-wide text-zinc-500 mb-4">Worth noting</h3>
       <ul className="space-y-2.5">
         {callouts.map((c, i) => (
-          <li key={i} className="flex items-start gap-2.5 text-sm text-gray-300 leading-relaxed">
+          <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-300 leading-relaxed">
             <span
               className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
-                c.type === 'positive' ? 'bg-[#3b82f6]' : c.type === 'negative' ? 'bg-red-400' : 'bg-gray-500'
+                c.type === 'positive' ? 'bg-[#3b82f6]' : c.type === 'negative' ? 'bg-red-400' : 'bg-zinc-500'
               }`}
             />
             {c.text}

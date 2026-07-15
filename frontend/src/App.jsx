@@ -8,6 +8,7 @@ import Header from './components/Header';
 import QueryInput, { DEFAULT_SETTINGS } from './components/QueryInput';
 import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
+import DatabaseConnect from './components/DatabaseConnect';
 import ResultsDashboard from './components/ResultsDashboard';
 import DataQuality from './components/DataQuality';
 
@@ -24,6 +25,7 @@ export default function App() {
   // App Shell State
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'dashboard'
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [dataSourceTab, setDataSourceTab] = useState('csv'); // 'csv' or 'database'
 
   // Refresh the authoritative multi-table list from the backend (source of
   // truth) after any upload/delete, instead of tracking only the last upload.
@@ -67,6 +69,28 @@ export default function App() {
   const handleTableRemoved = useCallback(async () => {
     await refreshDatasets();
     setSelectedTable(null);
+  }, [refreshDatasets]);
+
+  const handleImportSuccess = useCallback(async (importResult) => {
+    const first = importResult.imported?.[0];
+    if (first) {
+      setDatasetInfo(prev => ({
+        ...prev,
+        has_data: true,
+        lastUploadTable: first.table_name,
+        rowCount: first.row_count,
+        columns: first.columns || [],
+        columnTypes: first.column_types || {},
+        dataQuality: first.data_quality || null,
+        preview_rows: first.preview_rows || [],
+      }));
+    }
+    await refreshDatasets();
+    setSelectedTable(null);
+    setResponse(null);
+    setError(null);
+    setChatMessages([]);
+    setCurrentView('dashboard');
   }, [refreshDatasets]);
 
   const handleSubmit = useCallback(async (query) => {
@@ -153,12 +177,35 @@ export default function App() {
                     Connect your data
                   </h1>
                   <p className="text-zinc-400 text-base max-w-lg mx-auto leading-relaxed">
-                    Upload your business spreadsheet to securely analyze trends, ask natural language questions, and generate instant BI dashboards.
+                    Upload a spreadsheet or connect a database to securely analyze trends, ask natural language questions, and generate instant BI dashboards.
                   </p>
                 </div>
-                
-                <DatasetUpload onUploadSuccess={handleUploadSuccess} onTableRemoved={handleTableRemoved} tables={datasetInfo.tables} />
-                
+
+                <div className="flex justify-center gap-1 mb-6 p-1 bg-white/[0.03] border border-white/5 rounded-xl w-fit mx-auto">
+                  <button
+                    onClick={() => setDataSourceTab('csv')}
+                    className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      dataSourceTab === 'csv' ? 'active-pill' : 'text-zinc-400 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    Upload CSV
+                  </button>
+                  <button
+                    onClick={() => setDataSourceTab('database')}
+                    className={`px-5 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      dataSourceTab === 'database' ? 'active-pill' : 'text-zinc-400 hover:text-white border border-transparent'
+                    }`}
+                  >
+                    Connect Database
+                  </button>
+                </div>
+
+                {dataSourceTab === 'csv' ? (
+                  <DatasetUpload onUploadSuccess={handleUploadSuccess} onTableRemoved={handleTableRemoved} tables={datasetInfo.tables} />
+                ) : (
+                  <DatabaseConnect onImportSuccess={handleImportSuccess} />
+                )}
+
                 {datasetInfo.has_data && (
                   <div className="mt-8 text-center">
                     <button 
@@ -182,10 +229,10 @@ export default function App() {
                     <span className="text-xs text-zinc-500 mr-1">Query scope:</span>
                     <button
                       onClick={() => setSelectedTable(null)}
-                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                      className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
                         !selectedTable
-                          ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
-                          : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                          ? 'active-pill'
+                          : 'border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
                       }`}
                       title="Let the AI pick across all your tables, including joins"
                     >
@@ -195,10 +242,10 @@ export default function App() {
                       <button
                         key={t.name}
                         onClick={() => setSelectedTable(t.name)}
-                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
                           selectedTable === t.name
-                            ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
-                            : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                            ? 'active-pill'
+                            : 'border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
                         }`}
                       >
                         {t.name.replace(/_/g, ' ')}
@@ -264,7 +311,7 @@ export default function App() {
                                 <tr key={i} className="hover:bg-white/5 transition-colors">
                                   {datasetInfo.columns.map(col => (
                                     <td key={col} className="px-4 py-2.5 truncate max-w-[200px]">
-                                      {row[col] ?? <span className="text-zinc-600">—</span>}
+                                      {row[col] ?? <span className="text-zinc-500">—</span>}
                                     </td>
                                   ))}
                                 </tr>

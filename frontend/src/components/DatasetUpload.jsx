@@ -26,7 +26,7 @@ function DataQuality({ report }) {
             </li>
           ))}
           {issues.length > 3 && (
-            <li className="text-xs text-zinc-600 pl-5 pt-1 font-medium">
+            <li className="text-xs text-zinc-500 pl-5 pt-1 font-medium">
               +{issues.length - 3} more issues detected
             </li>
           )}
@@ -58,7 +58,7 @@ function DataPreview({ upload }) {
               <tr key={i} className="hover:bg-white/5 transition-colors">
                 {columns.map(col => (
                   <td key={col} className="px-4 py-2 truncate max-w-[200px]">
-                    {row[col] ?? <span className="text-zinc-600">—</span>}
+                    {row[col] ?? <span className="text-zinc-500">—</span>}
                   </td>
                 ))}
               </tr>

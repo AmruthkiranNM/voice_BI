@@ -125,6 +125,28 @@ export async function deleteDataset(tableName) {
   }
 }
 
+/** Test a Postgres-compatible connection string and list its tables */
+export async function testDbConnection(connectionString) {
+  try {
+    const { data } = await api.post('/connections/test', { connection_string: connectionString });
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Connection failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
+/** Import selected tables from a connected external database */
+export async function importDbTables(connectionString, tables) {
+  try {
+    const { data } = await api.post('/connections/import', { connection_string: connectionString, tables });
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Import failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
 /** Clear server-side query cache */
 export async function clearCache() {
   try {

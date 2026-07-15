@@ -95,10 +95,12 @@ from routes.query import router as query_router
 from routes.upload import router as upload_router
 from routes.datasets import router as datasets_router
 from routes.chat import router as chat_router
+from routes.connections import router as connections_router
 app.include_router(query_router)
 app.include_router(upload_router)
 app.include_router(datasets_router)
 app.include_router(chat_router)
+app.include_router(connections_router)
 
 
 # ── Root Endpoint ──

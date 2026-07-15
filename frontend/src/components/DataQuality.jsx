@@ -5,18 +5,20 @@ export default function DataQuality({ quality }) {
 
   const { score, issue_count, issues } = quality;
 
-  // Determine overall status color
-  let statusColor = 'text-green-400';
-  let bgGlow = 'bg-green-500/10';
-  let borderColor = 'border-green-500/20';
-  if (score < 70) {
+  // Determine overall status color — thresholds/colors match the compact
+  // DataQuality score badge shown during upload (DatasetUpload.jsx) so the
+  // same score always reads as the same severity throughout the app.
+  let statusColor = 'text-emerald-400';
+  let bgGlow = 'bg-emerald-500/10';
+  let borderColor = 'border-emerald-500/20';
+  if (score < 60) {
     statusColor = 'text-red-400';
     bgGlow = 'bg-red-500/10';
     borderColor = 'border-red-500/20';
-  } else if (score < 90) {
-    statusColor = 'text-yellow-400';
-    bgGlow = 'bg-yellow-500/10';
-    borderColor = 'border-yellow-500/20';
+  } else if (score < 85) {
+    statusColor = 'text-amber-400';
+    bgGlow = 'bg-amber-500/10';
+    borderColor = 'border-amber-500/20';
   }
 
   return (
@@ -44,7 +46,7 @@ export default function DataQuality({ quality }) {
             <div key={idx} className="flex gap-3 p-3 rounded-lg bg-black/40 border border-white/5">
               <div className="mt-0.5">
                 {issue.severity === 'high' && <TbAlertTriangle className="w-4 h-4 text-red-400" />}
-                {issue.severity === 'medium' && <TbAlertCircle className="w-4 h-4 text-yellow-400" />}
+                {issue.severity === 'medium' && <TbAlertCircle className="w-4 h-4 text-amber-400" />}
                 {issue.severity === 'low' && <TbInfoCircle className="w-4 h-4 text-blue-400" />}
               </div>
               <div>

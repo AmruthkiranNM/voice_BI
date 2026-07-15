@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
+import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload } from 'react-icons/tb';
 
 const PAGE_SIZE = 25;
 
@@ -76,7 +77,7 @@ export default function ResultTable({ result, fullWidth = false }) {
   }, [filteredRows, numericCols]);
 
   const fmt = (v, c) => {
-    if (v == null) return <span className="text-gray-600">—</span>;
+    if (v == null) return <span className="text-zinc-500">—</span>;
     if (numericCols.includes(c)) {
       const n = Number(v);
       if (!Number.isNaN(n)) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -144,15 +145,25 @@ export default function ResultTable({ result, fullWidth = false }) {
     document.addEventListener('mouseup', onUp);
   }, [colWidths]);
 
-  if (!columns.length || !rows.length) return null;
+  if (!columns.length || !rows.length) {
+    return (
+      <div className="bi-table-panel">
+        <div className="bi-empty-state">
+          <div className="bi-empty-icon">📭</div>
+          <div className="bi-empty-title">No rows returned</div>
+          <div className="bi-empty-sub">This query ran successfully but matched no data. Try a broader question or a different filter.</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bi-table-panel">
       {/* Table Header */}
       <div className="bi-table-header">
         <div className="flex items-center gap-2">
-          <button className="bi-table-toggle" onClick={() => setIsExpanded(v => !v)}>
-            {isExpanded ? '▼' : '▶'}
+          <button className="bi-table-toggle" onClick={() => setIsExpanded(v => !v)} aria-label={isExpanded ? 'Collapse table' : 'Expand table'}>
+            {isExpanded ? <TbChevronDown className="w-4 h-4" /> : <TbChevronRight className="w-4 h-4" />}
           </button>
           <h3 className="bi-table-title">Data Table</h3>
           <span className="bi-table-count">{filteredRows.length.toLocaleString()} rows · {visibleCols.length} cols</span>
@@ -161,7 +172,7 @@ export default function ResultTable({ result, fullWidth = false }) {
         <div className="bi-table-controls">
           {/* Search */}
           <div className="bi-search-wrap">
-            <span className="bi-search-icon">🔍</span>
+            <TbSearch className="bi-search-icon w-3.5 h-3.5" />
             <input
               type="text"
               value={filter}
@@ -169,12 +180,16 @@ export default function ResultTable({ result, fullWidth = false }) {
               placeholder="Search rows…"
               className="bi-search-input"
             />
-            {filter && <button className="bi-search-clear" onClick={() => setFilter('')}>✕</button>}
+            {filter && (
+              <button className="bi-search-clear" onClick={() => setFilter('')} aria-label="Clear search">
+                <TbX className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Column visibility */}
           <div className="relative group">
-            <button className="bi-ctrl-btn">Columns ▾</button>
+            <button className="bi-ctrl-btn flex items-center gap-1">Columns <TbChevronDown className="w-3.5 h-3.5" /></button>
             <div className="bi-col-dropdown">
               {columns.map(c => (
                 <label key={c} className="bi-col-item">
@@ -195,8 +210,8 @@ export default function ResultTable({ result, fullWidth = false }) {
             </div>
           </div>
 
-          <button className="bi-ctrl-btn" onClick={exportCsv}>↓ CSV</button>
-          <button className="bi-ctrl-btn" onClick={exportJson}>↓ JSON</button>
+          <button className="bi-ctrl-btn flex items-center gap-1" onClick={exportCsv}><TbDownload className="w-3.5 h-3.5" /> CSV</button>
+          <button className="bi-ctrl-btn flex items-center gap-1" onClick={exportJson}><TbDownload className="w-3.5 h-3.5" /> JSON</button>
         </div>
       </div>
 

@@ -13,9 +13,8 @@ from services.database import (
 )
 from services.suggestions import generate_suggestions_for_table
 from services.domain_detector import analyze_dataset
-from services.vector_store import is_index_ready, build_index
-from models.schema_loader import generate_schema_documents
-from services import query_cache
+from services.vector_store import is_index_ready
+from services.ingest import rebuild_index
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def delete_dataset(table_name: str):
     finally:
         conn.close()
 
-    _rebuild_index()
+    rebuild_index()
     return {"success": True, "removed": table_name, "tables": get_all_table_names()}
 
 
@@ -78,12 +77,5 @@ def delete_dataset(table_name: str):
 def delete_all_datasets():
     """Clear the entire workspace (all uploaded tables)."""
     removed = drop_all_user_tables()
-    _rebuild_index()
+    rebuild_index()
     return {"success": True, "removed": removed, "tables": get_all_table_names()}
-
-
-def _rebuild_index():
-    query_cache.invalidate()
-    schema_docs = generate_schema_documents()
-    if schema_docs:
-        build_index(schema_docs)

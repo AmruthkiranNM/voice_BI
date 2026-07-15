@@ -10,24 +10,24 @@ export default function DatasetSummary({ datasetInfo }) {
 
   return (
     <div className="panel-card h-full">
-      <h3 className="text-xs font-data uppercase tracking-wide text-gray-500 mb-4">Your dataset</h3>
+      <h3 className="text-xs font-data uppercase tracking-wide text-zinc-500 mb-4">Your dataset</h3>
 
       <dl className="space-y-3 text-sm">
         {businessType && (
           <div>
-            <dt className="text-gray-500 text-xs">Type</dt>
+            <dt className="text-zinc-500 text-xs">Type</dt>
             <dd className="text-white font-medium mt-0.5">{businessType}</dd>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <dt className="text-gray-500 text-xs">Rows</dt>
+            <dt className="text-zinc-500 text-xs">Rows</dt>
             <dd className="text-white font-semibold mt-0.5 font-data">
               {datasetInfo.rowCount?.toLocaleString() ?? '—'}
             </dd>
           </div>
           <div>
-            <dt className="text-gray-500 text-xs">Columns</dt>
+            <dt className="text-zinc-500 text-xs">Columns</dt>
             <dd className="text-white font-semibold mt-0.5 font-data">
               {columns.length || '—'}
             </dd>
@@ -35,8 +35,8 @@ export default function DatasetSummary({ datasetInfo }) {
         </div>
         {datasetInfo.tableName && (
           <div>
-            <dt className="text-gray-500 text-xs">Source</dt>
-            <dd className="text-gray-300 mt-0.5 capitalize truncate">
+            <dt className="text-zinc-500 text-xs">Source</dt>
+            <dd className="text-zinc-300 mt-0.5 capitalize truncate">
               {datasetInfo.tableName.replace(/_/g, ' ')}
             </dd>
           </div>
@@ -63,7 +63,7 @@ export default function DatasetSummary({ datasetInfo }) {
 function ColumnGroup({ label, items, color, extra }) {
   return (
     <div>
-      <p className="text-xs text-gray-500 mb-1.5">{label}</p>
+      <p className="text-xs text-zinc-500 mb-1.5">{label}</p>
       <div className="flex flex-wrap gap-1.5">
         {items.map(col => (
           <span
@@ -74,7 +74,7 @@ function ColumnGroup({ label, items, color, extra }) {
           </span>
         ))}
         {extra > 0 && (
-          <span className="text-[11px] text-gray-600 px-1">+{extra} more</span>
+          <span className="text-[11px] text-zinc-500 px-1">+{extra} more</span>
         )}
       </div>
     </div>

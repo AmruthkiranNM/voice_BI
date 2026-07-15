@@ -57,12 +57,12 @@ export default function Sidebar({
                 }}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                  ${isActive 
-                    ? 'bg-blue-500/10 text-blue-500 shadow-sm border border-blue-500/20' 
+                  ${isActive
+                    ? 'active-pill shadow-sm'
                     : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-transparent'}
                 `}
               >
-                <Icon className={`w-5 h-5 ${isActive ? 'text-blue-500' : 'text-zinc-500'}`} />
+                <Icon className={`w-5 h-5 ${isActive ? 'text-blue-300' : 'text-zinc-500'}`} />
                 {item.label}
               </button>
             );
@@ -72,10 +72,13 @@ export default function Sidebar({
         {/* Footer Area */}
         <div className="p-4 border-t border-white/5">
           <button
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/5 transition-all"
+            disabled
+            title="Settings — coming soon"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-600 cursor-not-allowed"
           >
-            <TbSettings className="w-5 h-5 text-zinc-500" />
+            <TbSettings className="w-5 h-5 text-zinc-600" />
             Settings
+            <span className="ml-auto text-[10px] text-zinc-600 uppercase tracking-wide">Soon</span>
           </button>
           
           <div className="mt-4 px-3 py-3 rounded-lg bg-white/[0.02] border border-white/5 flex items-center gap-3">
