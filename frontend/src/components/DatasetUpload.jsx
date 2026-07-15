@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
-import { uploadDataset } from '../services/api';
-import { TbCloudUpload, TbFileSpreadsheet, TbCheck, TbAlertCircle } from 'react-icons/tb';
+import { uploadDataset, deleteDataset } from '../services/api';
+import { TbCloudUpload, TbFileSpreadsheet, TbCheck, TbAlertCircle, TbTrash, TbTable } from 'react-icons/tb';
 
 function DataQuality({ report }) {
   if (!report) return null;
@@ -70,7 +70,50 @@ function DataPreview({ upload }) {
   );
 }
 
-export default function DatasetUpload({ onUploadSuccess }) {
+function TableList({ tables, onRemoved }) {
+  const [removingName, setRemovingName] = useState(null);
+
+  if (!tables?.length) return null;
+
+  const handleRemove = async (name) => {
+    setRemovingName(name);
+    try {
+      await deleteDataset(name);
+      onRemoved?.();
+    } catch {
+      // leave the table visible on failure; user can retry
+    } finally {
+      setRemovingName(null);
+    }
+  };
+
+  return (
+    <div className="mt-6 space-y-2">
+      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
+        Your tables ({tables.length}) — ask questions across all of them, including joins
+      </p>
+      {tables.map(t => (
+        <div key={t.name} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
+          <div className="flex items-center gap-2 min-w-0">
+            <TbTable className="w-4 h-4 text-blue-400 shrink-0" />
+            <span className="text-sm text-zinc-200 truncate">{t.name.replace(/_/g, ' ')}</span>
+            <span className="text-xs text-zinc-500 shrink-0">{t.row_count?.toLocaleString()} rows</span>
+          </div>
+          <button
+            onClick={() => handleRemove(t.name)}
+            disabled={removingName === t.name}
+            className="text-zinc-500 hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/10 transition-colors disabled:opacity-50"
+            title={`Remove ${t.name}`}
+          >
+            <TbTrash className="w-4 h-4" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables = [] }) {
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState(null);
@@ -102,10 +145,11 @@ export default function DatasetUpload({ onUploadSuccess }) {
   }, [onUploadSuccess]);
 
   const businessType = lastUpload?.domain?.business_type || lastUpload?.domain?.label;
+  const showEmptyState = !lastUpload && tables.length === 0;
 
   return (
     <section className="w-full">
-      {!lastUpload ? (
+      {showEmptyState ? (
         <div
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
@@ -155,52 +199,79 @@ export default function DatasetUpload({ onUploadSuccess }) {
         </div>
       ) : (
         <div className="glass-panel p-6 sm:p-8 rounded-2xl">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
-            <div className="flex gap-4">
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0 h-fit">
-                <TbFileSpreadsheet className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-semibold text-zinc-100 truncate">{lastUpload.table_name?.replace(/_/g, ' ')}</h3>
-                  <TbCheck className="w-4 h-4 text-emerald-400" />
-                </div>
-                <p className="text-sm text-zinc-500 font-data">
-                  {lastUpload.row_count?.toLocaleString()} rows • {lastUpload.columns?.length} columns
-                </p>
-                {businessType && (
-                  <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-medium text-zinc-300">
-                    <span>Domain:</span>
-                    <span className="text-blue-400">{businessType}</span>
+          {lastUpload ? (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
+                <div className="flex gap-4">
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0 h-fit">
+                    <TbFileSpreadsheet className="w-6 h-6 text-blue-400" />
                   </div>
-                )}
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-semibold text-zinc-100 truncate">{lastUpload.table_name?.replace(/_/g, ' ')}</h3>
+                      <TbCheck className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <p className="text-sm text-zinc-500 font-data">
+                      {lastUpload.row_count?.toLocaleString()} rows • {lastUpload.columns?.length} columns
+                    </p>
+                    {businessType && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-medium text-zinc-300">
+                        <span>Domain:</span>
+                        <span className="text-blue-400">{businessType}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0">
+                  <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-all w-full sm:w-auto"
+                  >
+                    Add Another Table
+                  </button>
+                </div>
+              </div>
+
+              <DataQuality report={lastUpload.data_quality} />
+
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowPreview(v => !v)}
+                  className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                >
+                  {showPreview ? 'Hide Preview' : 'Show Data Preview'}
+                </button>
+                {showPreview && <DataPreview upload={lastUpload} />}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0">
+                  <TbTable className="w-6 h-6 text-blue-400" />
+                </div>
+                <p className="text-sm text-zinc-400">
+                  {tables.length} table{tables.length === 1 ? '' : 's'} in your workspace
+                </p>
+              </div>
+              <div className="flex shrink-0">
+                <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="btn-primary px-4 py-2 text-sm rounded-lg disabled:opacity-50 w-full sm:w-auto"
+                >
+                  {isUploading ? 'Uploading...' : 'Add Another Table'}
+                </button>
               </div>
             </div>
-            
-            <div className="flex shrink-0">
-              <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-all w-full sm:w-auto"
-              >
-                Replace Dataset
-              </button>
-            </div>
-          </div>
+          )}
 
-          <DataQuality report={lastUpload.data_quality} />
-
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={() => setShowPreview(v => !v)}
-              className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-            >
-              {showPreview ? 'Hide Preview' : 'Show Data Preview'}
-            </button>
-            {showPreview && <DataPreview upload={lastUpload} />}
-          </div>
+          <TableList tables={tables} onRemoved={onTableRemoved} />
         </div>
       )}
 

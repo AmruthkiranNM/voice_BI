@@ -11,6 +11,7 @@ so queries always target the dataset the user uploaded in this session.
 
 import logging
 from services.vector_store import search, is_index_ready
+from services.database import get_table_schema
 from models.schema_loader import generate_table_document
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,10 @@ def run(query: str, plan: dict, table_name: str | None = None) -> dict:
             schema_context_parts.append(result["document"])
 
     schema_context = "\n\n---\n\n".join(schema_context_parts)
+    if len(retrieved_tables) > 1:
+        join_hints = _build_join_hints(retrieved_tables)
+        if join_hints:
+            schema_context += "\n\n---\n\n" + join_hints
 
     rag_output = {
         "retrieved_tables": retrieved_tables,
@@ -90,6 +95,32 @@ def _context_for_table(table_name: str) -> dict:
         "similarity_scores": {table_name: 1.0},
         "pinned_table": table_name,
     }
+
+
+def _build_join_hints(tables: list[str]) -> str:
+    """
+    Uploaded CSVs never carry real foreign keys (SQLite PRAGMA returns none
+    for pandas.to_sql tables), so the SQL generator has no way to know which
+    columns join two tables. Suggest join keys heuristically: columns with
+    the same name in two or more of the retrieved tables are very likely the
+    join columns (e.g. "customer_id" in both "orders" and "customers").
+    """
+    cols_by_table = {t: {c["column_name"] for c in get_table_schema(t)} for t in tables}
+    lines = []
+    for i, t1 in enumerate(tables):
+        for t2 in tables[i + 1:]:
+            shared = sorted(cols_by_table[t1] & cols_by_table[t2])
+            shared = [c for c in shared if c.lower() not in ("id", "name")]
+            if shared:
+                lines.append(f"  - {t1}.{'/'.join(shared)} = {t2}.{'/'.join(shared)}")
+    if not lines:
+        return ""
+    return (
+        "Likely JOIN keys (columns with matching names across these tables — "
+        "no real foreign keys exist since this data comes from separate CSV "
+        "uploads, so use these to JOIN when the question spans tables):\n"
+        + "\n".join(lines)
+    )
 
 
 def _build_enriched_query(query: str, plan: dict) -> str:

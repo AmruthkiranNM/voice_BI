@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { submitQuery } from './services/api';
+import { useState, useCallback, useEffect } from 'react';
+import { submitQuery, getDatasets } from './services/api';
 import { useQueryHistory } from './hooks/useQueryHistory';
 import { TbMenu2 } from 'react-icons/tb';
 
@@ -16,31 +16,58 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
-  const [datasetInfo, setDatasetInfo] = useState({ has_data: false, suggestions: [], domain: null });
+  const [datasetInfo, setDatasetInfo] = useState({ has_data: false, suggestions: [], domain: null, tables: [] });
+  const [selectedTable, setSelectedTable] = useState(null); // null = auto (all tables, allows joins)
   const [chatMessages, setChatMessages] = useState([]);
   const { history, addEntry, clearHistory, removeEntry } = useQueryHistory();
-  
+
   // App Shell State
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'dashboard'
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  const handleUploadSuccess = useCallback((uploadResult) => {
-    setDatasetInfo({
+  // Refresh the authoritative multi-table list from the backend (source of
+  // truth) after any upload/delete, instead of tracking only the last upload.
+  const refreshDatasets = useCallback(async () => {
+    const data = await getDatasets();
+    setDatasetInfo(prev => ({
+      ...prev,
+      has_data: data.has_data,
+      tables: data.tables || [],
+      domain: data.domain || prev.domain,
+      suggestions: data.suggestions || prev.suggestions,
+    }));
+    return data;
+  }, []);
+
+  // Load any tables already uploaded in a previous session (backend workspace
+  // persists across page reloads — the frontend just needs to ask for it).
+  useEffect(() => {
+    refreshDatasets();
+  }, [refreshDatasets]);
+
+  const handleUploadSuccess = useCallback(async (uploadResult) => {
+    setDatasetInfo(prev => ({
+      ...prev,
       has_data: true,
-      suggestions: uploadResult.suggestions || [],
-      domain: uploadResult.domain || null,
-      tableName: uploadResult.table_name,
+      lastUploadTable: uploadResult.table_name,
       rowCount: uploadResult.row_count,
       columns: uploadResult.columns || [],
       columnTypes: uploadResult.column_types || {},
       dataQuality: uploadResult.data_quality || null,
       preview_rows: uploadResult.preview_rows || [],
-    });
+    }));
+    await refreshDatasets();
+    setSelectedTable(null); // new table added — go back to auto/all-tables scope
     setResponse(null);
     setError(null);
     setChatMessages([]);
     setCurrentView('dashboard');
-  }, []);
+  }, [refreshDatasets]);
+
+  const handleTableRemoved = useCallback(async () => {
+    await refreshDatasets();
+    setSelectedTable(null);
+  }, [refreshDatasets]);
 
   const handleSubmit = useCallback(async (query) => {
     if (!datasetInfo.has_data) {
@@ -56,7 +83,7 @@ export default function App() {
     try {
       const result = await submitQuery(query, {
         model: settings.model || null,
-        tableName: datasetInfo.tableName || null,
+        tableName: selectedTable || null,
         cacheMode: settings.cacheMode,
         fastMode: settings.fastMode,
         skipInsight: settings.skipInsight,
@@ -76,7 +103,7 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [settings, datasetInfo.has_data, datasetInfo.tableName, addEntry]);
+  }, [settings, datasetInfo.has_data, selectedTable, addEntry]);
 
   const hasResults = response && (
     response.sql || response.result?.row_count > 0 || response.insight
@@ -130,7 +157,7 @@ export default function App() {
                   </p>
                 </div>
                 
-                <DatasetUpload onUploadSuccess={handleUploadSuccess} />
+                <DatasetUpload onUploadSuccess={handleUploadSuccess} onTableRemoved={handleTableRemoved} tables={datasetInfo.tables} />
                 
                 {datasetInfo.has_data && (
                   <div className="mt-8 text-center">
@@ -149,6 +176,37 @@ export default function App() {
             {currentView === 'dashboard' && (
               <div className="animate-in space-y-8">
                 
+                {/* Table scope selector — only shown once more than one table is uploaded */}
+                {datasetInfo.tables?.length > 1 && (
+                  <div className="flex flex-wrap items-center gap-2 -mb-2">
+                    <span className="text-xs text-zinc-500 mr-1">Query scope:</span>
+                    <button
+                      onClick={() => setSelectedTable(null)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        !selectedTable
+                          ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                          : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                      }`}
+                      title="Let the AI pick across all your tables, including joins"
+                    >
+                      Auto (all tables)
+                    </button>
+                    {datasetInfo.tables.map(t => (
+                      <button
+                        key={t.name}
+                        onClick={() => setSelectedTable(t.name)}
+                        className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                          selectedTable === t.name
+                            ? 'bg-blue-500/15 border-blue-500/40 text-blue-300'
+                            : 'border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                        }`}
+                      >
+                        {t.name.replace(/_/g, ' ')}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* AI Command Center */}
                 <div className="glass-panel p-1 rounded-2xl shadow-2xl shadow-black/50 mb-8">
                   <div className="bg-[#18181b] rounded-xl p-4 sm:p-5 border border-white/5">
@@ -238,7 +296,7 @@ export default function App() {
                 {hasResults && !isLoading && (
                   <ResultsDashboard
                     response={response}
-                    datasetInfo={datasetInfo}
+                    datasetInfo={{ ...datasetInfo, tableName: selectedTable }}
                     settings={settings}
                     chatMessages={chatMessages}
                     onChatMessagesChange={setChatMessages}

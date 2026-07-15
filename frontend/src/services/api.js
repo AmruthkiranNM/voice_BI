@@ -114,6 +114,17 @@ export async function getDatasets() {
   }
 }
 
+/** Remove one uploaded table from the workspace */
+export async function deleteDataset(tableName) {
+  try {
+    const { data } = await api.delete(`/datasets/${encodeURIComponent(tableName)}`);
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Failed to remove table.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
 /** Clear server-side query cache */
 export async function clearCache() {
   try {

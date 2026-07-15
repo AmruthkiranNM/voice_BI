@@ -1,4 +1,4 @@
-"""Tests that upload replaces prior datasets and queries stay scoped."""
+"""Tests that uploads accumulate into a multi-table workspace and queries stay scoped."""
 
 import io
 
@@ -11,7 +11,7 @@ from main import app
 from services.database import get_all_table_names
 
 
-def test_upload_replaces_previous_tables(temp_database):
+def test_upload_accumulates_tables(temp_database):
     client = TestClient(app)
 
     sales = pd.DataFrame({"product": ["A"], "revenue": [100]})
@@ -35,7 +35,11 @@ def test_upload_replaces_previous_tables(temp_database):
     assert r2.json()["table_name"] == "restaurant"
 
     tables = get_all_table_names()
-    assert tables == ["restaurant"]
+    assert set(tables) == {"sales", "restaurant"}
+
+    del_resp = client.delete("/api/datasets/sales")
+    assert del_resp.status_code == 200
+    assert get_all_table_names() == ["restaurant"]
 
 
 def test_rag_pins_to_active_table(temp_database):
