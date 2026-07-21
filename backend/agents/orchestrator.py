@@ -27,7 +27,7 @@ def process_query(
     query: str,
     model: str | None = None,
     *,
-    table_name: str | None = None,
+    table_names: list[str] | None = None,
     cache_mode: bool = True,
     fast_mode: bool = False,
     skip_insight: bool = False,
@@ -59,8 +59,11 @@ def process_query(
     if fast_mode:
         skip_insight = True
 
+    # Stable cache key component for the scope (order-independent).
+    scope_key = ",".join(sorted(table_names)) if table_names else None
+
     if cache_mode:
-        cached = query_cache.get(query, model, fast_mode, skip_insight, table_name)
+        cached = query_cache.get(query, model, fast_mode, skip_insight, scope_key)
         if cached:
             return cached
 
@@ -110,7 +113,7 @@ def process_query(
         # ════════════════════════════════════════════
         # STEP 2: RAG Retriever Agent
         # ════════════════════════════════════════════
-        rag_context = rag_agent.run(query, plan, table_name=table_name)
+        rag_context = rag_agent.run(query, plan, table_names=table_names)
         log_step("RAG Retriever Agent", "completed", {
             "tables_retrieved": rag_context.get("retrieved_tables"),
             "similarity_scores": rag_context.get("similarity_scores"),
@@ -146,6 +149,7 @@ def process_query(
                 validation_result = validator.run(
                     sql,
                     retrieved_tables=rag_context.get("retrieved_tables"),
+                    allowed_tables=rag_context.get("pinned_tables"),
                 )
                 log_step("Validator Agent", "passed", {
                     "warnings": validation_result.get("warnings", []),
@@ -243,9 +247,10 @@ def process_query(
         from services.domain_detector import analyze_dataset
         from services.database import get_all_table_names, get_table_schema
 
-        active_table = table_name or (
-            rag_context.get("retrieved_tables") or [None]
-        )[0]
+        active_table = (
+            (table_names or [None])[0]
+            or (rag_context.get("retrieved_tables") or [None])[0]
+        )
         if active_table:
             ts = get_table_schema(active_table)
             domain = analyze_dataset([c["column_name"] for c in ts], ts)
@@ -289,7 +294,7 @@ def process_query(
         }
 
         if cache_mode:
-            query_cache.set(query, model, fast_mode, skip_insight, response, table_name)
+            query_cache.set(query, model, fast_mode, skip_insight, response, scope_key)
 
         logger.info(
             "[Orchestrator] Pipeline completed in %.3f seconds — %d rows returned",

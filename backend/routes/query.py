@@ -45,7 +45,12 @@ class QueryRequest(BaseModel):
     )
     table_name: str | None = Field(
         default=None,
-        description="Active uploaded table to query (scopes SQL to this dataset)",
+        description="Single active table to query (legacy; prefer table_names)",
+    )
+    table_names: list[str] | None = Field(
+        default=None,
+        description="Tables in scope for this query (one data source's tables). "
+                    "SQL is restricted to exactly these; multiple enables joins.",
     )
 
 
@@ -85,20 +90,27 @@ def handle_query(request: QueryRequest):
             detail="No business data found. Please upload a CSV file before asking questions.",
         )
 
-    logger.info("Received query: %s (table=%s)", request.query, request.table_name)
+    logger.info(
+        "Received query: %s (tables=%s)",
+        request.query, request.table_names or request.table_name,
+    )
 
-    table_name = request.table_name
-    if not table_name:
+    # Resolve the scope: an explicit table_names list wins; fall back to the
+    # single legacy table_name; else if there's exactly one table, use it.
+    table_names = request.table_names
+    if not table_names and request.table_name:
+        table_names = [request.table_name]
+    if not table_names:
         from services.database import get_all_table_names
         tables = get_all_table_names()
         if len(tables) == 1:
-            table_name = tables[0]
+            table_names = tables
 
     try:
         result = process_query(
             request.query,
             model=request.model,
-            table_name=table_name,
+            table_names=table_names,
             cache_mode=request.cache_mode,
             fast_mode=request.fast_mode,
             skip_insight=request.skip_insight,

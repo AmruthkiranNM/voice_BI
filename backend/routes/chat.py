@@ -33,6 +33,7 @@ class ChatRequest(BaseModel):
     history: list[ChatTurn] = Field(default_factory=list, description="Prior turns in this follow-up thread")
     model: str | None = Field(default=None, description="Optional Ollama model override")
     table_name: str | None = Field(default=None, description="The active dataset table name")
+    table_names: list[str] | None = Field(default=None, description="Active data source scope for any re-query")
 
 
 class ChatResponse(BaseModel):
@@ -64,6 +65,7 @@ def handle_chat(request: ChatRequest):
                 "result": request.result,
                 "insight": request.insight,
                 "table_name": request.table_name,
+                "table_names": request.table_names,
             },
             history=[turn.model_dump() for turn in request.history],
         )

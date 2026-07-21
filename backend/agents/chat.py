@@ -100,8 +100,13 @@ def run(
         else:
             combined_query = f"Original context: '{context.get('query')}'. Follow-up question: {message}"
             
+        scope = context.get("table_names") or (
+            [context["table_name"]] if context.get("table_name") else None
+        )
         try:
-            new_result = process_query(combined_query, fast_mode=False, skip_insight=False)
+            new_result = process_query(
+                combined_query, table_names=scope, fast_mode=False, skip_insight=False,
+            )
             if new_result["success"] and new_result["insight"]:
                 return f"I ran a new analysis to answer your question:\n\n{new_result['insight']}"
             elif new_result["success"]:

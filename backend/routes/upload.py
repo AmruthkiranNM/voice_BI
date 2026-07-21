@@ -38,7 +38,12 @@ async def upload_dataset(file: UploadFile = File(...)):
                 buffer.seek(0)
                 df = pd.read_csv(buffer, encoding="cp1252")
 
-        result = ingest_dataframe(df, file.filename, source_label="CSV upload")
+        result = ingest_dataframe(
+            df, file.filename,
+            source_label="Uploaded files",
+            source_id="local_files",
+            source_type="csv",
+        )
         rebuild_index()
         result["total_tables"] = len(get_all_table_names())
         return result

@@ -110,16 +110,28 @@ def rebuild_index() -> None:
         build_index(schema_docs)
 
 
-def ingest_dataframe(df: pd.DataFrame, raw_name: str, *, source_label: str) -> dict:
+def ingest_dataframe(
+    df: pd.DataFrame,
+    raw_name: str,
+    *,
+    source_label: str,
+    source_id: str = "local_files",
+    source_type: str = "csv",
+) -> dict:
     """
     Run a DataFrame through the full ingestion pipeline (sanitize, normalize,
     write to SQLite) and return the same response shape regardless of
     whether it came from a CSV upload or an external database table, so the
     frontend's upload-success handling works unchanged for both.
 
+    The table is tagged with its data source (source_id/label/type) so
+    queries can be scoped to one source and never mix, e.g., a Postgres
+    connection's tables with CSV uploads.
+
     Does NOT rebuild the RAG index — call rebuild_index() once after
     ingesting all tables in a batch (e.g. all tables from one DB import).
     """
+    from services.sources import register_table
     if df.empty:
         raise ValueError(f"'{raw_name}' has no rows.")
 
@@ -143,6 +155,8 @@ def ingest_dataframe(df: pd.DataFrame, raw_name: str, *, source_label: str) -> d
     finally:
         conn.close()
 
+    register_table(table_name, source_id, source_label, source_type)
+
     row_count = get_table_row_count(table_name)
     columns = [col["column_name"] for col in get_table_schema(table_name)]
     column_types = {col: str(dtype) for col, dtype in df.dtypes.items()}
@@ -161,6 +175,9 @@ def ingest_dataframe(df: pd.DataFrame, raw_name: str, *, source_label: str) -> d
         "domain": suggestion_bundle["domain"],
         "suggestions": suggestion_bundle["suggestions"],
         "data_quality": quality_report,
+        "source_id": source_id,
+        "source_label": source_label,
+        "source_type": source_type,
         "message": (
             f"Imported {row_count:,} rows from '{raw_name}' ({source_label}). "
             f"Detected: {suggestion_bundle['domain']['label']}. "

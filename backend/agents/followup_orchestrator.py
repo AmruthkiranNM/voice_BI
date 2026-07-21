@@ -97,11 +97,14 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     # 2. Execute new query using Orchestrator
     try:
         logger.info(f"[FOLLOWUP:{req_id}] 10 query planning started")
+        scope = context.get("table_names") or (
+            [context["table_name"]] if context.get("table_name") else None
+        )
         new_result = process_query(
-            resolved_question, 
-            fast_mode=False, 
+            resolved_question,
+            fast_mode=False,
             skip_insight=True,
-            table_name=context.get("table_name")
+            table_names=scope,
         )
         logger.info(f"[FOLLOWUP:{req_id}] 16 result validation completed")
         

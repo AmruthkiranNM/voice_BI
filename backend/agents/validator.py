@@ -28,7 +28,9 @@ class ValidationError(Exception):
 
 
 def run(
-    sql: str, retrieved_tables: list[str] | None = None
+    sql: str,
+    retrieved_tables: list[str] | None = None,
+    allowed_tables: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Validate a SQL query for security and schema correctness.
@@ -36,6 +38,9 @@ def run(
     Args:
         sql: The SQL query to validate.
         retrieved_tables: Tables retrieved by RAG (for contextual validation).
+        allowed_tables: When set, the query may reference ONLY these tables
+            (the active data source's scope). Referencing any table outside
+            this set is rejected, keeping data sources isolated.
 
     Returns:
         Dictionary with validation status and details.
@@ -62,7 +67,7 @@ def run(
     logger.info("[Validator Agent] SELECT-only check passed.")
 
     # ── Step 3: Schema Validation ──
-    warnings = _check_schema(sql, retrieved_tables)
+    warnings = _check_schema(sql, retrieved_tables, allowed_tables)
     if warnings:
         result["warnings"] = warnings
         logger.warning("[Validator Agent] Schema warnings: %s", warnings)
@@ -110,16 +115,20 @@ def _check_select_only(sql: str) -> None:
 
 
 def _check_schema(
-    sql: str, retrieved_tables: list[str] | None = None
+    sql: str,
+    retrieved_tables: list[str] | None = None,
+    allowed_tables: list[str] | None = None,
 ) -> list[str]:
     """
-    Validate that tables and columns referenced in SQL exist in the database.
+    Validate that tables and columns referenced in SQL exist in the database
+    and (when a scope is given) stay within the active data source.
 
     Returns a list of warning messages (non-fatal).
     """
     warnings = []
     db_tables = get_all_table_names()
     db_tables_lower = {t.lower() for t in db_tables}
+    allowed_lower = {t.lower() for t in allowed_tables} if allowed_tables else None
 
     # Extract table names from SQL (basic extraction from FROM and JOIN clauses)
     sql_tables = _extract_tables_from_sql(sql)
@@ -129,6 +138,12 @@ def _check_schema(
             raise ValidationError(
                 reason=f"Table '{table}' does not exist in the database. "
                        f"Available tables: {db_tables}",
+                violation_type="schema",
+            )
+        if allowed_lower is not None and table.lower() not in allowed_lower:
+            raise ValidationError(
+                reason=f"Table '{table}' is outside the selected data source. "
+                       f"This query may only use: {allowed_tables}",
                 violation_type="schema",
             )
 

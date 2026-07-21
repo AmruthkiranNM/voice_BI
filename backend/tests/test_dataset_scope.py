@@ -53,9 +53,31 @@ def test_rag_pins_to_active_table(temp_database):
 
     from agents.rag_agent import run
 
-    ctx = run("What are the most popular items?", {}, table_name="restaurant")
+    ctx = run("What are the most popular items?", {}, table_names=["restaurant"])
 
     assert ctx["retrieved_tables"] == ["restaurant"]
     assert ctx["pinned_table"] == "restaurant"
+    assert ctx["pinned_tables"] == ["restaurant"]
     assert "menu_item" in ctx["schema_context"]
     assert "Widget" not in ctx["schema_context"]
+
+
+def test_rag_scopes_to_multiple_tables_with_join_hints(temp_database):
+    conn = sqlite3.connect(config.DATABASE_PATH)
+    conn.execute("CREATE TABLE orders (order_id INTEGER, customer_id INTEGER, amount REAL)")
+    conn.execute("INSERT INTO orders VALUES (1, 10, 50.0)")
+    conn.execute("CREATE TABLE customers (customer_id INTEGER, city TEXT)")
+    conn.execute("INSERT INTO customers VALUES (10, 'NYC')")
+    conn.execute("CREATE TABLE unrelated (foo TEXT)")
+    conn.execute("INSERT INTO unrelated VALUES ('bar')")
+    conn.commit()
+    conn.close()
+
+    from agents.rag_agent import run
+
+    ctx = run("total amount per city", {}, table_names=["orders", "customers"])
+
+    assert set(ctx["pinned_tables"]) == {"orders", "customers"}
+    assert ctx["pinned_table"] is None  # multi-table scope
+    assert "customer_id" in ctx["schema_context"]  # join hint surfaced
+    assert "unrelated" not in ctx["schema_context"]

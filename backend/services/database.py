@@ -41,7 +41,8 @@ def get_all_table_names() -> list[str]:
     try:
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' "
-            "AND name NOT LIKE 'sqlite_%' ORDER BY name;"
+            "AND name NOT LIKE 'sqlite_%' "
+            "AND name NOT LIKE '\\_vbi\\_%' ESCAPE '\\' ORDER BY name;"
         )
         return [row["name"] for row in cursor.fetchall()]
     finally:

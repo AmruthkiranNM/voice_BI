@@ -135,9 +135,9 @@ export default function QueryInput({
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6 px-2">
         {/* Suggestions */}
-        <div className="flex-1 overflow-x-auto scrollbar-none">
+        <div className="flex-1 min-w-0 relative">
           {suggestions.length > 0 && (
-            <div className="flex items-center gap-2 pb-2">
+            <div className="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
               <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider shrink-0 mr-1">Suggestions:</span>
               {suggestions.map(s => (
                 <button
@@ -152,10 +152,12 @@ export default function QueryInput({
               ))}
             </div>
           )}
+          {/* Fade to hint the row scrolls horizontally when it overflows */}
+          <div className="pointer-events-none absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-[#18181b] to-transparent sm:hidden" />
         </div>
 
         {/* Secondary Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="relative flex items-center gap-2 shrink-0">
           {history.length > 0 && (
             <button
               type="button"
@@ -174,78 +176,76 @@ export default function QueryInput({
             <TbSettings className="w-4 h-4" />
             Settings
           </button>
-        </div>
-      </div>
 
-      {/* Popovers for Settings/History */}
-      <div className="relative">
-        {showAdvanced && (
-          <div className="absolute right-0 top-2 w-72 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-4 z-30 animate-in">
-            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Analysis Settings</h4>
-            <div className="space-y-4">
-              <label className="block">
-                <span className="text-sm text-zinc-300 block mb-1.5">AI Model</span>
-                <select
-                  value={settings.model || ''}
-                  onChange={e => updateSetting('model', e.target.value)}
-                  disabled={isLoading}
-                  className="w-full bg-[#09090b] border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500/50 transition-colors"
-                >
-                  {models.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </label>
-              
-              <div className="space-y-3 pt-2">
-                <Toggle label="Enable Cache (Faster)" checked={settings.cacheMode} onChange={v => updateSetting('cacheMode', v)} disabled={isLoading} />
-                <Toggle label="Fast Mode (Skip Summary)" checked={settings.fastMode} onChange={v => updateSetting('fastMode', v)} disabled={isLoading} />
-                <Toggle label="Voice Answers (Read Aloud)" checked={settings.speakInsight} onChange={v => updateSetting('speakInsight', v)} disabled={isLoading} />
-              </div>
-              
-              <div className="pt-2 border-t border-white/10 flex justify-end">
-                <button 
-                  type="button" 
-                  onClick={handleClearCache} 
-                  disabled={isLoading}
-                  className="text-xs font-medium text-zinc-400 hover:text-blue-400 transition-colors"
-                >
-                  {cacheCleared ? 'Cache Cleared ✓' : 'Clear System Cache'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* Popovers — anchored to this row so they open directly under the
+              Recent/Settings buttons instead of floating over content below. */}
+          {showAdvanced && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-4 z-30 animate-in">
+              <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">Analysis Settings</h4>
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="text-sm text-zinc-300 block mb-1.5">AI Model</span>
+                  <select
+                    value={settings.model || ''}
+                    onChange={e => updateSetting('model', e.target.value)}
+                    disabled={isLoading}
+                    className="w-full bg-[#09090b] border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500/50 transition-colors"
+                  >
+                    {models.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </label>
 
-        {showHistory && history.length > 0 && (
-          <div className="absolute right-0 top-2 w-80 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-4 z-30 animate-in">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Recent Queries</h4>
-              <button onClick={onClearHistory} className="text-[10px] uppercase font-bold text-red-400/80 hover:text-red-400">Clear</button>
-            </div>
-            <div className="space-y-1 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
-              {history.map(item => (
-                <div key={item.id} className="flex items-start gap-2 group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                <div className="space-y-3 pt-2">
+                  <Toggle label="Enable Cache (Faster)" checked={settings.cacheMode} onChange={v => updateSetting('cacheMode', v)} disabled={isLoading} />
+                  <Toggle label="Fast Mode (Skip Summary)" checked={settings.fastMode} onChange={v => updateSetting('fastMode', v)} disabled={isLoading} />
+                  <Toggle label="Voice Answers (Read Aloud)" checked={settings.speakInsight} onChange={v => updateSetting('speakInsight', v)} disabled={isLoading} />
+                </div>
+
+                <div className="pt-2 border-t border-white/10 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => { setQuery(item.query); if (!isLoading) onSubmit(item.query); setShowHistory(false); }}
+                    onClick={handleClearCache}
                     disabled={isLoading}
-                    className="flex-1 text-left text-sm text-zinc-300 hover:text-blue-400 line-clamp-2 leading-snug"
+                    className="text-xs font-medium text-zinc-400 hover:text-blue-400 transition-colors"
                   >
-                    {item.query}
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => onRemoveHistory?.(item.id)}
-                    className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 rounded transition-all"
-                  >
-                    <TbX className="w-4 h-4" />
+                    {cacheCleared ? 'Cache Cleared ✓' : 'Clear System Cache'}
                   </button>
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
 
+          {showHistory && history.length > 0 && (
+            <div className="absolute right-0 top-full mt-2 w-80 bg-[#18181b] border border-white/10 rounded-xl shadow-2xl p-4 z-30 animate-in">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Recent Queries</h4>
+                <button onClick={onClearHistory} className="text-[10px] uppercase font-bold text-red-400/80 hover:text-red-400">Clear</button>
+              </div>
+              <div className="space-y-1 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                {history.map(item => (
+                  <div key={item.id} className="flex items-start gap-2 group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => { setQuery(item.query); if (!isLoading) onSubmit(item.query); setShowHistory(false); }}
+                      disabled={isLoading}
+                      className="flex-1 text-left text-sm text-zinc-300 hover:text-blue-400 line-clamp-2 leading-snug"
+                    >
+                      {item.query}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRemoveHistory?.(item.id)}
+                      className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-1 rounded transition-all"
+                    >
+                      <TbX className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

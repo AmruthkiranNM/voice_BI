@@ -22,6 +22,7 @@ import psycopg2
 
 from config import MAX_UPLOAD_ROWS
 from services.ingest import ingest_dataframe, rebuild_index
+from services.sources import source_id_for_connection
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ def import_tables(connection_string: str, table_names: list[str]) -> dict:
     workspace. Continues past per-table failures so one bad table doesn't
     block the rest of the batch; failures are reported back per table.
     """
+    source_id, source_label = source_id_for_connection(connection_string)
     conn = _connect(connection_string)
     imported = []
     errors = []
@@ -93,7 +95,12 @@ def import_tables(connection_string: str, table_names: list[str]) -> dict:
                     f'SELECT * FROM "public"."{name}" LIMIT {MAX_UPLOAD_ROWS};',
                     conn,
                 )
-                result = ingest_dataframe(df, name, source_label="Postgres connection")
+                result = ingest_dataframe(
+                    df, name,
+                    source_label=source_label,
+                    source_id=source_id,
+                    source_type="postgres",
+                )
                 imported.append(result)
             except Exception as e:
                 logger.warning("Failed to import table '%s': %s", name, e)
@@ -104,4 +111,9 @@ def import_tables(connection_string: str, table_names: list[str]) -> dict:
     if imported:
         rebuild_index()
 
-    return {"imported": imported, "errors": errors}
+    return {
+        "imported": imported,
+        "errors": errors,
+        "source_id": source_id,
+        "source_label": source_label,
+    }

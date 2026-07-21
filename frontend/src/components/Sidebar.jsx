@@ -1,21 +1,45 @@
-import { TbMessageChatbot, TbDatabaseImport, TbSettings, TbLayoutDashboard, TbHistory } from 'react-icons/tb';
+import { useState } from 'react';
+import {
+  TbMessageChatbot, TbDatabaseImport, TbSettings, TbLayoutDashboard,
+  TbDatabase, TbFileSpreadsheet, TbTrash, TbLoader2,
+} from 'react-icons/tb';
+import { deleteSource } from '../services/api';
 
 export default function Sidebar({
   currentView,
   onViewChange,
   isMobileOpen,
-  setIsMobileOpen
+  setIsMobileOpen,
+  sources = [],
+  activeSourceId,
+  onSelectSource,
+  onDatasetsChanged,
 }) {
+  const [removingId, setRemovingId] = useState(null);
+
   const navItems = [
     { id: 'dashboard', label: 'Analysis Workspace', icon: TbLayoutDashboard },
     { id: 'upload', label: 'Data Source', icon: TbDatabaseImport },
   ];
 
+  const handleRemoveSource = async (e, sourceId) => {
+    e.stopPropagation();
+    setRemovingId(sourceId);
+    try {
+      await deleteSource(sourceId);
+      onDatasetsChanged?.();
+    } catch {
+      // leave it in place on failure; user can retry
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   return (
     <>
       {/* Mobile overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -67,6 +91,54 @@ export default function Sidebar({
               </button>
             );
           })}
+
+          {/* Data Sources — pick which "session" queries run against */}
+          {sources.length > 0 && (
+            <div className="pt-6">
+              <div className="flex items-center justify-between mb-3 px-2">
+                <span className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                  Data Sources
+                </span>
+                <span className="text-[10px] text-zinc-600">{sources.length}</span>
+              </div>
+              <div className="space-y-1">
+                {sources.map(src => {
+                  const isActive = src.id === activeSourceId;
+                  const SrcIcon = src.type === 'csv' ? TbFileSpreadsheet : TbDatabase;
+                  return (
+                    <button
+                      key={src.id}
+                      onClick={() => { onSelectSource?.(src.id); onViewChange('dashboard'); setIsMobileOpen(false); }}
+                      className={`group w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-left
+                        ${isActive
+                          ? 'active-pill'
+                          : 'text-zinc-400 hover:text-zinc-100 hover:bg-white/5 border border-transparent'}`}
+                      title={src.label}
+                    >
+                      <SrcIcon className={`w-4 h-4 shrink-0 ${isActive ? 'text-blue-300' : 'text-zinc-500'}`} />
+                      <span className="flex-1 min-w-0 truncate">{src.label}</span>
+                      <span className="text-[10px] text-zinc-500 shrink-0">{src.tables.length}</span>
+                      {src.type !== 'csv' && (
+                        removingId === src.id ? (
+                          <TbLoader2 className="w-3.5 h-3.5 animate-spin text-zinc-500 shrink-0" />
+                        ) : (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => handleRemoveSource(e, src.id)}
+                            className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 p-0.5 rounded transition-all shrink-0"
+                            title={`Disconnect ${src.label}`}
+                          >
+                            <TbTrash className="w-3.5 h-3.5" />
+                          </span>
+                        )
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </nav>
 
         {/* Footer Area */}
@@ -80,14 +152,14 @@ export default function Sidebar({
             Settings
             <span className="ml-auto text-[10px] text-zinc-600 uppercase tracking-wide">Soon</span>
           </button>
-          
+
           <div className="mt-4 px-3 py-3 rounded-lg bg-white/[0.02] border border-white/5 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-violet-600 flex items-center justify-center text-xs font-medium text-white shadow-inner">
               US
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-zinc-200 truncate">User Session</p>
-              <p className="text-xs text-zinc-500 truncate">Enterprise Plan</p>
+              <p className="text-xs text-zinc-500 truncate">Local · Private</p>
             </div>
           </div>
         </div>

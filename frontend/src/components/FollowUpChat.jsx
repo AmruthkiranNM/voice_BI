@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 export default function FollowUpChat({
-  query, sql, result, insight, model, tableName,
+  query, sql, result, insight, model, tableName, tableNames,
   messages, onMessagesChange, autoSpeak
 }) {
   const [input, setInput] = useState('');
@@ -43,6 +43,7 @@ export default function FollowUpChat({
         history: newMsgs.slice(-5),
         model,
         tableName,
+        tableNames,
       });
 
       const aiMsg = { role: 'assistant', content: response.reply };

@@ -16,6 +16,7 @@ export async function submitQuery(query, options = {}) {
   const {
     model = null,
     tableName = null,
+    tableNames = null,
     cacheMode = true,
     fastMode = false,
     skipInsight = false,
@@ -26,6 +27,7 @@ export async function submitQuery(query, options = {}) {
       query,
       model: model || null,
       table_name: tableName || null,
+      table_names: tableNames && tableNames.length ? tableNames : null,
       cache_mode: cacheMode,
       fast_mode: fastMode,
       skip_insight: skipInsight,
@@ -71,7 +73,7 @@ export async function uploadDataset(file) {
 }
 
 /** Ask a conversational follow-up about an existing query result */
-export async function sendChatMessage(message, { query, sql, result, insight, history = [], model = null, tableName = null } = {}) {
+export async function sendChatMessage(message, { query, sql, result, insight, history = [], model = null, tableName = null, tableNames = null } = {}) {
   try {
     const { data } = await api.post('/chat', {
       message,
@@ -82,6 +84,7 @@ export async function sendChatMessage(message, { query, sql, result, insight, hi
       history: history.map(h => ({ role: h.role, content: h.content })),
       model: model || null,
       table_name: tableName || null,
+      table_names: tableNames && tableNames.length ? tableNames : null,
     });
     return data;
   } catch (error) {
@@ -143,6 +146,17 @@ export async function importDbTables(connectionString, tables) {
     return data;
   } catch (error) {
     const msg = error.response?.data?.detail || error.message || 'Import failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
+/** Remove an entire data source (all its tables) */
+export async function deleteSource(sourceId) {
+  try {
+    const { data } = await api.delete(`/sources/${encodeURIComponent(sourceId)}`);
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Failed to remove source.';
     throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
   }
 }

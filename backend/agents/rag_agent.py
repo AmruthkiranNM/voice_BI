@@ -5,8 +5,9 @@ Uses the FAISS vector store to retrieve database schema documents
 that are most relevant to the user's query. This provides context
 to the SQL Generator Agent, preventing hallucinated table/column names.
 
-When ``table_name`` is provided, retrieval is pinned to that table only
-so queries always target the dataset the user uploaded in this session.
+When ``table_names`` is provided, retrieval is pinned to exactly those
+tables (one data source's scope) so queries never reference tables from
+another source, and joins are only ever built within the scope.
 """
 
 import logging
@@ -17,7 +18,7 @@ from models.schema_loader import generate_table_document
 logger = logging.getLogger(__name__)
 
 
-def run(query: str, plan: dict, table_name: str | None = None) -> dict:
+def run(query: str, plan: dict, table_names: list[str] | None = None) -> dict:
     """
     Retrieve relevant schema documents using RAG.
 
@@ -27,15 +28,17 @@ def run(query: str, plan: dict, table_name: str | None = None) -> dict:
     Args:
         query: Original natural language query.
         plan: Execution plan from the Planner Agent.
-        table_name: When set, use only this uploaded table (skip vector search).
+        table_names: When set, restrict scope to exactly these tables (skip
+            vector search). One entry = single-table query; several = join
+            scope. This is the active data source's table set.
 
     Returns:
         Dictionary with retrieved schema context.
     """
     logger.info("[RAG Agent] Retrieving schema for query: %s", query[:80])
 
-    if table_name:
-        return _context_for_table(table_name)
+    if table_names:
+        return _context_for_tables(table_names)
 
     if not is_index_ready():
         raise RuntimeError(
@@ -73,6 +76,7 @@ def run(query: str, plan: dict, table_name: str | None = None) -> dict:
             r["table_name"]: r["similarity_score"] for r in results
         },
         "pinned_table": None,
+        "pinned_tables": None,
     }
 
     logger.info(
@@ -84,16 +88,23 @@ def run(query: str, plan: dict, table_name: str | None = None) -> dict:
     return rag_output
 
 
-def _context_for_table(table_name: str) -> dict:
-    """Build schema context for the active uploaded table only."""
-    document = generate_table_document(table_name)
-    logger.info("[RAG Agent] Pinned to active table: %s", table_name)
+def _context_for_tables(table_names: list[str]) -> dict:
+    """Build schema context for exactly the given tables (the active source scope)."""
+    parts = [generate_table_document(t) for t in table_names]
+    schema_context = "\n\n---\n\n".join(parts)
+    if len(table_names) > 1:
+        join_hints = _build_join_hints(table_names)
+        if join_hints:
+            schema_context += "\n\n---\n\n" + join_hints
+
+    logger.info("[RAG Agent] Scoped to %d table(s): %s", len(table_names), table_names)
     return {
-        "retrieved_tables": [table_name],
-        "schema_context": document,
-        "num_results": 1,
-        "similarity_scores": {table_name: 1.0},
-        "pinned_table": table_name,
+        "retrieved_tables": list(table_names),
+        "schema_context": schema_context,
+        "num_results": len(table_names),
+        "similarity_scores": {t: 1.0 for t in table_names},
+        "pinned_table": table_names[0] if len(table_names) == 1 else None,
+        "pinned_tables": list(table_names),
     }
 
 

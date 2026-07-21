@@ -82,10 +82,17 @@ def run(
 
     plan_text = _format_plan(plan)
     schema_context = rag_context.get("schema_context", "No schema available.")
-    pinned = rag_context.get("pinned_table")
-    if pinned:
+    pinned_tables = rag_context.get("pinned_tables") or (
+        [rag_context["pinned_table"]] if rag_context.get("pinned_table") else None
+    )
+    if pinned_tables:
+        if len(pinned_tables) == 1:
+            scope = f"the table [{pinned_tables[0]}]"
+        else:
+            names = ", ".join(f"[{t}]" for t in pinned_tables)
+            scope = f"ONLY these tables: {names} (JOIN across them when the question needs data from more than one)"
         schema_context = (
-            f"IMPORTANT: Query ONLY the table [{pinned}]. "
+            f"IMPORTANT: Query {scope}. "
             f"Do not use any other table.\n\n{schema_context}"
         )
     today = datetime.now().strftime("%Y-%m-%d")
@@ -112,6 +119,18 @@ def run(
     return sql
 
 
+def _scope_tables(rag_context: dict) -> list[str]:
+    """Tables the SQL may reference: the pinned source scope, else retrieved, else all."""
+    from services.database import get_all_table_names
+
+    return (
+        rag_context.get("pinned_tables")
+        or ([rag_context["pinned_table"]] if rag_context.get("pinned_table") else None)
+        or rag_context.get("retrieved_tables")
+        or get_all_table_names()
+    )
+
+
 def _repair_columns(sql: str, rag_context: dict) -> str:
     """
     Deterministically fix the most common LLM mistake on multi-word columns:
@@ -124,10 +143,7 @@ def _repair_columns(sql: str, rag_context: dict) -> str:
     import re
     from services.database import get_table_schema, get_all_table_names
 
-    tables = (
-        [rag_context["pinned_table"]] if rag_context.get("pinned_table")
-        else rag_context.get("retrieved_tables") or get_all_table_names()
-    )
+    tables = _scope_tables(rag_context)
     cols = [c["column_name"] for t in tables for c in get_table_schema(t)]
 
     norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower())
@@ -165,12 +181,9 @@ def _fix_text_aggregates(sql: str, rag_context: dict) -> str:
     which reports the actual categories instead of a lying zero.
     """
     import re
-    from services.database import get_table_schema, get_all_table_names
+    from services.database import get_table_schema
 
-    tables = (
-        [rag_context["pinned_table"]] if rag_context.get("pinned_table")
-        else rag_context.get("retrieved_tables") or get_all_table_names()
-    )
+    tables = _scope_tables(rag_context)
     text_cols = {
         c["column_name"]
         for t in tables

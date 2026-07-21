@@ -185,7 +185,7 @@ def run(fast: bool = True) -> None:
 
         for category, question, check in spec["cases"]:
             start = time.time()
-            result = process_query(question, table_name=table, cache_mode=False, fast_mode=fast)
+            result = process_query(question, table_names=[table], cache_mode=False, fast_mode=fast)
             elapsed = time.time() - start
             total_time += elapsed
             total += 1
