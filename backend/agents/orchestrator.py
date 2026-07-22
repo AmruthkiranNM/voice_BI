@@ -212,7 +212,7 @@ def process_query(
                 })
                 break
 
-            last_error = exec_result["error"]
+            last_error = _enrich_column_error(exec_result["error"], rag_context)
             previous_sql = sql
             log_step("Execution Agent", f"failed_attempt_{attempt}", {"error": last_error})
 
@@ -354,6 +354,31 @@ def _strip_spurious_date_filter(sql: str) -> str | None:
         return stripped
 
     return None
+
+
+def _enrich_column_error(error: str, rag_context: dict) -> str:
+    """
+    At low temperature the SQL agent regenerates near-identical SQL when the
+    retry prompt only repeats a generic "no such column: X" error — it has
+    no concrete alternative to reach for. List the real columns of the
+    scoped tables so the retry has something to correct to.
+    """
+    from services.database import get_table_schema
+
+    m = re.search(r"no such column:\s*(\S+)", error or "", re.IGNORECASE)
+    if not m:
+        return error
+
+    tables = (
+        rag_context.get("pinned_tables")
+        or rag_context.get("retrieved_tables")
+        or []
+    )
+    lines = [f"  {t}: {[c['column_name'] for c in get_table_schema(t)]}" for t in tables]
+    if not lines:
+        return error
+
+    return f"{error}\nActual available columns per table:\n" + "\n".join(lines)
 
 
 def _diagnose_zero_rows(sql: str, query: str) -> str | None:

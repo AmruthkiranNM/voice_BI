@@ -16,7 +16,7 @@ pandas>=2.0.0
 # pip doesn't grab a multi-GB CUDA wheel. Embeddings run on CPU (see
 # config.EMBEDDING_DEVICE) so the local GPU's VRAM stays free for Ollama.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.4.1+cpu
+torch==2.7.1+cpu
 sentence-transformers==3.0.0
 
 # Vector store
