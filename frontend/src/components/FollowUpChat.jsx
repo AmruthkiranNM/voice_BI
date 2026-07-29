@@ -128,7 +128,7 @@ export default function FollowUpChat({
 
       <div className="relative group z-10">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
-        <div className="relative flex items-center bg-[#09090b] border border-white/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
+        <div className="relative flex items-center bg-[#1C1917] border border-white/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
           {isSupported && (
             <button
               onClick={isListening ? stopListening : startListening}

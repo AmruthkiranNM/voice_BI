@@ -27,7 +27,10 @@ DATABASE_PATH = str(DATA_DIR / "business.db")
 # ──────────────────────────────────────────────
 # LLM Configuration
 # ──────────────────────────────────────────────
-# Supports: "ollama" (local)
+# Supports: "ollama" (local, default — keeps the "100% local" guarantee) or
+# "groq" (free-tier cloud API, much larger models, but data leaves the machine).
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").lower()
+
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
@@ -35,6 +38,11 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 # 300s default so a stuck/overloaded local model fails fast with a clear
 # error instead of hanging the request for 5 minutes on modest hardware.
 OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "180"))
+
+# Groq (https://console.groq.com) — free tier, OpenAI-compatible chat API.
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_TIMEOUT_SECONDS = int(os.getenv("GROQ_TIMEOUT_SECONDS", "60"))
 
 
 # ──────────────────────────────────────────────

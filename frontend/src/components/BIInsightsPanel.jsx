@@ -68,7 +68,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: topEntry.label,
       value: formatStatValue(topEntry.value),
       sub: topEntry.valueColumn,
-      accent: '#3b82f6',
+      accent: '#D97757',
       badge: 'Rank #1',
     });
   }
@@ -110,7 +110,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: primaryStat.label,
       value: formatStatValue(primaryStat.sum),
       sub: `Avg: ${formatStatValue(primaryStat.avg)} · Max: ${formatStatValue(primaryStat.max)}`,
-      accent: '#60a5fa',
+      accent: '#E2946F',
       badge: `${rowCount} records`,
     });
   }
@@ -124,7 +124,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: '',
       value: '',
       sub: c.text,
-      accent: c.type === 'positive' ? '#3b82f6' : c.type === 'negative' ? '#f87171' : '#a78bfa',
+      accent: c.type === 'positive' ? '#D97757' : c.type === 'negative' ? '#f87171' : '#a78bfa',
       badge: null,
     });
   }

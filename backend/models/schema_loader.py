@@ -9,7 +9,12 @@ a single table with its columns, types, relationships, and sample data.
 import logging
 from typing import Any
 
-from services.database import get_full_schema, get_sample_data, get_table_row_count
+from services.database import (
+    get_full_schema,
+    get_low_cardinality_values,
+    get_sample_data,
+    get_table_row_count,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,15 @@ def _format_column(col: dict[str, Any]) -> str:
     if col["default_value"] is not None:
         parts.append(f"DEFAULT {col['default_value']}")
     return " | ".join(parts)
+
+
+def _format_distinct_values(table_name: str, columns: list[dict[str, Any]]) -> str:
+    """Format the exact valid values of low-cardinality text columns."""
+    values_by_col = get_low_cardinality_values(table_name, schema=columns)
+    if not values_by_col:
+        return ""
+    parts = [f"{col}={{{', '.join(sorted(values))}}}" for col, values in values_by_col.items()]
+    return "Categorical values: " + "; ".join(parts)
 
 
 def _format_foreign_keys(fks: list[dict[str, str]]) -> str:
@@ -87,6 +101,10 @@ def generate_schema_documents() -> list[dict[str, str]]:
         lines.append("")
         lines.append(_format_foreign_keys(table_info["foreign_keys"]))
         lines.append("")
+        distinct_values = _format_distinct_values(table_name, table_info["columns"])
+        if distinct_values:
+            lines.append(distinct_values)
+            lines.append("")
         lines.append(_format_sample_rows(table_name))
 
         document = "\n".join(lines)
@@ -122,6 +140,10 @@ def generate_table_document(table_name: str) -> str:
     lines.append("")
     lines.append(_format_foreign_keys(table_info["foreign_keys"]))
     lines.append("")
+    distinct_values = _format_distinct_values(table_name, table_info["columns"])
+    if distinct_values:
+        lines.append(distinct_values)
+        lines.append("")
     lines.append(_format_sample_rows(table_name))
 
     return "\n".join(lines)

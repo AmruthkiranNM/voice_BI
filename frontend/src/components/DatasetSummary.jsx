@@ -49,7 +49,7 @@ export default function DatasetSummary({ datasetInfo }) {
             <ColumnGroup label="Numbers" items={numeric} color="text-emerald-400" />
           )}
           {categories.length > 0 && (
-            <ColumnGroup label="Groups" items={categories.slice(0, 6)} color="text-[#3b82f6]" extra={categories.length - 6} />
+            <ColumnGroup label="Groups" items={categories.slice(0, 6)} color="text-[#D97757]" extra={categories.length - 6} />
           )}
           {dates.length > 0 && (
             <ColumnGroup label="Dates" items={dates} color="text-amber-400" />

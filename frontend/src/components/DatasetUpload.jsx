@@ -5,12 +5,12 @@ import { TbCloudUpload, TbFileSpreadsheet, TbCheck, TbAlertCircle, TbTrash, TbTa
 function DataQuality({ report }) {
   if (!report) return null;
   const { score, issues } = report;
-  const colorClass = score >= 85 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' 
-                   : score >= 60 ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' 
+  const colorClass = score >= 85 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20'
+                   : score >= 60 ? 'text-amber-400 bg-amber-400/10 border-amber-400/20'
                    : 'text-red-400 bg-red-400/10 border-red-400/20';
 
   return (
-    <div className="mt-4 p-4 rounded-lg bg-white/[0.02] border border-white/5 space-y-3">
+    <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-zinc-400">Data Quality Score</span>
         <div className={`px-2.5 py-1 rounded-full border text-xs font-bold ${colorClass}`}>
@@ -41,10 +41,10 @@ function DataPreview({ upload }) {
   const columns = upload.columns || Object.keys(upload.preview_rows[0]);
 
   return (
-    <div className="mt-4 rounded-lg border border-white/10 bg-black/40 overflow-hidden">
+    <div className="mt-4 rounded-xl border border-white/10 overflow-hidden">
       <div className="overflow-x-auto max-h-48 scrollbar-thin">
         <table className="w-full text-xs text-left whitespace-nowrap">
-          <thead className="sticky top-0 bg-[#18181b] text-zinc-400 border-b border-white/10 z-10">
+          <thead className="sticky top-0 bg-[#262220] text-zinc-400 border-b border-white/10 z-10">
             <tr>
               {columns.map(col => (
                 <th key={col} className="px-4 py-2.5 font-medium uppercase tracking-wider text-[10px]">
@@ -159,24 +159,22 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
             processFile(e.dataTransfer.files[0]);
           }}
           className={`
-            relative group flex flex-col items-center justify-center w-full h-64 sm:h-72
-            rounded-2xl border-2 border-dashed transition-all duration-300 ease-in-out
-            ${isDragging 
-              ? 'border-blue-500 bg-blue-500/10' 
-              : 'border-zinc-700 hover:border-blue-500/50 hover:bg-white/[0.02] bg-white/[0.01]'
+            relative group flex flex-col items-center justify-center w-full h-60 sm:h-64
+            rounded-2xl border-2 border-dashed transition-colors duration-200
+            ${isDragging
+              ? 'border-[#D97757] bg-[#D97757]/[0.06]'
+              : 'border-white/10 hover:border-[#D97757]/40 hover:bg-white/[0.02]'
             }
           `}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          
           <div className="relative z-10 flex flex-col items-center text-center space-y-4 px-6">
             <div className={`
-              p-4 rounded-full transition-transform duration-300 
-              ${isDragging ? 'scale-110 bg-blue-500/20' : 'bg-white/5 group-hover:scale-110'}
+              p-4 rounded-full transition-colors duration-200
+              ${isDragging ? 'bg-[#D97757]/15' : 'bg-white/5'}
             `}>
-              <TbCloudUpload className={`w-8 h-8 ${isDragging ? 'text-blue-400' : 'text-zinc-400 group-hover:text-blue-400'}`} />
+              <TbCloudUpload className={`w-7 h-7 ${isDragging ? 'text-[#D97757]' : 'text-zinc-400'}`} />
             </div>
-            
+
             <div>
               <p className="text-lg font-medium text-zinc-100">
                 Drag and drop your dataset
@@ -187,7 +185,7 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
             </div>
 
             <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={e => processFile(e.target.files[0])} />
-            
+
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
@@ -198,13 +196,13 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
           </div>
         </div>
       ) : (
-        <div className="glass-panel p-6 sm:p-8 rounded-2xl">
+        <div className="surface-card p-6 sm:p-8">
           {lastUpload ? (
             <>
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6">
                 <div className="flex gap-4">
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0 h-fit">
-                    <TbFileSpreadsheet className="w-6 h-6 text-blue-400" />
+                  <div className="p-3 bg-[#D97757]/10 border border-[#D97757]/20 rounded-xl shrink-0 h-fit">
+                    <TbFileSpreadsheet className="w-6 h-6 text-[#D97757]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -217,7 +215,7 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
                     {businessType && (
                       <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-xs font-medium text-zinc-300">
                         <span>Domain:</span>
-                        <span className="text-blue-400">{businessType}</span>
+                        <span className="text-[#D97757]">{businessType}</span>
                       </div>
                     )}
                   </div>
@@ -228,7 +226,7 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="text-sm font-medium text-zinc-400 hover:text-white px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-all w-full sm:w-auto"
+                    className="btn-secondary text-sm px-4 py-2 w-full sm:w-auto"
                   >
                     Add Another Table
                   </button>
@@ -241,7 +239,7 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
                 <button
                   type="button"
                   onClick={() => setShowPreview(v => !v)}
-                  className="text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                  className="text-sm font-medium text-[#D97757] hover:text-[#EFC3AC] transition-colors flex items-center gap-1"
                 >
                   {showPreview ? 'Hide Preview' : 'Show Data Preview'}
                 </button>
@@ -251,8 +249,8 @@ export default function DatasetUpload({ onUploadSuccess, onTableRemoved, tables 
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl shrink-0">
-                  <TbTable className="w-6 h-6 text-blue-400" />
+                <div className="p-3 bg-[#D97757]/10 border border-[#D97757]/20 rounded-xl shrink-0">
+                  <TbTable className="w-6 h-6 text-[#D97757]" />
                 </div>
                 <p className="text-sm text-zinc-400">
                   {tables.length} table{tables.length === 1 ? '' : 's'} in your workspace

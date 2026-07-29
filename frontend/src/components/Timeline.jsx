@@ -42,7 +42,7 @@ export default function Timeline({ agentLogs }) {
                     wasSkipped
                       ? 'border-white/10 text-zinc-600 bg-white/[0.02]'
                       : done
-                        ? 'border-[#3b82f6]/50 bg-[#3b82f6]/10 text-[#3b82f6]'
+                        ? 'border-[#D97757]/50 bg-[#D97757]/10 text-[#D97757]'
                         : 'border-white/10 bg-black/20 text-zinc-600'
                   }`}
                 >
@@ -65,7 +65,7 @@ export default function Timeline({ agentLogs }) {
                   <div className="absolute inset-0 bg-white/10" />
                   <div
                     className={`absolute inset-0 transition-all duration-500 ${
-                      done ? 'bg-[#3b82f6]/40' : ''
+                      done ? 'bg-[#D97757]/40' : ''
                     }`}
                   />
                 </div>

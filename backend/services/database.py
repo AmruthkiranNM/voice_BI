@@ -187,6 +187,53 @@ def get_sample_values(
     return values
 
 
+def get_low_cardinality_values(
+    table_name: str,
+    schema: list[dict[str, Any]] | None = None,
+    max_distinct: int = 12,
+) -> dict[str, list[str]]:
+    """
+    For each text column with few distinct values (e.g. a Category/Region
+    column), return its full set of values. Small local LLMs generate a
+    filter like WHERE Category = 'Bars' only if the exact valid values are
+    spelled out in the schema context — otherwise a question like "highest
+    selling bars" silently drops the filter because the model has no way to
+    confirm "bars" names a real category value rather than ordinary English.
+    """
+    schema = schema or get_table_schema(table_name)
+    text_cols = [
+        c["column_name"]
+        for c in schema
+        if (c.get("data_type") or "").upper() in ("TEXT", "VARCHAR", "CHAR", "STRING", "")
+        # ID/key-like columns are never what a business question names as a
+        # filter term ("bars", "australia") — skip them to keep the schema
+        # context small enough to fit the model's context window.
+        and not c["column_name"].lower().endswith("id")
+        and not c.get("is_primary_key")
+    ]
+    if not text_cols:
+        return {}
+
+    result: dict[str, list[str]] = {}
+    conn = get_connection()
+    try:
+        for col in text_cols:
+            try:
+                cursor = conn.execute(
+                    f"SELECT DISTINCT [{col}] FROM [{table_name}] "
+                    f"WHERE [{col}] IS NOT NULL LIMIT ?;",
+                    (max_distinct + 1,),
+                )
+                values = [str(row[0]) for row in cursor.fetchall()]
+                if 0 < len(values) <= max_distinct:
+                    result[col] = values
+            except sqlite3.OperationalError:
+                continue
+    finally:
+        conn.close()
+    return result
+
+
 def execute_query(sql: str) -> dict[str, Any]:
     """
     Execute a read-only SQL query and return results.

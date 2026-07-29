@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../services/api';
-import { TbCloudCheck, TbCloudOff, TbCloudUpload } from 'react-icons/tb';
 
 export default function Header({ isProcessing }) {
   const [online, setOnline] = useState(false);
@@ -13,21 +12,14 @@ export default function Header({ isProcessing }) {
   }, []);
 
   const status = isProcessing ? 'working' : online ? 'ready' : 'offline';
+  const dotClass = status === 'working' ? 'bg-[#D97757] animate-pulse' : status === 'ready' ? 'bg-emerald-500' : 'bg-red-500';
+  const label = status === 'working' ? 'Processing' : status === 'ready' ? 'Local · Private' : 'Offline';
+  const textClass = status === 'working' ? 'text-[#D97757]' : status === 'ready' ? 'text-zinc-500' : 'text-red-400';
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.02] border border-white/5">
-      {status === 'working' ? (
-        <TbCloudUpload className="w-4 h-4 text-blue-400 animate-pulse" />
-      ) : status === 'ready' ? (
-        <TbCloudCheck className="w-4 h-4 text-emerald-400" />
-      ) : (
-        <TbCloudOff className="w-4 h-4 text-red-400" />
-      )}
-      <span className={`text-[11px] font-medium uppercase tracking-wider ${
-        status === 'working' ? 'text-blue-400' : status === 'ready' ? 'text-emerald-400' : 'text-red-400'
-      }`}>
-        {status === 'working' ? 'Processing' : status === 'ready' ? 'Connected' : 'Offline'}
-      </span>
+    <div className="flex items-center gap-2 px-1">
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`} />
+      <span className={`text-xs font-medium ${textClass}`}>{label}</span>
     </div>
   );
 }

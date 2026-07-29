@@ -27,6 +27,7 @@ CRITICAL RULES:
   * "how many", "number of", "count of" → COUNT(*) (counting rows/records). "How many sales/orders" means COUNT(*), NOT SUM of an amount.
   * "total", "sum of", "combined", "how much revenue/money" → SUM(<value column>).
   * "average", "mean" → AVG(<value column>). "highest"/"lowest"/"maximum"/"minimum" → MAX/MIN.
+- CATEGORICAL FILTERS — the schema lists the exact values that exist for certain text columns (e.g. Category is one of: Bars, Bites, Other). When the question names a term that matches ONE of those values (e.g. "bars"), add WHERE <column> = '<that one matching value>'. Never add an IN(...) list of every possible value for that column — that is not a filter, and matching all values is equivalent to not filtering at all, which is wrong when the question named a specific one.
 - Before using AVG/SUM/MAX/MIN on a column, check its type in the schema below. NEVER aggregate a TEXT/VARCHAR column numerically — AVG() or SUM() on text silently returns 0, which is wrong. If the question asks for an "average"/"total" of a column that is actually categorical text (e.g. a size label like Small/Medium/Large, a Yes/No flag, a status), there is no numeric average — instead return a breakdown: SELECT <category_column>, COUNT(*) AS count ... GROUP BY <category_column> (combined with any other requested grouping, e.g. country).
 - Only add a date/time WHERE filter when the question names a period (e.g. "last month", "this year"). For general "over time" / "trend" questions, include ALL rows — do NOT filter to recent dates.
 - RELATIVE vs NAMED periods — do not confuse them:
@@ -97,6 +98,15 @@ def run(
         )
     today = datetime.now().strftime("%Y-%m-%d")
 
+    detected_filters = _detect_categorical_filters(query, rag_context)
+    if detected_filters:
+        lines = "\n".join(f"  - WHERE {t}.{c} = '{v}'" for t, c, v in detected_filters)
+        plan_text += (
+            f"\n\nDETECTED FILTERS — the question names these exact category values; "
+            f"apply them as WHERE conditions (do not also filter to any of that "
+            f"column's other values):\n{lines}"
+        )
+
     retry_section = ""
     if previous_sql and error_message:
         retry_section = RETRY_SECTION.format(
@@ -115,8 +125,98 @@ def run(
     sql = _clean_sql(call_llm(prompt, expect_json=False))
     sql = _repair_columns(sql, rag_context)
     sql = _fix_text_aggregates(sql, rag_context)
+    sql = _ensure_filter_tables_joined(sql, detected_filters, rag_context)
     logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
     return sql
+
+
+def _ensure_filter_tables_joined(
+    sql: str, detected_filters: list[tuple[str, str, str]], rag_context: dict,
+) -> str:
+    """
+    A detected categorical filter (e.g. products.category = 'Bars') is useless
+    if the model referenced that table in WHERE but forgot to JOIN it — SQLite
+    then errors with "no such column", and at low temperature the retry loop
+    tends to regenerate the same SQL. Deterministically add any missing JOIN
+    using the same shared-column heuristic already used for join hints.
+    """
+    import re
+    from services.database import get_table_schema
+
+    if not detected_filters:
+        return sql
+
+    from_join_tables = set(re.findall(r"\b(?:FROM|JOIN)\s+([A-Za-z_][A-Za-z0-9_]*)", sql, re.IGNORECASE))
+    needed_tables = {t for t, _, _ in detected_filters}
+    missing = needed_tables - from_join_tables
+    if not missing:
+        return sql
+
+    cols_by_table = {
+        t: {c["column_name"] for c in get_table_schema(t)}
+        for t in from_join_tables | missing
+    }
+
+    insert_point = re.search(r"\bWHERE\b", sql, re.IGNORECASE)
+    if not insert_point:
+        return sql
+
+    join_clauses = []
+    for missing_table in missing:
+        for present_table in from_join_tables:
+            shared = sorted(cols_by_table.get(missing_table, set()) & cols_by_table.get(present_table, set()))
+            shared = [c for c in shared if c.lower() not in ("id", "name")]
+            if shared:
+                join_clauses.append(
+                    f"JOIN {missing_table} ON {present_table}.{shared[0]} = {missing_table}.{shared[0]}\n"
+                )
+                from_join_tables.add(missing_table)
+                break
+
+    if not join_clauses:
+        return sql
+
+    idx = insert_point.start()
+    return sql[:idx] + "".join(join_clauses) + sql[idx:]
+
+
+def _detect_categorical_filters(query: str, rag_context: dict) -> list[tuple[str, str, str]]:
+    """
+    Deterministically match words in the question against known low-cardinality
+    column values (e.g. Category: Bars/Bites/Other), so a category or region
+    name in the question always becomes an explicit WHERE condition instead of
+    depending on a small local model to infer it from prose alone.
+
+    Returns a list of (table, column, value) tuples.
+    """
+    import re
+    from services.database import get_low_cardinality_values, get_table_schema
+
+    query_words = set(re.findall(r"[a-z0-9]+", query.lower()))
+
+    def word_forms(word: str) -> set[str]:
+        forms = {word}
+        if word.endswith("ies"):
+            forms.add(word[:-3] + "y")
+        elif word.endswith("es"):
+            forms.add(word[:-2])
+        if word.endswith("s") and not word.endswith("ss"):
+            forms.add(word[:-1])
+        return forms
+
+    matches = []
+    for table in _scope_tables(rag_context):
+        values_by_col = get_low_cardinality_values(table, schema=get_table_schema(table))
+        for col, values in values_by_col.items():
+            for value in values:
+                value_words = re.findall(r"[a-z0-9]+", value.lower())
+                if not value_words:
+                    continue
+                if all(
+                    query_words & word_forms(vw) for vw in value_words
+                ):
+                    matches.append((table, col, value))
+    return matches
 
 
 def _scope_tables(rag_context: dict) -> list[str]:
@@ -243,11 +343,22 @@ def _clean_sql(sql: str) -> str:
         stripped = line.strip()
         if not stripped:
             continue
-        if stripped.startswith(("Here", "This", "The ", "Note:", "Explanation")):
+        if stripped.startswith(("Here", "This", "The ", "Note:", "Explanation", "Let's", "Let us")):
+            continue
+        # Reasoning preambles from chatty models: numbered/bulleted prose lines
+        # ("1. **Identify the Tables**: ...") before the actual SQL starts.
+        if re.match(r"^(\d+\.|[-*])\s", stripped) and not re.match(
+            r"^(SELECT|FROM|WHERE|JOIN|GROUP|ORDER|HAVING|LIMIT|AND|OR|ON)\b",
+            stripped, re.IGNORECASE,
+        ):
             continue
         sql_lines.append(line)
 
     sql = "\n".join(sql_lines).strip()
+    # If a SQL statement starts partway through, drop everything before it.
+    match = re.search(r"\b(SELECT|WITH)\b", sql, re.IGNORECASE)
+    if match:
+        sql = sql[match.start():]
     if sql and not sql.endswith(";"):
         sql += ";"
     return sql

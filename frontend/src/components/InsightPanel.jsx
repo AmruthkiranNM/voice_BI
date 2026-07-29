@@ -20,7 +20,7 @@ export default function InsightPanel({ insight, autoSpeak = false }) {
           <button
             type="button"
             onClick={() => isSpeaking ? stop() : speak(insight)}
-            className="text-xs text-gray-500 hover:text-[#3b82f6] transition-colors"
+            className="text-xs text-gray-500 hover:text-[#D97757] transition-colors"
           >
             {isSpeaking ? 'Stop' : 'Listen'}
           </button>
