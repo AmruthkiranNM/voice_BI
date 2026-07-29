@@ -8,9 +8,9 @@ export default function DataQuality({ quality }) {
   // Determine overall status color — thresholds/colors match the compact
   // DataQuality score badge shown during upload (DatasetUpload.jsx) so the
   // same score always reads as the same severity throughout the app.
-  let statusColor = 'text-emerald-400';
-  let bgGlow = 'bg-emerald-500/10';
-  let borderColor = 'border-emerald-500/20';
+  let statusColor = 'text-[#3E7A4D]';
+  let bgGlow = 'bg-[#3E7A4D]/10';
+  let borderColor = 'border-[#3E7A4D]/20';
   if (score < 60) {
     statusColor = 'text-red-400';
     bgGlow = 'bg-red-500/10';
@@ -43,7 +43,7 @@ export default function DataQuality({ quality }) {
       {issues?.length > 0 && (
         <div className="space-y-3">
           {issues.map((issue, idx) => (
-            <div key={idx} className="flex gap-3 p-3 rounded-lg bg-black/40 border border-white/5">
+            <div key={idx} className="flex gap-3 p-3 rounded-lg bg-black/40 border border-black/5">
               <div className="mt-0.5">
                 {issue.severity === 'high' && <TbAlertTriangle className="w-4 h-4 text-red-400" />}
                 {issue.severity === 'medium' && <TbAlertCircle className="w-4 h-4 text-amber-400" />}

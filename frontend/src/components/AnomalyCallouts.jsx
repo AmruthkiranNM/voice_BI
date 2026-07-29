@@ -18,7 +18,7 @@ export default function AnomalyCallouts({ result }) {
           <li key={i} className="flex items-start gap-2.5 text-sm text-zinc-300 leading-relaxed">
             <span
               className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
-                c.type === 'positive' ? 'bg-[#D97757]' : c.type === 'negative' ? 'bg-red-400' : 'bg-zinc-500'
+                c.type === 'positive' ? 'bg-[#3E7A4D]' : c.type === 'negative' ? 'bg-[#9C4A2A]' : 'bg-zinc-500'
               }`}
             />
             {c.text}

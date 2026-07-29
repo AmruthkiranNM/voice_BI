@@ -40,10 +40,10 @@ export default function Timeline({ agentLogs }) {
                 <div
                   className={`w-9 h-9 flex items-center justify-center text-xs font-data font-semibold border ${
                     wasSkipped
-                      ? 'border-white/10 text-zinc-600 bg-white/[0.02]'
+                      ? 'border-black/10 text-zinc-600 bg-black/[0.02]'
                       : done
-                        ? 'border-[#D97757]/50 bg-[#D97757]/10 text-[#D97757]'
-                        : 'border-white/10 bg-black/20 text-zinc-600'
+                        ? 'border-[#9C4A2A]/50 bg-[#9C4A2A]/10 text-[#9C4A2A]'
+                        : 'border-black/10 bg-black/[0.03] text-zinc-600'
                   }`}
                 >
                   {i + 1}
@@ -62,10 +62,10 @@ export default function Timeline({ agentLogs }) {
 
               {i < STEPS.length - 1 && (
                 <div className="flex-1 h-px relative -top-4 mx-1">
-                  <div className="absolute inset-0 bg-white/10" />
+                  <div className="absolute inset-0 bg-black/10" />
                   <div
                     className={`absolute inset-0 transition-all duration-500 ${
-                      done ? 'bg-[#D97757]/40' : ''
+                      done ? 'bg-[#9C4A2A]/40' : ''
                     }`}
                   />
                 </div>

@@ -9,14 +9,15 @@ user instead of re-running the full SQL pipeline.
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agents import chat as chat_agent
+from services.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Chat"])
+router = APIRouter(prefix="/api", tags=["Chat"], dependencies=[Depends(require_auth)])
 
 
 class ChatTurn(BaseModel):

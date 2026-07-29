@@ -5,7 +5,7 @@
  */
 
 export const BI_COLORS = [
-  '#D97757', // clay (primary)
+  '#9C4A2A', // clay (primary)
   '#5B7FA6', // dusty blue
   '#6B8F71', // sage
   '#C9A227', // muted gold
@@ -43,26 +43,26 @@ export function getPalette(count) {
 
 /** ECharts-compatible rich tooltip theme */
 export const ECHARTS_TOOLTIP_STYLE = {
-  backgroundColor: 'rgba(38,34,32,0.96)', /* zinc-900 */
-  borderColor: 'rgba(217, 119, 87,0.3)',    /* blue-500 */
+  backgroundColor: 'rgba(255,255,255,0.98)',
+  borderColor: '#DCD4C4',
   borderWidth: 1,
-  textStyle: { color: '#F2ECE6', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
+  textStyle: { color: '#1B2430', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
   padding: [10, 14],
-  extraCssText: 'box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); border-radius: 8px;',
+  extraCssText: 'box-shadow: 0 10px 25px -5px rgba(27,36,48,0.15); border-radius: 8px;',
 };
 
 export const ECHARTS_AXIS_STYLE = {
-  axisLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } },
+  axisLine: { lineStyle: { color: 'rgba(27,36,48,0.12)' } },
   axisTick: { show: false },
-  axisLabel: { color: '#A89F9A', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
-  splitLine: { lineStyle: { color: 'rgba(255,255,255,0.04)', type: 'dashed' } },
-  nameTextStyle: { color: '#79706B', fontSize: 11 },
+  axisLabel: { color: '#9C7A3E', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+  splitLine: { lineStyle: { color: 'rgba(27,36,48,0.06)', type: 'dashed' } },
+  nameTextStyle: { color: '#8A8272', fontSize: 11 },
 };
 
 export const ECHARTS_LEGEND_STYLE = {
-  textStyle: { color: '#A89F9A', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
+  textStyle: { color: '#9C7A3E', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
   itemWidth: 10,
   itemHeight: 10,
   icon: 'roundRect',
-  pageTextStyle: { color: '#A89F9A' },
+  pageTextStyle: { color: '#9C7A3E' },
 };

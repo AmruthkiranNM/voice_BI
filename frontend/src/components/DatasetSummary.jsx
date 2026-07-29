@@ -16,19 +16,19 @@ export default function DatasetSummary({ datasetInfo }) {
         {businessType && (
           <div>
             <dt className="text-zinc-500 text-xs">Type</dt>
-            <dd className="text-white font-medium mt-0.5">{businessType}</dd>
+            <dd className="text-zinc-100 font-medium mt-0.5">{businessType}</dd>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <dt className="text-zinc-500 text-xs">Rows</dt>
-            <dd className="text-white font-semibold mt-0.5 font-data">
+            <dd className="text-zinc-100 font-semibold mt-0.5 font-data">
               {datasetInfo.rowCount?.toLocaleString() ?? '—'}
             </dd>
           </div>
           <div>
             <dt className="text-zinc-500 text-xs">Columns</dt>
-            <dd className="text-white font-semibold mt-0.5 font-data">
+            <dd className="text-zinc-100 font-semibold mt-0.5 font-data">
               {columns.length || '—'}
             </dd>
           </div>
@@ -44,12 +44,12 @@ export default function DatasetSummary({ datasetInfo }) {
       </dl>
 
       {(numeric.length > 0 || categories.length > 0 || dates.length > 0) && (
-        <div className="mt-5 pt-4 border-t border-white/5 space-y-3">
+        <div className="mt-5 pt-4 border-t border-black/5 space-y-3">
           {numeric.length > 0 && (
-            <ColumnGroup label="Numbers" items={numeric} color="text-emerald-400" />
+            <ColumnGroup label="Numbers" items={numeric} color="text-[#3E7A4D]" />
           )}
           {categories.length > 0 && (
-            <ColumnGroup label="Groups" items={categories.slice(0, 6)} color="text-[#D97757]" extra={categories.length - 6} />
+            <ColumnGroup label="Groups" items={categories.slice(0, 6)} color="text-[#9C4A2A]" extra={categories.length - 6} />
           )}
           {dates.length > 0 && (
             <ColumnGroup label="Dates" items={dates} color="text-amber-400" />
@@ -68,7 +68,7 @@ function ColumnGroup({ label, items, color, extra }) {
         {items.map(col => (
           <span
             key={col}
-            className={`text-[11px] px-2 py-0.5 bg-white/5 border border-white/10 font-data ${color}`}
+            className={`text-[11px] px-2 py-0.5 bg-black/5 border border-black/10 font-data ${color}`}
           >
             {col.replace(/_/g, ' ')}
           </span>

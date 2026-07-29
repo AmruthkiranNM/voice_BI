@@ -86,13 +86,13 @@ export default function DatabaseConnect({ onImportSuccess }) {
               value={connectionString}
               onChange={e => { setConnectionString(e.target.value); setDiscoveredTables(null); }}
               placeholder={PLACEHOLDER}
-              className="w-full bg-black/30 border border-white/10 rounded-lg pl-4 pr-10 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 font-data focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
+              className="w-full bg-black/30 border border-black/10 rounded-lg pl-4 pr-10 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 font-data focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40"
               autoComplete="off"
             />
             <button
               type="button"
               onClick={() => setShowConnectionString(v => !v)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-white/5"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-black/5"
               aria-label={showConnectionString ? 'Hide connection string' : 'Show connection string'}
               tabIndex={-1}
             >
@@ -126,13 +126,13 @@ export default function DatabaseConnect({ onImportSuccess }) {
                   <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">
                     {discoveredTables.length} table{discoveredTables.length === 1 ? '' : 's'} found — select which to import
                   </p>
-                  <TbCheck className="w-4 h-4 text-emerald-400" />
+                  <TbCheck className="w-4 h-4 text-[#3E7A4D]" />
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-thin pr-1">
                   {discoveredTables.map(t => (
                     <label
                       key={t.name}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-black/[0.02] border border-black/5 hover:bg-black/5 cursor-pointer transition-colors"
                     >
                       <input
                         type="checkbox"

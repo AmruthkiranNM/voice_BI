@@ -1,14 +1,15 @@
 import logging
 import pandas as pd
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 
 from config import MAX_UPLOAD_MB
+from services.auth import require_auth
 from services.database import get_all_table_names
 from services.ingest import ingest_dataframe, rebuild_index
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Upload"])
+router = APIRouter(prefix="/api", tags=["Upload"], dependencies=[Depends(require_auth)])
 
 
 @router.post("/upload")

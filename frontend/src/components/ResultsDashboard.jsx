@@ -2,7 +2,6 @@ import InsightPanel from './InsightPanel';
 import BIChartPanel from './BIChartPanel';
 import ResultTable from './ResultTable';
 import DatasetSummary from './DatasetSummary';
-import KPICard, { detectKpiMetrics } from './KPICard';
 import TechnicalDetails from './TechnicalDetails';
 import FollowUpChat from './FollowUpChat';
 import AnomalyCallouts from './AnomalyCallouts';
@@ -16,6 +15,7 @@ export default function ResultsDashboard({
   settings,
   chatMessages,
   onChatMessagesChange,
+  sourceLabel,
 }) {
   const query = response?.query;
   const plan = response?.metadata?.plan || null;
@@ -25,54 +25,41 @@ export default function ResultsDashboard({
   const insight = response?.insight || null;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
-  const kpis = detectKpiMetrics(result);
   const pipelineTime = metadata?.pipeline_time_seconds;
   const hasChart = result?.rows?.length > 0 && result?.columns?.length > 0;
 
   return (
     <section className="bi-dashboard animate-in">
 
-      {/* ── Query header bar ─────────────────────────────── */}
-      <div className="bi-query-bar relative overflow-hidden group">
-        <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-        <div className="min-w-0 relative z-10">
-          <p className="bi-query-eyebrow">Analysis Context</p>
-          <p className="bi-query-text">{query}</p>
+      {/* ── Header bar — small-caps eyebrow, serif heading, pill tags, no card ── */}
+      <div className="bi-header-bar">
+        <div className="min-w-0">
+          <p className="bi-header-eyebrow">Analysis Workspace{sourceLabel ? ` / ${sourceLabel}` : ''}</p>
+          <h2 className="bi-header-title">{query}</h2>
         </div>
-        <div className="bi-query-meta relative z-10">
-          {intent && (
-            <span className="bi-meta-tag">{intent}</span>
-          )}
+        <div className="bi-header-tags">
+          {intent && <span className="bi-tag">{intent}</span>}
           {result?.row_count != null && (
-            <span className="bi-meta-tag">{result.row_count.toLocaleString()} rows</span>
+            <span className="bi-tag">{result.row_count.toLocaleString()} rows</span>
           )}
           {pipelineTime != null && (
-            <span className="bi-meta-tag flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500"></span>
-              {pipelineTime.toFixed(2)}s
-            </span>
+            <span className="bi-tag">{pipelineTime.toFixed(2)}s</span>
           )}
           {metadata?.cache_hit && (
-            <span className="bi-meta-tag accent flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-              Cached
-            </span>
+            <span className="bi-tag accent">Cached</span>
           )}
           <button
             type="button"
             onClick={() => window.print()}
             className="no-print bi-export-btn"
           >
-            Export PDF
+            Export
           </button>
         </div>
       </div>
 
       {/* ── Agent Timeline ─────────────────────────────────── */}
       <Timeline agentLogs={response?.agent_logs} />
-
-      {/* ── KPI Cards ─────────────────────────────────────── */}
-      {kpis && <KPICard result={result} intent={intent} query={query} />}
 
       {/* ── Top Section: AI Answer + Insights ─────────────── */}
       <div className="bi-top-section">
@@ -133,7 +120,25 @@ export default function ResultsDashboard({
       {/* ── Technical Details ─────────────────────────────── */}
       <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />
 
+      {/* ── Footer trace ──────────────────────────────────── */}
+      <FooterTrace agentLogs={response?.agent_logs} pipelineTime={pipelineTime} />
+
     </section>
+  );
+}
+
+/** Muted, centered, one-line summary of the pipeline that produced this result. */
+function FooterTrace({ agentLogs, pipelineTime }) {
+  if (!agentLogs?.length) return null;
+  const steps = agentLogs
+    .filter(l => !l.status?.startsWith('skipped'))
+    .map(l => l.agent.replace(' Agent', '').replace('RAG Retriever', 'Retriever').replace('SQL Generator', 'SQL Writer').replace('Execution', 'Executor'));
+  const unique = [...new Set(steps)];
+  return (
+    <p className="text-center text-[11px] font-data text-zinc-500 pt-2">
+      {unique.join(' → ')}
+      {pipelineTime != null && ` — ${pipelineTime.toFixed(2)}s total`}
+    </p>
   );
 }
 
@@ -192,7 +197,7 @@ function SecondaryChartOrStats({ result, intent, query }) {
 
 function StatMini({ label, val, accent }) {
   return (
-    <div className="bg-white/[0.02] rounded-md p-2 border border-white/5">
+    <div className="bg-black/[0.02] rounded-md p-2 border border-black/5">
       <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold mb-0.5">{label}</p>
       <p className={`text-sm font-semibold font-mono ${accent ? 'text-blue-400' : 'text-zinc-100'}`}>{val}</p>
     </div>

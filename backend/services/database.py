@@ -10,20 +10,37 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from config import DATABASE_PATH, MAX_RESULT_ROWS
+from config import DATA_DIR, DATABASE_PATH, MAX_RESULT_ROWS
 
 logger = logging.getLogger(__name__)
 
 
+def get_database_path() -> str:
+    """
+    Resolve the SQLite file for the current request: the logged-in user's
+    own database (set via services.auth.require_auth), or the shared
+    default path outside a request (tests, scripts, startup).
+
+    Every table a user uploads or connects lives only in their own file, so
+    isolation between accounts falls out of this one function instead of
+    needing an owner_id column threaded through every table/query.
+    """
+    from services.auth import current_user_id
+    user_id = current_user_id.get()
+    if user_id is None:
+        return DATABASE_PATH
+    return str(DATA_DIR / f"business_{user_id}.db")
+
+
 def ensure_data_directory() -> None:
     """Create the data directory if it does not exist."""
-    Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    Path(get_database_path()).parent.mkdir(parents=True, exist_ok=True)
 
 
 def get_connection() -> sqlite3.Connection:
     """Create and return a new SQLite connection with row factory."""
     ensure_data_directory()
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(get_database_path())
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -35,7 +52,7 @@ def has_datasets() -> bool:
 
 def get_all_table_names() -> list[str]:
     """Return a list of all user table names in the database."""
-    if not Path(DATABASE_PATH).exists():
+    if not Path(get_database_path()).exists():
         return []
     conn = get_connection()
     try:

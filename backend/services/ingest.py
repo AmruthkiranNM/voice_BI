@@ -17,7 +17,7 @@ import pandas as pd
 
 import config
 from config import MAX_UPLOAD_ROWS, MAX_UPLOAD_COLUMNS
-from services.database import get_table_row_count, get_table_schema
+from services.database import get_database_path, get_table_row_count, get_table_schema
 from services.suggestions import generate_suggestions_for_table
 from services import data_quality, query_cache
 from services.vector_store import build_index
@@ -149,7 +149,7 @@ def ingest_dataframe(
 
     table_name = sanitize_table_name(raw_name)
 
-    conn = sqlite3.connect(config.DATABASE_PATH)
+    conn = sqlite3.connect(get_database_path())
     try:
         df.to_sql(table_name, conn, if_exists="replace", index=False)
     finally:

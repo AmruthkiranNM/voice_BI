@@ -68,13 +68,13 @@ const richTooltip = (labels, datasets) => ({
       return `
         <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};"></span>
-          <span style="color:#A89F9A;font-size:11px;">${p.seriesName}</span>
-          <span style="margin-left:auto;font-weight:600;color:#F2ECE6;">${fmtValueFull(val, colName)}</span>
-          ${pct != null ? `<span style="color:#79706B;font-size:10px;">${pct}%</span>` : ''}
-          <span style="color:${diff >= 0 ? '#D97757' : '#f87171'};font-size:10px;">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}% avg</span>
+          <span style="color:#9C7A3E;font-size:11px;">${p.seriesName}</span>
+          <span style="margin-left:auto;font-weight:600;color:#1B2430;">${fmtValueFull(val, colName)}</span>
+          ${pct != null ? `<span style="color:#8A8272;font-size:10px;">${pct}%</span>` : ''}
+          <span style="color:${diff >= 0 ? '#9C4A2A' : '#f87171'};font-size:10px;">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}% avg</span>
         </div>`;
     }).join('');
-    return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:#F2ECE6;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">${name}</div>${rows}</div>`;
+    return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:#1B2430;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(27, 36, 48, 0.08);">${name}</div>${rows}</div>`;
   },
 });
 
@@ -91,10 +91,10 @@ const itemTooltip = (datasets) => ({
     const sortedVals = [...allVals].sort((a, b) => b - a);
     const rank = sortedVals.indexOf(val) + 1;
     return `<div style="min-width:200px;">
-      <div style="font-weight:600;color:#F2ECE6;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">${p.name}</div>
-      <div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#A89F9A;">Value</span><span style="font-weight:600;color:#F2ECE6;">${fmtValueFull(val, colName)}</span></div>
-      ${pct != null ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#A89F9A;">Share</span><span style="color:#D97757;">${pct}%</span></div>` : ''}
-      ${rank ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#A89F9A;">Rank</span><span style="color:#E2946F;">#${rank} of ${allVals.length}</span></div>` : ''}
+      <div style="font-weight:600;color:#1B2430;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid rgba(27, 36, 48, 0.08);">${p.name}</div>
+      <div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Value</span><span style="font-weight:600;color:#1B2430;">${fmtValueFull(val, colName)}</span></div>
+      ${pct != null ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Share</span><span style="color:#9C4A2A;">${pct}%</span></div>` : ''}
+      ${rank ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Rank</span><span style="color:#B5613C;">#${rank} of ${allVals.length}</span></div>` : ''}
     </div>`;
   },
 });
@@ -117,14 +117,14 @@ function chartTitle(text, subtext = '') {
     subtext,
     left: 12,
     top: 8,
-    textStyle: { color: '#F2ECE6', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' },
-    subtextStyle: { color: '#79706B', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
+    textStyle: { color: '#1B2430', fontSize: 13, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif' },
+    subtextStyle: { color: '#8A8272', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
   };
 }
 
 const dataZoom = [
   { type: 'inside', xAxisIndex: 0, zoomOnMouseWheel: true },
-  { type: 'slider', height: 20, bottom: 4, fillerColor: 'rgba(217, 119, 87,0.08)', borderColor: 'rgba(255,255,255,0.08)', handleStyle: { color: '#D97757' }, textStyle: { color: '#79706B' } },
+  { type: 'slider', height: 20, bottom: 4, fillerColor: 'rgba(156, 74, 42,0.08)', borderColor: 'rgba(27, 36, 48, 0.08)', handleStyle: { color: '#9C4A2A' }, textStyle: { color: '#8A8272' } },
 ];
 
 const animationConfig = { animation: true, animationDuration: 600, animationEasing: 'cubicOut', animationDurationUpdate: 400, animationEasingUpdate: 'cubicInOut' };
@@ -163,8 +163,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       dataZoom: { title: { zoom: 'Zoom', back: 'Reset' } },
       restore: { title: 'Reset' },
     },
-    iconStyle: { color: '#79706B', borderColor: 'transparent' },
-    emphasis: { iconStyle: { color: '#D97757' } },
+    iconStyle: { color: '#8A8272', borderColor: 'transparent' },
+    emphasis: { iconStyle: { color: '#9C4A2A' } },
   };
 
   switch (type) {
@@ -175,14 +175,14 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle('Vertical Bar', `${primaryMetric} by ${labelColName}`),
         tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         dataZoom: labels.length > 10 ? dataZoom : [],
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'bar', data: ds.data, barMaxWidth: 48,
           itemStyle: { color: colors[i], borderRadius: [4, 4, 0, 0] },
           emphasis: { itemStyle: { color: getColor(i, 1), shadowBlur: 10, shadowColor: hexToRgba(colors[i], 0.4) } },
-          label: { show: extra.showLabels, position: 'top', color: '#A89F9A', fontSize: 10, formatter: p => fmt(p.value) },
+          label: { show: extra.showLabels, position: 'top', color: '#9C7A3E', fontSize: 10, formatter: p => fmt(p.value) },
         })),
         ...animationConfig,
       };
@@ -193,14 +193,14 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle('Horizontal Bar', `${primaryMetric} by ${labelColName}`),
         tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
         toolbox, grid: { left: 16, right: 16, top: 56, bottom: 16, containLabel: true },
-        xAxis: { type: 'value', ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, name: primaryMetric, nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { type: 'category', data: [...labels].reverse(), ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, width: 120, overflow: 'truncate' }, name: labelColName, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        dataZoom: labels.length > 10 ? [{ type: 'inside', yAxisIndex: 0 }, { type: 'slider', yAxisIndex: 0, width: 16, right: 0, fillerColor: 'rgba(217, 119, 87,0.08)', borderColor: 'rgba(255,255,255,0.08)' }] : [],
+        xAxis: { type: 'value', ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, name: primaryMetric, nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { type: 'category', data: [...labels].reverse(), ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, width: 120, overflow: 'truncate' }, name: labelColName, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        dataZoom: labels.length > 10 ? [{ type: 'inside', yAxisIndex: 0 }, { type: 'slider', yAxisIndex: 0, width: 16, right: 0, fillerColor: 'rgba(156, 74, 42,0.08)', borderColor: 'rgba(27, 36, 48, 0.08)' }] : [],
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'bar', data: [...ds.data].reverse(), barMaxWidth: 32,
           itemStyle: { color: colors[i], borderRadius: [0, 4, 4, 0] },
           emphasis: { itemStyle: { shadowBlur: 8, shadowColor: hexToRgba(colors[i], 0.4) } },
-          label: { show: extra.showLabels || labels.length <= 15, position: 'right', color: '#A89F9A', fontSize: 10, formatter: p => fmt(p.value) },
+          label: { show: extra.showLabels || labels.length <= 15, position: 'right', color: '#9C7A3E', fontSize: 10, formatter: p => fmt(p.value) },
         })),
         ...animationConfig,
       };
@@ -211,7 +211,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle('Grouped Bar', `Comparing metrics by ${labelColName}`),
         tooltip: richTooltip(labels, datasets), legend,
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         yAxis: yAxis(),
         dataZoom: labels.length > 10 ? dataZoom : [],
         series: datasets.map((ds, i) => ({
@@ -228,7 +228,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle('Stacked Bar', `Composition of metrics by ${labelColName}`),
         tooltip: { ...richTooltip(labels, datasets), trigger: 'axis', axisPointer: { type: 'shadow' } },
         legend, toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         yAxis: yAxis(),
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'bar', stack: 'total', data: ds.data,
@@ -246,16 +246,16 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle(type === 'multiLine' ? 'Multi-Line Comparison' : 'Line Chart', `${primaryMetric} across ${labelColName}`),
         tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         dataZoom: labels.length > 10 ? dataZoom : [],
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'line', data: ds.data, smooth: 0.4,
           symbol: 'circle', symbolSize: 5,
           lineStyle: { width: 2.5, color: colors[i] },
-          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#1C1917' },
+          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#FFFFFF' },
           emphasis: { scale: true, focus: 'series' },
-          label: { show: extra.showLabels, position: 'top', color: '#A89F9A', fontSize: 9, formatter: p => fmt(p.value) },
+          label: { show: extra.showLabels, position: 'top', color: '#9C7A3E', fontSize: 9, formatter: p => fmt(p.value) },
         })),
         ...animationConfig,
       };
@@ -267,8 +267,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         title: chartTitle(type === 'stackedArea' ? 'Stacked Area' : 'Area Chart', `${primaryMetric} trend across ${labelColName}`),
         tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         dataZoom: labels.length > 10 ? dataZoom : [],
         series: datasets.map((ds, i) => ({
           name: ds.label, type: 'line', data: ds.data, smooth: 0.4,
@@ -300,26 +300,26 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
               const val = Number(p.value) || 0;
               return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
                 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};"></span>
-                <span style="color:#A89F9A;font-size:11px;">${p.seriesName} (cumulative)</span>
-                <span style="margin-left:auto;font-weight:600;color:#F2ECE6;">${fmtFull(val)}</span>
+                <span style="color:#9C7A3E;font-size:11px;">${p.seriesName} (cumulative)</span>
+                <span style="margin-left:auto;font-weight:600;color:#1B2430;">${fmtFull(val)}</span>
               </div>`;
             }).join('');
-            return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:#F2ECE6;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.08);">${name}</div>${rows}</div>`;
+            return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:#1B2430;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(27, 36, 48, 0.08);">${name}</div>${rows}</div>`;
           },
         },
         legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
-        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { ...yAxis(), name: `${primaryMetric} (Cumulative)`, nameLocation: 'middle', nameGap: 60, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { ...yAxis(), name: `${primaryMetric} (Cumulative)`, nameLocation: 'middle', nameGap: 60, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         dataZoom: labels.length > 10 ? dataZoom : [],
         series: cumDatasets.map((ds, i) => ({
           name: ds.label, type: 'line', data: ds.data, smooth: 0.3,
           symbol: 'circle', symbolSize: 5,
           lineStyle: { width: 2.5, color: colors[i] },
           areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: hexToRgba(colors[i], 0.25) }, { offset: 1, color: hexToRgba(colors[i], 0.02) }] } },
-          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#1C1917' },
+          itemStyle: { color: colors[i], borderWidth: 2, borderColor: '#FFFFFF' },
           emphasis: { scale: true, focus: 'series' },
-          label: { show: extra.showLabels, position: 'top', color: '#A89F9A', fontSize: 9, formatter: p => fmt(p.value) },
+          label: { show: extra.showLabels, position: 'top', color: '#9C7A3E', fontSize: 9, formatter: p => fmt(p.value) },
         })),
         ...animationConfig,
       };
@@ -359,7 +359,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
                 type: 'text',
                 style: {
                   text: fmt(pieTotal),
-                  fill: '#F2ECE6',
+                  fill: '#1B2430',
                   fontSize: 22,
                   fontWeight: 700,
                   fontFamily: 'JetBrains Mono, monospace',
@@ -372,7 +372,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
                 type: 'text',
                 style: {
                   text: 'Total',
-                  fill: '#79706B',
+                  fill: '#8A8272',
                   fontSize: 11,
                   fontFamily: 'Inter, system-ui, sans-serif',
                   textAlign: 'center',
@@ -391,19 +391,19 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           label: {
             show: true,
             formatter: p => p.percent > 4 ? `${p.name}\n${p.percent.toFixed(1)}%` : '',
-            color: '#A89F9A',
+            color: '#9C7A3E',
             fontSize: 10,
             lineHeight: 14,
           },
-          labelLine: { length: 12, length2: 8, lineStyle: { color: 'rgba(255,255,255,0.15)' } },
+          labelLine: { length: 12, length2: 8, lineStyle: { color: 'rgba(27, 36, 48, 0.15)' } },
           emphasis: {
             scale: true,
             scaleSize: 8,
             focus: 'self',
             blurScope: 'coordinateSystem',
-            itemStyle: { shadowBlur: 20, shadowColor: 'rgba(217, 119, 87,0.4)' },
+            itemStyle: { shadowBlur: 20, shadowColor: 'rgba(156, 74, 42,0.4)' },
           },
-          itemStyle: { borderColor: '#1C1917', borderWidth: 2, borderRadius: 4 },
+          itemStyle: { borderColor: '#FFFFFF', borderWidth: 2, borderRadius: 4 },
           animationType: 'scale',
           animationEasing: 'elasticOut',
         }],
@@ -423,10 +423,10 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           name: datasets[0]?.label || 'Value', type: 'treemap', data: tmData,
           top: 48,
           roam: false, nodeClick: 'zoomToNode',
-          label: { show: true, formatter: p => `${p.name}\n${fmt(p.value)}`, color: '#1C1917', fontWeight: 600, fontSize: 11 },
-          itemStyle: { borderColor: '#1C1917', borderWidth: 2, gapWidth: 3 },
-          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(217, 119, 87,0.4)' } },
-          breadcrumb: { show: true, bottom: 4, height: 20, itemStyle: { color: '#1f2937', textStyle: { color: '#A89F9A' } } },
+          label: { show: true, formatter: p => `${p.name}\n${fmt(p.value)}`, color: '#F7F3EA', fontWeight: 600, fontSize: 11 },
+          itemStyle: { borderColor: '#FFFFFF', borderWidth: 2, gapWidth: 3 },
+          emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(156, 74, 42,0.4)' } },
+          breadcrumb: { show: true, bottom: 4, height: 20, itemStyle: { color: '#1f2937', textStyle: { color: '#9C7A3E' } } },
           levels: [{ color: colors, colorMappingBy: 'index' }],
         }],
         ...animationConfig,
@@ -446,8 +446,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         },
         legend: { show: false }, toolbox,
         grid: { left: 60, right: 30, top: 56, bottom: 60, containLabel: true },
-        xAxis: { type: 'value', name: xLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { type: 'value', name: yLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { type: 'value', name: xLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { type: 'value', name: yLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         series: [{ type: 'scatter', data: scData, symbolSize: 10, itemStyle: { color: colors[0], opacity: 0.8 }, emphasis: { scale: true, itemStyle: { shadowBlur: 12, shadowColor: hexToRgba(colors[0], 0.5) } } }],
         ...animationConfig,
       };
@@ -465,8 +465,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         tooltip: { ...ECHARTS_TOOLTIP_STYLE, trigger: 'item', formatter: p => `<b>${labels[p.dataIndex]}</b><br/>${xLabel}: ${fmtFull(p.value[0])}<br/>${yLabel}: ${fmtFull(p.value[1])}<br/>${sizeLabel}: ${fmtFull(p.value[2])}` },
         legend: { show: false }, toolbox,
         grid: { left: 60, right: 30, top: 56, bottom: 60, containLabel: true },
-        xAxis: { type: 'value', name: xLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 35, nameTextStyle: { color: '#79706B', fontSize: 11 } },
-        yAxis: { type: 'value', name: yLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#79706B', fontSize: 11 } },
+        xAxis: { type: 'value', name: xLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 35, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
+        yAxis: { type: 'value', name: yLabel, ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, formatter: v => fmt(v) }, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: '#8A8272', fontSize: 11 } },
         series: [{ type: 'scatter', data: bData, symbolSize: d => Math.max(8, Math.sqrt(d[2] / maxR) * 60), itemStyle: { color: colors[0], opacity: 0.7 }, emphasis: { scale: true } }],
         ...animationConfig,
       };
@@ -485,10 +485,10 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           center: ['50%', '56%'],
           radius: '65%',
           axisNameGap: 8,
-          axisName: { color: '#A89F9A', fontSize: 11 },
-          splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
-          splitArea: { areaStyle: { color: ['rgba(255,255,255,0.01)', 'rgba(255,255,255,0.03)'] } },
-          axisLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } },
+          axisName: { color: '#9C7A3E', fontSize: 11 },
+          splitLine: { lineStyle: { color: 'rgba(27, 36, 48, 0.06)' } },
+          splitArea: { areaStyle: { color: ['rgba(27, 36, 48, 0.01)', 'rgba(27, 36, 48, 0.03)'] } },
+          axisLine: { lineStyle: { color: 'rgba(27, 36, 48, 0.06)' } },
         },
         series: datasets.slice(0, 4).map((ds, i) => ({
           name: ds.label, type: 'radar',
@@ -517,8 +517,8 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         grid: { left: 80, right: 16, top: 56, bottom: 80, containLabel: true },
         xAxis: { type: 'category', data: labels.slice(0, 20), ...ECHARTS_AXIS_STYLE, axisLabel: { ...ECHARTS_AXIS_STYLE.axisLabel, rotate: 35 } },
         yAxis: { type: 'category', data: datasets.slice(0, 20).map(d => d.label), ...ECHARTS_AXIS_STYLE },
-        visualMap: { min: Math.min(...vals), max: Math.max(...vals), calculable: true, orient: 'horizontal', left: 'center', bottom: 4, inRange: { color: ['#1f2937', '#D97757'] }, textStyle: { color: '#79706B' } },
-        series: [{ type: 'heatmap', data: hmData, label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(217, 119, 87,0.3)' } } }],
+        visualMap: { min: Math.min(...vals), max: Math.max(...vals), calculable: true, orient: 'horizontal', left: 'center', bottom: 4, inRange: { color: ['#1f2937', '#9C4A2A'] }, textStyle: { color: '#8A8272' } },
+        series: [{ type: 'heatmap', data: hmData, label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(156, 74, 42,0.3)' } } }],
         ...animationConfig,
       };
     }
@@ -534,9 +534,9 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
         series: [{
           name: datasets[0]?.label || 'Value', type: 'funnel', data: fnData,
           left: '10%', width: '80%', top: 56, bottom: 20,
-          label: { show: true, position: 'inside', color: '#1C1917', fontWeight: 600, fontSize: 11, formatter: p => `${p.name}\n${fmt(p.value)}` },
+          label: { show: true, position: 'inside', color: '#F7F3EA', fontWeight: 600, fontSize: 11, formatter: p => `${p.name}\n${fmt(p.value)}` },
           emphasis: { label: { fontSize: 13 } },
-          itemStyle: { borderColor: '#1C1917', borderWidth: 2 },
+          itemStyle: { borderColor: '#FFFFFF', borderWidth: 2 },
         }],
         ...animationConfig,
       };
@@ -579,12 +579,12 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           radius: '75%',
           center: ['50%', '58%'],
           data: [{ value: gVal, name: labels[0] || 'Value' }],
-          axisLine: { lineStyle: { width: 18, color: [[0.3, '#f87171'], [0.7, '#f59e0b'], [1, '#D97757']] } },
-          pointer: { itemStyle: { color: '#F2ECE6' } },
+          axisLine: { lineStyle: { width: 18, color: [[0.3, '#f87171'], [0.7, '#f59e0b'], [1, '#9C4A2A']] } },
+          pointer: { itemStyle: { color: '#1B2430' } },
           axisTick: { show: false }, splitLine: { show: false },
-          axisLabel: { color: '#79706B', fontSize: 10, formatter: v => fmt(v) },
-          title: { color: '#A89F9A', fontSize: 12, offsetCenter: [0, '80%'] },
-          detail: { valueAnimation: true, formatter: v => fmt(v), color: '#F2ECE6', fontSize: 28, fontWeight: 700, offsetCenter: [0, '50%'] },
+          axisLabel: { color: '#8A8272', fontSize: 10, formatter: v => fmt(v) },
+          title: { color: '#9C7A3E', fontSize: 12, offsetCenter: [0, '80%'] },
+          detail: { valueAnimation: true, formatter: v => fmt(v), color: '#1B2430', fontSize: 28, fontWeight: 700, offsetCenter: [0, '50%'] },
         }],
         ...animationConfig,
       };

@@ -9,6 +9,58 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+const TOKEN_KEY = 'voice_bi_token';
+
+export function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+api.interceptors.request.use(config => {
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// A session that's expired or been revoked server-side should drop the user
+// back to the login screen instead of showing confusing per-request errors.
+api.interceptors.response.use(
+  res => res,
+  error => {
+    if (error.response?.status === 401) {
+      setToken(null);
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
+    return Promise.reject(error);
+  },
+);
+
+/** Register a new account */
+export async function register(email, password) {
+  try {
+    const { data } = await api.post('/auth/register', { email, password });
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Registration failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
+/** Log in with an existing account */
+export async function login(email, password) {
+  try {
+    const { data } = await api.post('/auth/login', { email, password });
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Login failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
 /**
  * Submit a business question to the analysis pipeline
  */

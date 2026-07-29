@@ -12,9 +12,9 @@ export default function Header({ isProcessing }) {
   }, []);
 
   const status = isProcessing ? 'working' : online ? 'ready' : 'offline';
-  const dotClass = status === 'working' ? 'bg-[#D97757] animate-pulse' : status === 'ready' ? 'bg-emerald-500' : 'bg-red-500';
+  const dotClass = status === 'working' ? 'bg-[#9C4A2A] animate-pulse' : status === 'ready' ? 'bg-[#3E7A4D]' : 'bg-red-500';
   const label = status === 'working' ? 'Processing' : status === 'ready' ? 'Local · Private' : 'Offline';
-  const textClass = status === 'working' ? 'text-[#D97757]' : status === 'ready' ? 'text-zinc-500' : 'text-red-400';
+  const textClass = status === 'working' ? 'text-[#9C4A2A]' : status === 'ready' ? 'text-zinc-500' : 'text-red-400';
 
   return (
     <div className="flex items-center gap-2 px-1">

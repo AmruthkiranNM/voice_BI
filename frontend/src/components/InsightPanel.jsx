@@ -20,13 +20,13 @@ export default function InsightPanel({ insight, autoSpeak = false }) {
           <button
             type="button"
             onClick={() => isSpeaking ? stop() : speak(insight)}
-            className="text-xs text-gray-500 hover:text-[#D97757] transition-colors"
+            className="text-xs text-gray-500 hover:text-[#9C4A2A] transition-colors"
           >
             {isSpeaking ? 'Stop' : 'Listen'}
           </button>
         )}
       </div>
-      <RichText text={insight} className="text-sm sm:text-base text-gray-300" />
+      <RichText text={insight} className="text-sm sm:text-base text-[#3D3226]" />
     </div>
   );
 }

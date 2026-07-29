@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { submitQuery, getDatasets } from './services/api';
+import { submitQuery, getDatasets, getToken, setToken } from './services/api';
 import { useQueryHistory } from './hooks/useQueryHistory';
 import { TbMenu2, TbDatabase, TbFileSpreadsheet } from 'react-icons/tb';
 
@@ -11,8 +11,41 @@ import DatasetUpload from './components/DatasetUpload';
 import DatabaseConnect from './components/DatabaseConnect';
 import ResultsDashboard from './components/ResultsDashboard';
 import DataQuality from './components/DataQuality';
+import DataQualityPage from './components/DataQualityPage';
+import LoginPage from './components/LoginPage';
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    if (getToken()) {
+      // Token exists from a previous session; the user object isn't
+      // persisted, so a minimal placeholder is enough to unlock the app —
+      // any expired/invalid token still gets rejected on the first API call.
+      setUser({ email: null });
+    }
+    setAuthChecked(true);
+
+    const onLogout = () => setUser(null);
+    window.addEventListener('auth:logout', onLogout);
+    return () => window.removeEventListener('auth:logout', onLogout);
+  }, []);
+
+  const handleAuthenticated = useCallback((token, authedUser) => {
+    setToken(token);
+    setUser(authedUser);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    setToken(null);
+    setUser(null);
+    setSources([]);
+    setActiveSourceId(null);
+    setResponse(null);
+    setChatMessages([]);
+  }, []);
+
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState(null);
@@ -27,7 +60,7 @@ export default function App() {
   const [lastPreview, setLastPreview] = useState(null);
 
   const [chatMessages, setChatMessages] = useState([]);
-  const { history, addEntry, clearHistory, removeEntry } = useQueryHistory();
+  const { history, addEntry, clearHistory, removeEntry, pinned, togglePin } = useQueryHistory();
 
   // App Shell State
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'dashboard'
@@ -65,7 +98,7 @@ export default function App() {
     return data;
   }, []);
 
-  useEffect(() => { refreshDatasets(); }, [refreshDatasets]);
+  useEffect(() => { if (user) refreshDatasets(); }, [user, refreshDatasets]);
 
   // Switching source always resets the table selection to Auto.
   const selectSource = useCallback((sourceId) => {
@@ -75,7 +108,7 @@ export default function App() {
     setChatMessages([]);
   }, []);
 
-  const afterIngest = useCallback(async (firstTable, newSourceId) => {
+  const afterIngest = useCallback(async (firstTable, newSourceId, navigate = true) => {
     if (firstTable) {
       setLastPreview({
         sourceId: newSourceId,
@@ -92,16 +125,20 @@ export default function App() {
     setResponse(null);
     setError(null);
     setChatMessages([]);
-    setCurrentView('dashboard');
+    if (navigate) setCurrentView('dashboard');
   }, [refreshDatasets]);
 
+  // Both CSV and database connections stay on the Data Source view after
+  // ingesting — one consistent "connect, then explicitly move on" flow
+  // instead of CSV pausing for a preview while DB connections used to jump
+  // straight to the dashboard.
   const handleUploadSuccess = useCallback(
-    (uploadResult) => afterIngest(uploadResult, uploadResult.source_id || 'local_files'),
+    (uploadResult) => afterIngest(uploadResult, uploadResult.source_id || 'local_files', false),
     [afterIngest],
   );
 
   const handleImportSuccess = useCallback(
-    (importResult) => afterIngest(importResult.imported?.[0], importResult.source_id),
+    (importResult) => afterIngest(importResult.imported?.[0], importResult.source_id, false),
     [afterIngest],
   );
 
@@ -161,8 +198,11 @@ export default function App() {
   // Preview only makes sense for the source it came from.
   const showPreview = lastPreview && lastPreview.sourceId === activeSource?.id;
 
+  if (!authChecked) return null;
+  if (!user) return <LoginPage onAuthenticated={handleAuthenticated} />;
+
   return (
-    <div className="flex h-screen bg-[#1C1917] text-zinc-100 font-sans overflow-hidden">
+    <div className="flex h-screen bg-[#F7F3EA] text-zinc-100 font-sans overflow-hidden">
 
       {/* Sidebar Navigation */}
       <Sidebar
@@ -175,6 +215,8 @@ export default function App() {
         onSelectSource={selectSource}
         onDatasetsChanged={handleTableRemoved}
         isProcessing={isLoading}
+        user={user}
+        onLogout={handleLogout}
       />
 
       {/* Main Workspace */}
@@ -184,7 +226,7 @@ export default function App() {
         <header className="h-14 flex items-center justify-between px-4 sm:px-10 lg:hidden shrink-0">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="p-2 -ml-2 text-zinc-400 hover:text-white rounded-md"
+            className="p-2 -ml-2 text-zinc-400 hover:text-zinc-100 rounded-md"
             aria-label="Open menu"
           >
             <TbMenu2 className="w-5 h-5" />
@@ -201,7 +243,7 @@ export default function App() {
             {currentView === 'upload' && (
               <div className="animate-in max-w-2xl mx-auto">
                 <div className="text-center space-y-3 pt-6 pb-10">
-                  <h1 className="text-4xl sm:text-[2.75rem] font-semibold text-white tracking-tight">
+                  <h1 className="text-4xl sm:text-[2.75rem] font-semibold text-zinc-100 tracking-tight">
                     Connect your data
                   </h1>
                   <p className="text-zinc-400 text-base max-w-md mx-auto leading-relaxed">
@@ -213,7 +255,7 @@ export default function App() {
                   <button
                     onClick={() => setDataSourceTab('csv')}
                     className={`flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-full transition-colors ${
-                      dataSourceTab === 'csv' ? 'active-pill' : 'text-zinc-400 hover:text-white'
+                      dataSourceTab === 'csv' ? 'active-pill' : 'text-zinc-400 hover:text-zinc-100'
                     }`}
                   >
                     <TbFileSpreadsheet className="w-4 h-4" /> Upload CSV
@@ -221,7 +263,7 @@ export default function App() {
                   <button
                     onClick={() => setDataSourceTab('database')}
                     className={`flex items-center gap-2 px-5 py-2 text-sm font-medium rounded-full transition-colors ${
-                      dataSourceTab === 'database' ? 'active-pill' : 'text-zinc-400 hover:text-white'
+                      dataSourceTab === 'database' ? 'active-pill' : 'text-zinc-400 hover:text-zinc-100'
                     }`}
                   >
                     <TbDatabase className="w-4 h-4" /> Connect Database
@@ -232,13 +274,17 @@ export default function App() {
                   <DatasetUpload
                     onUploadSuccess={handleUploadSuccess}
                     onTableRemoved={handleTableRemoved}
+                    onContinueToQuality={() => setCurrentView('quality')}
                     tables={sources.find(s => s.type === 'csv')?.tables || []}
                   />
                 ) : (
                   <DatabaseConnect onImportSuccess={handleImportSuccess} />
                 )}
 
-                {hasData && (
+                {/* Single "move on" CTA — hidden while the CSV flow above is
+                    already showing its own "Continue to quality check" button,
+                    so there's never more than one obvious next step at once. */}
+                {hasData && !(dataSourceTab === 'csv' && showPreview) && (
                   <div className="mt-10 text-center">
                     <button
                       onClick={() => setCurrentView('dashboard')}
@@ -257,7 +303,7 @@ export default function App() {
 
                 {!hasResults && (
                   <div className="text-center pt-2 pb-2 max-w-2xl mx-auto">
-                    <h1 className="text-3xl sm:text-[2.25rem] font-semibold text-white tracking-tight">
+                    <h1 className="text-3xl sm:text-[2.25rem] font-semibold text-zinc-100 tracking-tight">
                       What do you want to know?
                     </h1>
                     {activeSource && (
@@ -275,14 +321,14 @@ export default function App() {
                     ACTIVE source, or Auto (all of them). Only shown when the
                     active source has more than one table. */}
                 {activeTables.length > 1 && (
-                  <div className="flex flex-wrap items-center justify-center gap-2 -mt-6 -mb-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2 -mt-2">
                     <span className="text-xs text-zinc-500 mr-1">Scope:</span>
                     <button
                       onClick={() => setSelectedTables(new Set())}
                       className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
                         selectedTables.size === 0
                           ? 'active-pill'
-                          : 'border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                          : 'border border-black/10 text-zinc-400 hover:text-zinc-100 hover:bg-black/5'
                       }`}
                       title="Let the AI use every table in this source, including joins"
                     >
@@ -295,7 +341,7 @@ export default function App() {
                           key={t.name}
                           onClick={() => toggleTable(t.name)}
                           className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                            on ? 'active-pill' : 'border border-white/10 text-zinc-400 hover:text-white hover:bg-white/5'
+                            on ? 'active-pill' : 'border border-black/10 text-zinc-400 hover:text-zinc-100 hover:bg-black/5'
                           }`}
                           title={on ? 'Click to remove from scope' : 'Click to add to scope'}
                         >
@@ -304,7 +350,7 @@ export default function App() {
                       );
                     })}
                     {selectedTables.size > 1 && (
-                      <span className="text-[11px] text-[#EFC3AC]/70">
+                      <span className="text-[11px] text-[#D9A98F]/70">
                         {selectedTables.size} tables · joins allowed
                       </span>
                     )}
@@ -316,6 +362,7 @@ export default function App() {
                   <QueryInput
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
+                    insight={response?.insight}
                     settings={settings}
                     onSettingsChange={setSettings}
                     suggestions={!hasResults ? (activeSource?.suggestions || []) : []}
@@ -323,13 +370,15 @@ export default function App() {
                     history={history}
                     onClearHistory={clearHistory}
                     onRemoveHistory={removeEntry}
+                    pinned={pinned}
+                    onTogglePin={togglePin}
                   />
                 ) : (
                   <div className="text-center py-6 text-zinc-500 text-sm surface-card max-w-xl mx-auto">
                     Please connect a data source first.
                     <button
                       onClick={() => setCurrentView('upload')}
-                      className="ml-2 text-[#D97757] hover:text-[#EFC3AC] underline underline-offset-4"
+                      className="ml-2 text-[#9C4A2A] hover:text-[#D9A98F] underline underline-offset-4"
                     >
                       Go to Data Source
                     </button>
@@ -345,15 +394,15 @@ export default function App() {
                     {lastPreview.preview_rows?.length > 0 && (
                       <div className="surface-card p-6 animate-in">
                         <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
-                          <TbFileSpreadsheet className="w-4 h-4 text-[#D97757]" />
+                          <TbFileSpreadsheet className="w-4 h-4 text-[#9C4A2A]" />
                           Data Preview
                           <span className="text-zinc-500 font-normal text-xs ml-1">
                             {lastPreview.tableName?.replace(/_/g, ' ')} · {lastPreview.rowCount?.toLocaleString()} rows
                           </span>
                         </h3>
-                        <div className="overflow-x-auto max-h-64 scrollbar-thin rounded-xl border border-white/10">
+                        <div className="overflow-x-auto max-h-64 scrollbar-thin rounded-xl border border-black/10">
                           <table className="w-full text-xs text-left whitespace-nowrap">
-                            <thead className="sticky top-0 bg-[#262220] text-zinc-400 border-b border-white/10 z-10">
+                            <thead className="sticky top-0 bg-[#FFFFFF] text-zinc-400 border-b border-black/10 z-10">
                               <tr>
                                 {lastPreview.columns.map(col => (
                                   <th key={col} className="px-4 py-3 font-medium uppercase tracking-wider text-[10px]">
@@ -362,9 +411,9 @@ export default function App() {
                                 ))}
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5 text-zinc-300">
+                            <tbody className="divide-y divide-black/5 text-zinc-300">
                               {lastPreview.preview_rows.slice(0, 8).map((row, i) => (
-                                <tr key={i} className="hover:bg-white/5 transition-colors">
+                                <tr key={i} className="hover:bg-black/5 transition-colors">
                                   {lastPreview.columns.map(col => (
                                     <td key={col} className="px-4 py-2.5 truncate max-w-[200px]">
                                       {row[col] ?? <span className="text-zinc-500">—</span>}
@@ -384,7 +433,7 @@ export default function App() {
 
                 {isLoading && (
                   <div className="flex flex-col items-center gap-5 py-20">
-                    <div className="w-8 h-8 border-2 border-[#D97757]/25 border-t-[#D97757] rounded-full animate-spin"></div>
+                    <div className="w-8 h-8 border-2 border-[#9C4A2A]/25 border-t-[#9C4A2A] rounded-full animate-spin"></div>
                     <div className="text-center space-y-1">
                       <p className="text-sm font-medium text-zinc-200">Thinking through your data…</p>
                       <p className="text-xs text-zinc-500">Generating SQL, running it, and building the visuals</p>
@@ -395,6 +444,7 @@ export default function App() {
                 {hasResults && !isLoading && (
                   <ResultsDashboard
                     response={response}
+                    sourceLabel={activeSource?.label}
                     datasetInfo={{
                       has_data: hasData,
                       domain: activeSource?.domain || null,
@@ -407,6 +457,15 @@ export default function App() {
                   />
                 )}
               </div>
+            )}
+
+            {/* View: Data Quality */}
+            {currentView === 'quality' && (
+              <DataQualityPage
+                quality={lastPreview?.dataQuality}
+                tableName={lastPreview?.tableName}
+                onContinue={hasData ? () => setCurrentView('dashboard') : null}
+              />
             )}
 
           </div>

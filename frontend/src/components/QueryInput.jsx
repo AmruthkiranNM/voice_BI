@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getModels, clearCache } from '../services/api';
-import { useVoiceInput } from '../hooks/useVoice';
-import { TbMicrophone, TbMicrophoneOff, TbSend, TbSettings, TbHistory, TbX, TbSparkles } from 'react-icons/tb';
+import { useVoiceInput, useSpeechOutput } from '../hooks/useVoice';
+import { TbMicrophone, TbMicrophoneOff, TbSend, TbSettings, TbHistory, TbX, TbSparkles, TbHeadset, TbStar, TbStarFilled } from 'react-icons/tb';
 
 const DEFAULT_SETTINGS = {
   model: '',
@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
 export default function QueryInput({
   onSubmit,
   isLoading,
+  insight,
   settings,
   onSettingsChange,
   suggestions = [],
@@ -21,6 +22,8 @@ export default function QueryInput({
   history = [],
   onClearHistory,
   onRemoveHistory,
+  pinned = [],
+  onTogglePin,
 }) {
   const [query, setQuery] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -28,6 +31,12 @@ export default function QueryInput({
   const [models, setModels] = useState([]);
   const [cacheCleared, setCacheCleared] = useState(false);
   const [voiceError, setVoiceError] = useState(null);
+  // Conversation mode: after the mic hears a question, speak the answer
+  // when it arrives, then automatically re-open the mic — the same
+  // hands-free loop, but running through the exact same results pipeline
+  // (charts, table, KPIs) as a typed question, not a separate dead-end page.
+  const [conversationMode, setConversationMode] = useState(false);
+  const spokenInsightRef = useRef(null);
 
   const handleVoiceResult = useCallback((transcript) => {
     setVoiceError(null);
@@ -40,6 +49,27 @@ export default function QueryInput({
     onInterim: (t) => setQuery(t),
     onError: setVoiceError,
   });
+
+  const { speak, stop: stopSpeaking, isSpeaking, isSupported: speechSupported } = useSpeechOutput();
+
+  const toggleConversationMode = useCallback(() => {
+    setConversationMode(prev => {
+      const next = !prev;
+      if (next) startListening();
+      else { stopListening(); stopSpeaking(); }
+      return next;
+    });
+  }, [startListening, stopListening, stopSpeaking]);
+
+  // New answer arrived while in conversation mode → speak it, then re-open
+  // the mic once speech finishes.
+  useEffect(() => {
+    if (!conversationMode || !insight || isLoading) return;
+    if (spokenInsightRef.current === insight) return;
+    spokenInsightRef.current = insight;
+    speak(insight, { onEnd: () => { if (conversationMode) startListening(); } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insight, isLoading, conversationMode]);
 
   useEffect(() => {
     getModels().then(list => {
@@ -72,7 +102,7 @@ export default function QueryInput({
     <section className="relative w-full max-w-3xl mx-auto">
       {businessType && (
         <div className="flex items-center justify-center mb-4 gap-2 text-sm text-zinc-500">
-          <TbSparkles className="w-4 h-4 text-[#D97757]" />
+          <TbSparkles className="w-4 h-4 text-[#9C4A2A]" />
           <span>Ask about your <strong className="text-zinc-300 font-medium">{businessType.toLowerCase()}</strong> data</span>
         </div>
       )}
@@ -80,7 +110,7 @@ export default function QueryInput({
       <form onSubmit={handleSubmit} className="relative z-10">
         <div className={`ask-bar flex items-center p-1.5 pl-2 ${isListening ? 'is-listening' : ''}`}>
 
-          <div className="pl-2 pr-1 flex shrink-0">
+          <div className="pl-2 pr-1 flex items-center gap-0.5 shrink-0">
             {voiceSupported && (
               <button
                 type="button"
@@ -91,11 +121,28 @@ export default function QueryInput({
                   p-2 rounded-full flex items-center justify-center transition-colors
                   ${isListening
                     ? 'bg-red-500/15 text-red-400 animate-pulse'
-                    : 'text-zinc-500 hover:text-[#D97757] hover:bg-[#D97757]/10'
+                    : 'text-zinc-500 hover:text-[#9C4A2A] hover:bg-[#9C4A2A]/10'
                   }
                 `}
               >
                 {isListening ? <TbMicrophoneOff className="w-5 h-5" /> : <TbMicrophone className="w-5 h-5" />}
+              </button>
+            )}
+            {voiceSupported && speechSupported && (
+              <button
+                type="button"
+                onClick={toggleConversationMode}
+                disabled={isLoading}
+                title={conversationMode ? 'Exit hands-free conversation' : 'Start hands-free conversation (speaks answers, re-listens automatically)'}
+                className={`
+                  p-2 rounded-full flex items-center justify-center transition-colors
+                  ${conversationMode
+                    ? 'bg-[#9C4A2A]/15 text-[#9C4A2A]'
+                    : 'text-zinc-500 hover:text-[#9C4A2A] hover:bg-[#9C4A2A]/10'
+                  }
+                `}
+              >
+                <TbHeadset className="w-5 h-5" />
               </button>
             )}
           </div>
@@ -105,7 +152,11 @@ export default function QueryInput({
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder={isListening ? 'Listening...' : 'Ask a question about your data…'}
+            placeholder={
+              isListening ? 'Listening...'
+              : conversationMode ? 'Conversation mode — speak your question…'
+              : 'Ask a question about your data…'
+            }
             disabled={isLoading}
             className="flex-1 w-full bg-transparent text-base text-zinc-100 placeholder:text-zinc-600 outline-none px-2 py-2.5 disabled:opacity-50"
           />
@@ -126,12 +177,36 @@ export default function QueryInput({
         </div>
       </form>
 
+      {conversationMode && (
+        <p className="text-xs text-center mt-3 text-[#9C4A2A] flex items-center justify-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full bg-[#9C4A2A] ${isListening || isSpeaking ? 'animate-pulse' : ''}`} />
+          {isSpeaking ? 'Speaking the answer…' : isListening ? 'Listening…' : 'Conversation mode on — answers will be read aloud, then the mic reopens.'}
+        </p>
+      )}
+
       {voiceError && <p className="text-red-400 text-sm mt-3 text-center">{voiceError}</p>}
 
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-5 px-2">
         {/* Suggestions */}
         <div className="flex-1 min-w-0 relative">
+          {pinned.length > 0 && (
+            <div className="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
+              {pinned.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => { setQuery(p.query); if (!isLoading) onSubmit(p.query); }}
+                  disabled={isLoading}
+                  className="flex items-center gap-1.5 shrink-0 text-xs px-3 py-1.5 rounded-full disabled:opacity-40 whitespace-nowrap border border-[#9C4A2A]/30 text-[#9C4A2A] hover:bg-[#9C4A2A]/10 transition-colors"
+                  title="Pinned question"
+                >
+                  <TbStarFilled className="w-3 h-3" />
+                  {p.query}
+                </button>
+              ))}
+            </div>
+          )}
           {suggestions.length > 0 && (
             <div className="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
               {suggestions.map(s => (
@@ -155,7 +230,7 @@ export default function QueryInput({
             <button
               type="button"
               onClick={() => { setShowHistory(!showHistory); setShowAdvanced(false); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${showHistory ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/5'}`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${showHistory ? 'bg-black/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-200 hover:bg-black/5'}`}
             >
               <TbHistory className="w-4 h-4" />
               Recent
@@ -164,7 +239,7 @@ export default function QueryInput({
           <button
             type="button"
             onClick={() => { setShowAdvanced(!showAdvanced); setShowHistory(false); }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${showAdvanced ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/5'}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${showAdvanced ? 'bg-black/10 text-zinc-100' : 'text-zinc-500 hover:text-zinc-200 hover:bg-black/5'}`}
           >
             <TbSettings className="w-4 h-4" />
             Settings
@@ -182,7 +257,7 @@ export default function QueryInput({
                     value={settings.model || ''}
                     onChange={e => updateSetting('model', e.target.value)}
                     disabled={isLoading}
-                    className="w-full bg-[#1C1917] border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#D97757]/50 transition-colors"
+                    className="w-full bg-[#F7F3EA] border border-black/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#9C4A2A]/50 transition-colors"
                   >
                     {models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -194,12 +269,12 @@ export default function QueryInput({
                   <Toggle label="Voice Answers (Read Aloud)" checked={settings.speakInsight} onChange={v => updateSetting('speakInsight', v)} disabled={isLoading} />
                 </div>
 
-                <div className="pt-2 border-t border-white/10 flex justify-end">
+                <div className="pt-2 border-t border-black/10 flex justify-end">
                   <button
                     type="button"
                     onClick={handleClearCache}
                     disabled={isLoading}
-                    className="text-xs font-medium text-zinc-400 hover:text-[#D97757] transition-colors"
+                    className="text-xs font-medium text-zinc-400 hover:text-[#9C4A2A] transition-colors"
                   >
                     {cacheCleared ? 'Cache Cleared ✓' : 'Clear System Cache'}
                   </button>
@@ -216,14 +291,22 @@ export default function QueryInput({
               </div>
               <div className="space-y-1 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
                 {history.map(item => (
-                  <div key={item.id} className="flex items-start gap-2 group p-2 rounded-lg hover:bg-white/5 transition-colors">
+                  <div key={item.id} className="flex items-start gap-2 group p-2 rounded-lg hover:bg-black/5 transition-colors">
                     <button
                       type="button"
                       onClick={() => { setQuery(item.query); if (!isLoading) onSubmit(item.query); setShowHistory(false); }}
                       disabled={isLoading}
-                      className="flex-1 text-left text-sm text-zinc-300 hover:text-[#D97757] line-clamp-2 leading-snug"
+                      className="flex-1 text-left text-sm text-zinc-300 hover:text-[#9C4A2A] line-clamp-2 leading-snug"
                     >
                       {item.query}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onTogglePin?.(item)}
+                      title={pinned.some(p => p.query === item.query) ? 'Unpin' : 'Pin this question'}
+                      className={`p-1 rounded transition-all ${pinned.some(p => p.query === item.query) ? 'text-[#9C4A2A]' : 'opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-[#9C4A2A]'}`}
+                    >
+                      {pinned.some(p => p.query === item.query) ? <TbStarFilled className="w-4 h-4" /> : <TbStar className="w-4 h-4" />}
                     </button>
                     <button
                       type="button"
@@ -253,7 +336,7 @@ function Toggle({ label, checked, onChange, disabled }) {
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-5 rounded-full shrink-0 transition-colors border ${checked ? 'bg-[#D97757] border-[#D97757]' : 'bg-zinc-800 border-zinc-700'} ${disabled ? 'opacity-50' : ''}`}
+        className={`relative w-10 h-5 rounded-full shrink-0 transition-colors border ${checked ? 'bg-[#9C4A2A] border-[#9C4A2A]' : 'bg-zinc-800 border-zinc-700'} ${disabled ? 'opacity-50' : ''}`}
       >
         <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : ''} shadow-sm`} />
       </button>

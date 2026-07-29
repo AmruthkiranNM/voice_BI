@@ -12,7 +12,9 @@ import {
 import { recommendChartType, getChartCompatibility, suggestAlternatives, CHART_TYPE_GROUPS, ALL_CHART_TYPES } from '../utils/chartRecommender';
 import { buildEChartsOption, prepareChartData } from '../utils/echartsBuilder';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
-import { analyzeResult, formatStatValue } from '../utils/resultAnalytics';
+import { analyzeResult, formatStatValue, periodComparison } from '../utils/resultAnalytics';
+import { detectKpiMetrics } from './KPICard';
+import { BI_COLORS } from '../utils/biPalette';
 
 /* ═══════════════════════════════════════════════════════════
    ICON MAP — maps chart type id → react-icons component
@@ -184,6 +186,8 @@ export default function BIChartPanel({ result, intent, query = '' }) {
   }, [processedData, effectiveType, showLabels, compatibility, chartData?.labelCol]);
 
   const analysis = useMemo(() => analyzeResult(result), [result]);
+  const kpis = useMemo(() => detectKpiMetrics(result), [result]);
+  const kpiTrend = useMemo(() => periodComparison(result), [result]);
 
   const handleChartClick = useCallback((params) => {
     if (!params?.name) return;
@@ -197,7 +201,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
   const exportPng = useCallback(() => {
     const chart = chartRef.current?.getEchartsInstance();
     if (!chart) return;
-    const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#1C1917' });
+    const url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#FFFFFF' });
     const a = document.createElement('a');
     a.href = url;
     a.download = 'chart.png';
@@ -243,8 +247,8 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       {/* ── Header ── */}
       <div className="bi-chart-header">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500">Visualization</span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-[#D97757]/10 text-[#D97757] border border-[#D97757]/20">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#9C7A3E]">Overview</span>
+          <span className="text-[10px] px-2 py-0.5 rounded bg-[#9C4A2A]/10 text-[#9C4A2A] border border-[#9C4A2A]/20">
             {ALL_CHART_TYPES.find(t => t.id === effectiveType)?.label || effectiveType}
           </span>
           {compatibility[effectiveType]?.recommended && !activeType && (
@@ -307,6 +311,28 @@ export default function BIChartPanel({ result, intent, query = '' }) {
           <ControlBtn onClick={resetChart} title="Reset Chart" icon={<TbRefresh size={13} />} />
         </div>
       </div>
+
+      {/* ── KPI Strip (inside this card, not separate cards) ── */}
+      {kpis?.length > 0 && (
+        <div className="kpi-strip">
+          {kpis.slice(0, 4).map((kpi, i) => {
+            const trend = i === 0 ? kpiTrend : null;
+            const trendDir = trend?.direction;
+            return (
+              <div key={kpi.label} className="kpi-strip-cell" style={{ '--kpi-accent': BI_COLORS[i % BI_COLORS.length] }}>
+                <p className="kpi-strip-label">{kpi.label}</p>
+                <p className="kpi-strip-value">{formatStatValue(kpi.value)}</p>
+                {trendDir && trendDir !== 'flat' && (
+                  <div className={`kpi-strip-trend ${trendDir}`}>
+                    <span>{trendDir === 'up' ? '▲' : '▼'}</span>
+                    <span>{trend.pct != null ? `${Math.abs(trend.pct).toFixed(1)}%` : trendDir}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Chart Type Toolbar ── */}
       <div className="bi-chart-toolbar-wrap">
@@ -417,7 +443,6 @@ export default function BIChartPanel({ result, intent, query = '' }) {
             onEvents={{ click: handleChartClick, dblclick: () => { setCrossFilter(null); setDrillPath([]); } }}
             notMerge={true}
             lazyUpdate={false}
-            theme="dark"
           />
         ) : isUnsupported ? (
           <UnsupportedChart

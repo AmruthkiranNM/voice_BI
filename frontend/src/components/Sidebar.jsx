@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   TbDatabaseImport, TbLayoutDashboard,
   TbDatabase, TbFileSpreadsheet, TbTrash, TbLoader2,
+  TbClipboardCheck, TbLogout,
 } from 'react-icons/tb';
 import { deleteSource } from '../services/api';
 import Header from './Header';
@@ -16,12 +17,15 @@ export default function Sidebar({
   onSelectSource,
   onDatasetsChanged,
   isProcessing,
+  user,
+  onLogout,
 }) {
   const [removingId, setRemovingId] = useState(null);
 
   const navItems = [
     { id: 'dashboard', label: 'Analysis Workspace', icon: TbLayoutDashboard },
     { id: 'upload', label: 'Data Source', icon: TbDatabaseImport },
+    { id: 'quality', label: 'Data Quality', icon: TbClipboardCheck },
   ];
 
   const handleRemoveSource = async (e, sourceId) => {
@@ -50,7 +54,7 @@ export default function Sidebar({
       {/* Sidebar */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-[248px] bg-[#1C1917] border-r border-white/[0.06]
+        w-[248px] bg-[#F1EBDD] border-r border-black/[0.06]
         flex flex-col h-full transform transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -63,6 +67,9 @@ export default function Sidebar({
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto pb-6 px-3 space-y-0.5">
+          <div className="text-[10px] font-semibold text-[#9C7A3E] uppercase tracking-wider mb-2 px-3">
+            Workspace
+          </div>
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentView === item.id;
@@ -124,9 +131,25 @@ export default function Sidebar({
           )}
         </nav>
 
-        {/* Footer — connection status */}
-        <div className="p-4 border-t border-white/[0.06]">
+        {/* Footer — connection status + account */}
+        <div className="p-4 border-t border-black/[0.06] space-y-3">
           <Header isProcessing={isProcessing} />
+          {onLogout && (
+            <div className="flex items-center justify-between gap-2">
+              {user?.email && (
+                <span className="text-xs text-zinc-500 truncate" title={user.email}>{user.email}</span>
+              )}
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-[#9C4A2A] transition-colors shrink-0"
+                title="Log out"
+              >
+                <TbLogout className="w-3.5 h-3.5" />
+                Log out
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>

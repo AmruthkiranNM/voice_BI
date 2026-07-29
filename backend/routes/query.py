@@ -6,14 +6,15 @@ Accepts natural language business queries and returns SQL, results, and insights
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from agents.orchestrator import process_query
+from services.auth import require_auth
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Query"])
+router = APIRouter(prefix="/api", tags=["Query"], dependencies=[Depends(require_auth)])
 
 
 # ── Request / Response Models ──

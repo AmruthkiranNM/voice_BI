@@ -68,7 +68,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: topEntry.label,
       value: formatStatValue(topEntry.value),
       sub: topEntry.valueColumn,
-      accent: '#D97757',
+      accent: '#9C4A2A',
       badge: 'Rank #1',
     });
   }
@@ -82,7 +82,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: bottomItem.label,
       value: formatStatValue(bottomItem.value),
       sub: `${bottomItem.pct.toFixed(1)}% of total`,
-      accent: '#f87171',
+      accent: '#9C4A2A',
       badge: 'Needs Attention',
     });
   }
@@ -96,7 +96,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: trend.column,
       value: `${trend.direction === 'up' ? '+' : ''}${trend.pct.toFixed(1)}%`,
       sub: `${formatStatValue(trend.previous)} → ${formatStatValue(trend.current)}`,
-      accent: trend.direction === 'up' ? '#34d399' : '#f87171',
+      accent: trend.direction === 'up' ? '#3E7A4D' : '#9C4A2A',
       badge: trend.direction === 'up' ? 'Positive' : 'Negative',
     });
   }
@@ -110,7 +110,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: primaryStat.label,
       value: formatStatValue(primaryStat.sum),
       sub: `Avg: ${formatStatValue(primaryStat.avg)} · Max: ${formatStatValue(primaryStat.max)}`,
-      accent: '#E2946F',
+      accent: '#B5613C',
       badge: `${rowCount} records`,
     });
   }
@@ -124,7 +124,7 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       label: '',
       value: '',
       sub: c.text,
-      accent: c.type === 'positive' ? '#D97757' : c.type === 'negative' ? '#f87171' : '#a78bfa',
+      accent: c.type === 'positive' ? '#3E7A4D' : c.type === 'negative' ? '#9C4A2A' : '#B8965A',
       badge: null,
     });
   }

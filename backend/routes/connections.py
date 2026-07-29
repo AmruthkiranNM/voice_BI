@@ -6,15 +6,16 @@ import rather than a live query passthrough.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from services.auth import require_auth
 from services.database import get_all_table_names
 from services.db_import import list_tables, import_tables
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/connections", tags=["Connections"])
+router = APIRouter(prefix="/api/connections", tags=["Connections"], dependencies=[Depends(require_auth)])
 
 
 class TestConnectionRequest(BaseModel):

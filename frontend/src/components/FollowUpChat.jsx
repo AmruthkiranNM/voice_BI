@@ -67,7 +67,7 @@ export default function FollowUpChat({
     <div className="panel-card flex flex-col h-[500px] border-t-4 border-t-violet-500 shadow-xl shadow-violet-500/5 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-64 h-64 bg-violet-500/5 rounded-full blur-3xl pointer-events-none"></div>
       
-      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-white/5 relative z-10">
+      <div className="flex items-center gap-3 mb-4 pb-4 border-b border-black/5 relative z-10">
         <div className="p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
           <TbMessageCircle className="w-5 h-5 text-violet-400" />
         </div>
@@ -96,12 +96,12 @@ export default function FollowUpChat({
                   ? 'bg-blue-600/10 border border-blue-500/20 text-zinc-200 rounded-tr-sm'
                   : msg.isError
                     ? 'bg-red-500/10 border border-red-500/20 text-red-300 rounded-tl-sm font-light'
-                    : 'bg-white/[0.03] border border-white/5 text-zinc-300 rounded-tl-sm font-light'}
+                    : 'bg-black/[0.03] border border-black/5 text-zinc-300 rounded-tl-sm font-light'}
               `}>
                 {msg.role === 'user' ? (
                   msg.content
                 ) : (
-                  <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/40 prose-pre:border prose-pre:border-white/10">
+                  <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/40 prose-pre:border prose-pre:border-black/10">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {msg.content}
                     </ReactMarkdown>
@@ -117,7 +117,7 @@ export default function FollowUpChat({
             <div className="w-8 h-8 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center shrink-0">
               <TbRobot className="w-4 h-4 text-violet-400" />
             </div>
-            <div className="px-4 py-3 rounded-2xl bg-white/[0.03] border border-white/5 rounded-tl-sm flex items-center gap-1.5">
+            <div className="px-4 py-3 rounded-2xl bg-black/[0.03] border border-black/5 rounded-tl-sm flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
               <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
               <div className="w-1.5 h-1.5 bg-violet-400/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -128,7 +128,7 @@ export default function FollowUpChat({
 
       <div className="relative group z-10">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
-        <div className="relative flex items-center bg-[#1C1917] border border-white/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
+        <div className="relative flex items-center bg-[#F7F3EA] border border-black/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
           {isSupported && (
             <button
               onClick={isListening ? stopListening : startListening}

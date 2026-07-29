@@ -7,8 +7,9 @@ query is always scoped to one source's tables.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from services.auth import require_auth
 from services.database import (
     get_all_table_names,
     get_table_schema,
@@ -24,7 +25,7 @@ from services import sources as source_registry
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Datasets"])
+router = APIRouter(prefix="/api", tags=["Datasets"], dependencies=[Depends(require_auth)])
 
 
 def _table_info(name: str) -> dict:

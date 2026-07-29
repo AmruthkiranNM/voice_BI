@@ -11,9 +11,8 @@ import time
 from pathlib import Path
 from typing import Any
 
-import config
 from config import CACHE_MAX_ENTRIES, CACHE_TTL_SECONDS
-from services.database import get_all_table_names
+from services.database import get_all_table_names, get_database_path
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 def get_schema_fingerprint() -> str:
     """Fingerprint current DB tables + file mtime for cache invalidation."""
     tables = ",".join(sorted(get_all_table_names()))
-    db_path = Path(config.DATABASE_PATH)
+    db_path = Path(get_database_path())
     mtime = db_path.stat().st_mtime if db_path.exists() else 0
     raw = f"{tables}:{mtime}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
@@ -36,10 +35,16 @@ def _cache_key(
     skip_insight: bool,
     table_name: str | None = None,
 ) -> str:
+    from services.auth import current_user_id
+
     normalized = " ".join(query.strip().lower().split())
     model_name = model or "default"
     table = table_name or "*"
-    payload = f"{normalized}|{model_name}|fast={fast_mode}|insight={not skip_insight}|table={table}"
+    # get_database_path() already differs per user, but include the user id
+    # explicitly so cache entries can never collide across accounts even if
+    # two users' DB fingerprints happened to coincide.
+    user = current_user_id.get()
+    payload = f"user={user}|{normalized}|{model_name}|fast={fast_mode}|insight={not skip_insight}|table={table}"
     fingerprint = get_schema_fingerprint()
     return hashlib.sha256(f"{payload}|{fingerprint}".encode()).hexdigest()
 

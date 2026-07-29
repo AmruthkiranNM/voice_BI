@@ -7,7 +7,7 @@
 function highlightNumbers(text, key) {
   return text.split(/(\$?[\d,]+\.?\d*%?)/g).map((p, i) =>
     /^\$?[\d,]+\.?\d*%?$/.test(p) && p.trim()
-      ? <span key={`${key}-${i}`} className="font-data font-semibold text-[#D97757]">{p}</span>
+      ? <span key={`${key}-${i}`} className="font-data font-semibold text-[#9C4A2A]">{p}</span>
       : p
   );
 }
@@ -15,7 +15,7 @@ function highlightNumbers(text, key) {
 function inline(text, key) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) =>
     /^\*\*[^*]+\*\*$/.test(p)
-      ? <strong key={`${key}-${i}`} className="text-white font-semibold">{p.slice(2, -2)}</strong>
+      ? <strong key={`${key}-${i}`} className="text-zinc-100 font-semibold">{p.slice(2, -2)}</strong>
       : highlightNumbers(p, `${key}-${i}`)
   );
 }

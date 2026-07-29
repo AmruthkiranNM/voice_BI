@@ -96,6 +96,8 @@ from routes.upload import router as upload_router
 from routes.datasets import router as datasets_router
 from routes.chat import router as chat_router
 from routes.connections import router as connections_router
+from routes.auth import router as auth_router
+app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(upload_router)
 app.include_router(datasets_router)

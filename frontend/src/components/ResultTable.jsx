@@ -88,7 +88,7 @@ export default function ResultTable({ result, fullWidth = false }) {
       return (
         <span>
           {s.slice(0, idx)}
-          <mark className="bg-[#D97757]/30 text-white rounded">{s.slice(idx, idx + filter.length)}</mark>
+          <mark className="bg-[#9C4A2A]/30 text-zinc-100 rounded">{s.slice(idx, idx + filter.length)}</mark>
           {s.slice(idx + filter.length)}
         </span>
       );
@@ -165,7 +165,7 @@ export default function ResultTable({ result, fullWidth = false }) {
           <button className="bi-table-toggle" onClick={() => setIsExpanded(v => !v)} aria-label={isExpanded ? 'Collapse table' : 'Expand table'}>
             {isExpanded ? <TbChevronDown className="w-4 h-4" /> : <TbChevronRight className="w-4 h-4" />}
           </button>
-          <h3 className="bi-table-title">Data Table</h3>
+          <h3 className="bi-table-title">Results</h3>
           <span className="bi-table-count">{filteredRows.length.toLocaleString()} rows · {visibleCols.length} cols</span>
         </div>
 

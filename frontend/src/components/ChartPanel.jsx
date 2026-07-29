@@ -94,7 +94,7 @@ export default function ChartPanel({ result, intent, fullWidth = false }) {
         primaryValues[primaryValues.length - 1],
         ...forecast,
       ],
-      borderColor: '#D97757',
+      borderColor: '#9C4A2A',
       backgroundColor: 'transparent',
       borderWidth: 2,
       borderDash: [6, 4],
@@ -173,7 +173,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               type="button"
               onClick={onToggleTrend}
               className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                showTrend ? 'bg-white/10 text-white' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
+                showTrend ? 'bg-black/10 text-zinc-100' : 'text-gray-300 hover:text-zinc-100 bg-black/10 border border-black/10'
               }`}
             >
               Trendline
@@ -184,7 +184,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
               type="button"
               onClick={onToggleForecast}
               className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                showForecast ? 'bg-[#D97757] text-[#1C1917]' : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
+                showForecast ? 'bg-[#9C4A2A] text-[#F7F3EA]' : 'text-gray-300 hover:text-zinc-100 bg-black/10 border border-black/10'
               }`}
             >
               Forecast
@@ -199,8 +199,8 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
                   onClick={() => onTypeChange(ct.id)}
                   className={`px-2.5 py-1 text-xs font-medium transition-colors ${
                     selectedType === ct.id
-                      ? 'bg-[#D97757] text-[#1C1917]'
-                      : 'text-gray-300 hover:text-white bg-white/10 border border-white/10'
+                      ? 'bg-[#9C4A2A] text-[#F7F3EA]'
+                      : 'text-gray-300 hover:text-zinc-100 bg-black/10 border border-black/10'
                   }`}
                 >
                   {ct.label}
@@ -211,7 +211,7 @@ function ChartCard({ title, type, data, options, heightClass, chartTypes, select
           <button
             type="button"
             onClick={exportPng}
-            className="px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-white bg-white/10 border border-white/10 transition-colors"
+            className="px-2.5 py-1 text-xs font-medium text-gray-300 hover:text-zinc-100 bg-black/10 border border-black/10 transition-colors"
           >
             Export PNG
           </button>
@@ -319,11 +319,11 @@ function buildOptions(type, datasetCount) {
       legend: {
         display: datasetCount > 1 || isDoughnut,
         position: isDoughnut ? 'right' : 'top',
-        labels: { color: '#A89F9A', font: { size: 11 }, usePointStyle: true, boxWidth: 8 },
+        labels: { color: '#9C7A3E', font: { size: 11 }, usePointStyle: true, boxWidth: 8 },
       },
       tooltip: {
         backgroundColor: 'rgba(18, 18, 16, 0.95)',
-        titleColor: '#F2ECE6',
+        titleColor: '#1B2430',
         bodyColor: '#D1D5DB',
         borderColor: 'rgba(255,255,255,0.12)',
         borderWidth: 1,
@@ -334,14 +334,14 @@ function buildOptions(type, datasetCount) {
       scales: {
         x: {
           grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
-          ticks: { color: '#A89F9A', font: { size: 10 }, maxRotation: isHorizontal ? 0 : 45 },
+          ticks: { color: '#9C7A3E', font: { size: 10 }, maxRotation: isHorizontal ? 0 : 45 },
           border: { display: false },
           ...(isHorizontal && { beginAtZero: true }),
         },
         y: {
           grid: { color: 'rgba(255,255,255,0.04)', drawBorder: false },
           ticks: {
-            color: '#A89F9A',
+            color: '#9C7A3E',
             font: { size: 10 },
             ...(isHorizontal
               ? {}
