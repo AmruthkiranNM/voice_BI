@@ -1,9 +1,10 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
 import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload } from 'react-icons/tb';
+import { showToast } from '../utils/toast';
 
 const PAGE_SIZE = 25;
 
-export default function ResultTable({ result, fullWidth = false }) {
+export default function ResultTable({ result, fullWidth = false, onRowDrill }) {
   const [sort, setSort] = useState({ column: null, dir: 'asc' });
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -122,6 +123,7 @@ export default function ResultTable({ result, fullWidth = false }) {
     const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'data-export.csv'; a.click(); URL.revokeObjectURL(a.href);
+    showToast(`Exported ${filteredRows.length.toLocaleString()} rows as CSV`);
   };
 
   const exportJson = () => {
@@ -129,6 +131,7 @@ export default function ResultTable({ result, fullWidth = false }) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'data-export.json'; a.click(); URL.revokeObjectURL(a.href);
+    showToast(`Exported ${filteredRows.length.toLocaleString()} rows as JSON`);
   };
 
   // Column resize handlers
@@ -251,9 +254,11 @@ export default function ResultTable({ result, fullWidth = false }) {
                   return (
                     <tr
                       key={i}
-                      className={`bi-tr ${highlightRow === i ? 'highlighted' : ''}`}
+                      className={`bi-tr ${highlightRow === i ? 'highlighted' : ''} ${onRowDrill ? 'cursor-pointer' : ''}`}
                       onMouseEnter={() => setHighlightRow(i)}
                       onMouseLeave={() => setHighlightRow(null)}
+                      onClick={() => onRowDrill?.(row, visibleCols)}
+                      title={onRowDrill ? 'Ask a follow-up question about this row' : undefined}
                     >
                       <td className="bi-td bi-td-rank">
                         <span className="bi-rank-badge">{globalRank}</span>
@@ -263,7 +268,7 @@ export default function ResultTable({ result, fullWidth = false }) {
                           key={c}
                           className={`bi-td ${numericCols.includes(c) ? 'numeric' : ''} ${pinnedCol === c ? 'pinned' : ''}`}
                           title={String(row[c] ?? '')}
-                          onDoubleClick={() => setPinnedCol(prev => prev === c ? null : c)}
+                          onDoubleClick={e => { e.stopPropagation(); setPinnedCol(prev => prev === c ? null : c); }}
                         >
                           {fmt(row[c], c)}
                         </td>

@@ -10,11 +10,16 @@ import ErrorPanel from './components/ErrorPanel';
 import DatasetUpload from './components/DatasetUpload';
 import DatabaseConnect from './components/DatabaseConnect';
 import ResultsDashboard from './components/ResultsDashboard';
-import DataQuality from './components/DataQuality';
 import DataQualityPage from './components/DataQualityPage';
 import LoginPage from './components/LoginPage';
+import SkeletonLoader from './components/SkeletonLoader';
+import TablePreviewCard from './components/TablePreviewCard';
+import TabbedTables from './components/TabbedTables';
+import { useTablePreviews } from './hooks/useTablePreviews';
+import { useTheme } from './hooks/useTheme';
 
 export default function App() {
+  const { theme, toggleTheme } = useTheme();
   const [user, setUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
@@ -73,13 +78,19 @@ export default function App() {
     [sources, activeSourceId],
   );
   const activeTables = activeSource?.tables || [];
+  const activeTableNames = useMemo(() => activeTables.map(t => t.name), [activeTables]);
 
   // The scope sent to the backend: the picked tables, or all of the active
   // source's tables when nothing is explicitly picked ("Auto").
   const scopeTableNames = useMemo(() => {
     if (selectedTables.size > 0) return [...selectedTables];
-    return activeTables.map(t => t.name);
-  }, [selectedTables, activeTables]);
+    return activeTableNames;
+  }, [selectedTables, activeTableNames]);
+
+  // Sample rows + quality report for every table in the active source (not
+  // just the one most recently uploaded), used by the pre-results preview
+  // and the Data Quality tab.
+  const { previews: tablePreviews } = useTablePreviews(activeTableNames);
 
   // Pull the authoritative source list from the backend after any change.
   const refreshDatasets = useCallback(async () => {
@@ -202,7 +213,7 @@ export default function App() {
   if (!user) return <LoginPage onAuthenticated={handleAuthenticated} />;
 
   return (
-    <div className="flex h-screen bg-[#F7F3EA] text-zinc-100 font-sans overflow-hidden">
+    <div className="flex h-screen bg-bg text-zinc-100 font-sans overflow-hidden">
 
       {/* Sidebar Navigation */}
       <Sidebar
@@ -217,6 +228,8 @@ export default function App() {
         isProcessing={isLoading}
         user={user}
         onLogout={handleLogout}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
 
       {/* Main Workspace */}
@@ -385,61 +398,19 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Show Data Preview and Quality before any query is run */}
-                {!hasResults && showPreview && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {lastPreview.dataQuality && (
-                      <DataQuality quality={lastPreview.dataQuality} />
-                    )}
-                    {lastPreview.preview_rows?.length > 0 && (
-                      <div className="surface-card p-6 animate-in">
-                        <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
-                          <TbFileSpreadsheet className="w-4 h-4 text-[#9C4A2A]" />
-                          Data Preview
-                          <span className="text-zinc-500 font-normal text-xs ml-1">
-                            {lastPreview.tableName?.replace(/_/g, ' ')} · {lastPreview.rowCount?.toLocaleString()} rows
-                          </span>
-                        </h3>
-                        <div className="overflow-x-auto max-h-64 scrollbar-thin rounded-xl border border-black/10">
-                          <table className="w-full text-xs text-left whitespace-nowrap">
-                            <thead className="sticky top-0 bg-[#FFFFFF] text-zinc-400 border-b border-black/10 z-10">
-                              <tr>
-                                {lastPreview.columns.map(col => (
-                                  <th key={col} className="px-4 py-3 font-medium uppercase tracking-wider text-[10px]">
-                                    {col.replace(/_/g, ' ')}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-black/5 text-zinc-300">
-                              {lastPreview.preview_rows.slice(0, 8).map((row, i) => (
-                                <tr key={i} className="hover:bg-black/5 transition-colors">
-                                  {lastPreview.columns.map(col => (
-                                    <td key={col} className="px-4 py-2.5 truncate max-w-[200px]">
-                                      {row[col] ?? <span className="text-zinc-500">—</span>}
-                                    </td>
-                                  ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                {/* Data Preview — every table in this source, switchable via
+                    tabs instead of stacking one card per table */}
+                {!hasResults && activeTables.length > 0 && (
+                  <TabbedTables
+                    tableNames={activeTableNames}
+                    previews={tablePreviews}
+                    renderTable={(name, preview) => <TablePreviewCard preview={preview} />}
+                  />
                 )}
 
                 {error && <ErrorPanel error={error} />}
 
-                {isLoading && (
-                  <div className="flex flex-col items-center gap-5 py-20">
-                    <div className="w-8 h-8 border-2 border-[#9C4A2A]/25 border-t-[#9C4A2A] rounded-full animate-spin"></div>
-                    <div className="text-center space-y-1">
-                      <p className="text-sm font-medium text-zinc-200">Thinking through your data…</p>
-                      <p className="text-xs text-zinc-500">Generating SQL, running it, and building the visuals</p>
-                    </div>
-                  </div>
-                )}
+                {isLoading && <SkeletonLoader />}
 
                 {hasResults && !isLoading && (
                   <ResultsDashboard
@@ -462,8 +433,7 @@ export default function App() {
             {/* View: Data Quality */}
             {currentView === 'quality' && (
               <DataQualityPage
-                quality={lastPreview?.dataQuality}
-                tableName={lastPreview?.tableName}
+                tableNames={activeTableNames}
                 onContinue={hasData ? () => setCurrentView('dashboard') : null}
               />
             )}

@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 
 export default function FollowUpChat({
   query, sql, result, insight, model, tableName, tableNames,
-  messages, onMessagesChange, autoSpeak
+  messages, onMessagesChange, autoSpeak, pendingQuestion, onPendingQuestionHandled,
 }) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -24,6 +24,15 @@ export default function FollowUpChat({
     onResult: (t) => { setInput(t); handleSend(t); },
     onInterim: setInput,
   });
+
+  // A table row or chart bar was clicked elsewhere on the dashboard — ask
+  // about it here instead of duplicating the chat/send logic at that call site.
+  useEffect(() => {
+    if (!pendingQuestion) return;
+    handleSend(pendingQuestion);
+    onPendingQuestionHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingQuestion]);
 
   const handleSend = async (overrideInput = null) => {
     const text = (overrideInput || input).trim();
@@ -128,7 +137,7 @@ export default function FollowUpChat({
 
       <div className="relative group z-10">
         <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-500/20 to-blue-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity"></div>
-        <div className="relative flex items-center bg-[#F7F3EA] border border-black/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
+        <div className="relative flex items-center bg-bg border border-black/10 rounded-xl focus-within:border-violet-500/50 overflow-hidden shadow-inner">
           {isSupported && (
             <button
               onClick={isListening ? stopListening : startListening}

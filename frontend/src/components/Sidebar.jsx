@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   TbDatabaseImport, TbLayoutDashboard,
   TbDatabase, TbFileSpreadsheet, TbTrash, TbLoader2,
-  TbClipboardCheck, TbLogout,
+  TbClipboardCheck, TbLogout, TbSun, TbMoon,
 } from 'react-icons/tb';
 import { deleteSource } from '../services/api';
 import Header from './Header';
@@ -19,6 +19,8 @@ export default function Sidebar({
   isProcessing,
   user,
   onLogout,
+  theme,
+  onToggleTheme,
 }) {
   const [removingId, setRemovingId] = useState(null);
 
@@ -54,7 +56,7 @@ export default function Sidebar({
       {/* Sidebar */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-[248px] bg-[#F1EBDD] border-r border-black/[0.06]
+        w-[248px] bg-surface-alt border-r border-black/[0.06]
         flex flex-col h-full transform transition-transform duration-300 ease-in-out
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
@@ -133,6 +135,30 @@ export default function Sidebar({
 
         {/* Footer — connection status + account */}
         <div className="p-4 border-t border-black/[0.06] space-y-3">
+          {onToggleTheme && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-zinc-500 flex items-center gap-1.5">
+                {theme === 'dark' ? <TbMoon className="w-3.5 h-3.5" /> : <TbSun className="w-3.5 h-3.5" />}
+                {theme === 'dark' ? 'Dark' : 'Light'}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={theme === 'dark'}
+                onClick={onToggleTheme}
+                title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+                className={`relative w-10 h-5 rounded-full shrink-0 transition-colors border ${
+                  theme === 'dark' ? 'bg-[#9C4A2A] border-[#9C4A2A]' : 'bg-black/10 border-black/10'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform ${
+                    theme === 'dark' ? 'translate-x-5' : ''
+                  }`}
+                />
+              </button>
+            </div>
+          )}
           <Header isProcessing={isProcessing} />
           {onLogout && (
             <div className="flex items-center justify-between gap-2">

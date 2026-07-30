@@ -19,9 +19,6 @@ export const BI_COLORS = [
   '#D4A24E', // honey
 ];
 
-export const BI_COLORS_MUTED = BI_COLORS.map(c => c + '55'); // 33% opacity hex
-export const BI_COLORS_BORDER = BI_COLORS.map(c => c + 'cc'); // 80% opacity
-
 /** Get color by index (wraps around) */
 export function getColor(index, opacity = 1) {
   const hex = BI_COLORS[index % BI_COLORS.length];

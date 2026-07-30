@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import InsightPanel from './InsightPanel';
 import BIChartPanel from './BIChartPanel';
 import ResultTable from './ResultTable';
@@ -8,6 +9,7 @@ import AnomalyCallouts from './AnomalyCallouts';
 import Timeline from './Timeline';
 import BIInsightsPanel from './BIInsightsPanel';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
+import { showToast } from '../utils/toast';
 
 export default function ResultsDashboard({
   response,
@@ -27,6 +29,15 @@ export default function ResultsDashboard({
   const intent = plan?.intent || null;
   const pipelineTime = metadata?.pipeline_time_seconds;
   const hasChart = result?.rows?.length > 0 && result?.columns?.length > 0;
+
+  // Row-click drill-through: turn a clicked table row into a follow-up
+  // question for the AI Data Analyst chat below, instead of re-running the
+  // full SQL pipeline for a single row's worth of context.
+  const [pendingQuestion, setPendingQuestion] = useState(null);
+  const handleRowDrill = (row, cols) => {
+    const parts = cols.slice(0, 4).map(c => `${c.replace(/_/g, ' ')}: ${row[c]}`);
+    setPendingQuestion(`Tell me more about this row — ${parts.join(', ')}.`);
+  };
 
   return (
     <section className="bi-dashboard animate-in">
@@ -50,16 +61,13 @@ export default function ResultsDashboard({
           )}
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => { showToast('Export started — check your downloads or print dialog'); window.print(); }}
             className="no-print bi-export-btn"
           >
             Export
           </button>
         </div>
       </div>
-
-      {/* ── Agent Timeline ─────────────────────────────────── */}
-      <Timeline agentLogs={response?.agent_logs} />
 
       {/* ── Top Section: AI Answer + Insights ─────────────── */}
       <div className="bi-top-section">
@@ -81,7 +89,7 @@ export default function ResultsDashboard({
       </div>
 
       {/* ── Follow-Up Chat ────────────────────────────────── */}
-      <div className="no-print mt-8 mb-8">
+      <div id="followup-chat" className="no-print mt-8 mb-8">
         <FollowUpChat
           query={query}
           sql={sql}
@@ -93,6 +101,8 @@ export default function ResultsDashboard({
           messages={chatMessages}
           onMessagesChange={onChatMessagesChange}
           autoSpeak={settings.speakInsight}
+          pendingQuestion={pendingQuestion}
+          onPendingQuestionHandled={() => setPendingQuestion(null)}
         />
       </div>
 
@@ -114,8 +124,18 @@ export default function ResultsDashboard({
       </div>
 
       {/* ── Data Table (full width) ────────────────────────── */}
-      <ResultTable result={result} fullWidth />
+      <ResultTable
+        result={result}
+        fullWidth
+        onRowDrill={(row, cols) => {
+          handleRowDrill(row, cols);
+          document.getElementById('followup-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+      />
 
+
+      {/* ── Agent Timeline ─────────────────────────────────── */}
+      <Timeline agentLogs={response?.agent_logs} />
 
       {/* ── Technical Details ─────────────────────────────── */}
       <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />

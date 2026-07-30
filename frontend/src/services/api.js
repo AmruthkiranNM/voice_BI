@@ -169,6 +169,12 @@ export async function getDatasets() {
   }
 }
 
+/** Sample rows + a fresh quality report for one already-ingested table */
+export async function getTablePreview(tableName) {
+  const { data } = await api.get(`/datasets/${encodeURIComponent(tableName)}/preview`);
+  return data;
+}
+
 /** Remove one uploaded table from the workspace */
 export async function deleteDataset(tableName) {
   try {

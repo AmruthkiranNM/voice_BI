@@ -7,6 +7,7 @@ query is always scoped to one source's tables.
 """
 
 import logging
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
 from services.auth import require_auth
@@ -22,6 +23,7 @@ from services.domain_detector import analyze_dataset
 from services.vector_store import is_index_ready
 from services.ingest import rebuild_index
 from services import sources as source_registry
+from services import data_quality
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +78,33 @@ def list_datasets():
         "domain": primary["domain"] if primary else analyze_dataset([]),
         "suggestions": primary["suggestions"] if primary else [],
         "vector_store_ready": is_index_ready(),
+    }
+
+
+@router.get("/datasets/{table_name}/preview")
+def get_table_preview(table_name: str):
+    """
+    Sample rows + a fresh data-quality report for one already-ingested
+    table, computed on demand (not just cached from upload time) so the
+    Data Source and Data Quality views can show every table in a source,
+    not only the one most recently uploaded.
+    """
+    if table_name not in get_all_table_names():
+        raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found.")
+
+    conn = get_connection()
+    try:
+        df = pd.read_sql(f"SELECT * FROM [{table_name}]", conn)
+    finally:
+        conn.close()
+
+    return {
+        "table_name": table_name,
+        "row_count": len(df),
+        "columns": list(df.columns),
+        "column_types": {col: str(dtype) for col, dtype in df.dtypes.items()},
+        "preview_rows": df.head(8).fillna("").astype(str).to_dict(orient="records"),
+        "data_quality": data_quality.assess(df),
     }
 
 

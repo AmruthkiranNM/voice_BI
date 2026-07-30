@@ -41,7 +41,7 @@ export default function LoginPage({ onAuthenticated }) {
               value={email}
               onChange={e => setEmail(e.target.value)}
               autoComplete="email"
-              className="w-full bg-[#F7F3EA] border border-black/10 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#9C4A2A]/50 transition-colors"
+              className="w-full bg-bg border border-black/10 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#9C4A2A]/50 transition-colors"
               placeholder="you@business.com"
             />
           </label>
@@ -55,7 +55,7 @@ export default function LoginPage({ onAuthenticated }) {
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              className="w-full bg-[#F7F3EA] border border-black/10 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#9C4A2A]/50 transition-colors"
+              className="w-full bg-bg border border-black/10 rounded-lg px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-[#9C4A2A]/50 transition-colors"
               placeholder="••••••••"
             />
           </label>

@@ -178,10 +178,19 @@ export default function QueryInput({
       </form>
 
       {conversationMode && (
-        <p className="text-xs text-center mt-3 text-[#9C4A2A] flex items-center justify-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full bg-[#9C4A2A] ${isListening || isSpeaking ? 'animate-pulse' : ''}`} />
-          {isSpeaking ? 'Speaking the answer…' : isListening ? 'Listening…' : 'Conversation mode on — answers will be read aloud, then the mic reopens.'}
-        </p>
+        <div className="animate-in flex flex-col items-center mt-6 mb-2">
+          <div className="relative w-24 h-24 flex items-center justify-center mb-4">
+            <span className={`absolute w-24 h-24 rounded-full border border-[#9C4A2A]/25 ${!isLoading ? 'animate-ping' : ''}`} />
+            <span className="absolute w-[70px] h-[70px] rounded-full border border-[#9C4A2A]/25" />
+            <span className="relative w-12 h-12 rounded-full bg-[#9C4A2A] text-white text-base flex items-center justify-center shadow-[0_10px_24px_rgba(156,74,42,0.25)]">
+              {isListening ? '🎙' : isLoading ? '⋯' : isSpeaking ? '🔊' : '🎙'}
+            </span>
+          </div>
+          <p className="text-xs text-center text-[#9C4A2A] flex items-center justify-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full bg-[#9C4A2A] ${isListening || isSpeaking ? 'animate-pulse' : ''}`} />
+            {isSpeaking ? 'Speaking the answer…' : isListening ? 'Listening…' : isLoading ? 'Thinking…' : 'Conversation mode on — answers will be read aloud, then the mic reopens.'}
+          </p>
+        </div>
       )}
 
       {voiceError && <p className="text-red-400 text-sm mt-3 text-center">{voiceError}</p>}
@@ -257,7 +266,7 @@ export default function QueryInput({
                     value={settings.model || ''}
                     onChange={e => updateSetting('model', e.target.value)}
                     disabled={isLoading}
-                    className="w-full bg-[#F7F3EA] border border-black/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#9C4A2A]/50 transition-colors"
+                    className="w-full bg-bg border border-black/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-[#9C4A2A]/50 transition-colors"
                   >
                     {models.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>

@@ -56,7 +56,7 @@ function SchemaPreview({ upload }) {
       </p>
       <div className="rounded-xl border border-black/10 overflow-hidden">
         <table className="w-full text-xs text-left">
-          <thead className="bg-[#FFFFFF] text-zinc-500 border-b border-black/10">
+          <thead className="bg-card text-zinc-500 border-b border-black/10">
             <tr>
               <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[10px]">Column</th>
               <th className="px-4 py-2.5 font-medium uppercase tracking-wider text-[10px]">Type</th>
@@ -88,7 +88,7 @@ function DataPreview({ upload }) {
     <div className="mt-4 rounded-xl border border-black/10 overflow-hidden">
       <div className="overflow-x-auto max-h-48 scrollbar-thin">
         <table className="w-full text-xs text-left whitespace-nowrap">
-          <thead className="sticky top-0 bg-[#FFFFFF] text-zinc-400 border-b border-black/10 z-10">
+          <thead className="sticky top-0 bg-card text-zinc-400 border-b border-black/10 z-10">
             <tr>
               {columns.map(col => (
                 <th key={col} className="px-4 py-2.5 font-medium uppercase tracking-wider text-[10px]">
