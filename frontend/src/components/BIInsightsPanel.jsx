@@ -1,16 +1,20 @@
 import { useMemo, useState, useCallback, useRef } from 'react';
+import {
+  TbTrophy, TbAlertTriangle, TbTrendingUp, TbCircleFilled,
+  TbBulb, TbSearch, TbLink, TbChartBar, TbBrain, TbChevronUp, TbChevronDown,
+} from 'react-icons/tb';
 import { analyzeResult, formatStatValue, buildCallouts, periodComparison } from '../utils/resultAnalytics';
 import { BI_COLORS } from '../utils/biPalette';
 
 const INSIGHT_ICONS = {
-  top: '🏆',
-  low: '⚠️',
-  trend: '📈',
-  risk: '🔴',
-  opportunity: '💡',
-  pattern: '🔍',
-  correlation: '🔗',
-  neutral: '📊',
+  top: TbTrophy,
+  low: TbAlertTriangle,
+  trend: TbTrendingUp,
+  risk: TbCircleFilled,
+  opportunity: TbBulb,
+  pattern: TbSearch,
+  correlation: TbLink,
+  neutral: TbChartBar,
 };
 
 export default function BIInsightsPanel({ result, intent = '', query = '' }) {
@@ -135,9 +139,11 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
     <div className="bi-insights-panel">
       <div className="bi-insights-header" onClick={() => setExpanded(v => !v)}>
         <h3 className="bi-insights-title">
-          <span>🧠</span> Business Insights
+          <TbBrain className="w-4 h-4" /> Business Insights
         </h3>
-        <button className="bi-insights-toggle">{expanded ? '▲' : '▼'}</button>
+        <button className="bi-insights-toggle">
+          {expanded ? <TbChevronUp className="w-4 h-4" /> : <TbChevronDown className="w-4 h-4" />}
+        </button>
       </div>
 
       {expanded && (
@@ -177,10 +183,11 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
 }
 
 function InsightCard({ card }) {
+  const Icon = card.icon;
   return (
     <div className="bi-insight-card" style={{ '--insight-accent': card.accent }}>
       <div className="bi-insight-card-header">
-        <span className="bi-insight-icon">{card.icon}</span>
+        <span className="bi-insight-icon"><Icon className="w-4 h-4" style={{ color: card.accent }} /></span>
         <span className="bi-insight-title">{card.title}</span>
         {card.badge && (
           <span className="bi-insight-badge" style={{ borderColor: card.accent, color: card.accent }}>

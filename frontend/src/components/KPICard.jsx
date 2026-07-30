@@ -1,4 +1,5 @@
 import { useMemo, useEffect, useRef, useState } from 'react';
+import { TbTrophy, TbAlertTriangle } from 'react-icons/tb';
 import ReactECharts from 'echarts-for-react';
 import { analyzeResult, formatStatValue, periodComparison } from '../utils/resultAnalytics';
 import { hexToRgba, BI_COLORS } from '../utils/biPalette';
@@ -95,8 +96,8 @@ function KPICardItem({ kpi, index, trend, sparkData, isTop, isBottom }) {
         <div className="kpi-card-top">
           <p className="kpi-label">{kpi.label}</p>
           <div className="kpi-badges">
-            {isTop && <span className="kpi-badge top">🏆 Top</span>}
-            {isBottom && <span className="kpi-badge bottom">⚠ Low</span>}
+            {isTop && <span className="kpi-badge top"><TbTrophy className="w-3 h-3 inline -mt-0.5" /> Top</span>}
+            {isBottom && <span className="kpi-badge bottom"><TbAlertTriangle className="w-3 h-3 inline -mt-0.5" /> Low</span>}
           </div>
         </div>
         <div className="kpi-value-row">

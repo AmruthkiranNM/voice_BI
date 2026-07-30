@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useCallback } from 'react';
-import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload } from 'react-icons/tb';
+import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload, TbCalendar, TbInbox } from 'react-icons/tb';
 import { showToast } from '../utils/toast';
 
 const PAGE_SIZE = 25;
@@ -34,7 +34,7 @@ export default function ResultTable({ result, fullWidth = false, onRowDrill }) {
   const colTypeIcon = (c) => {
     switch (colType(c)) {
       case 'numeric': return '#';
-      case 'date': return '📅';
+      case 'date': return <TbCalendar className="w-3 h-3 inline" />;
       default: return 'Aa';
     }
   };
@@ -152,7 +152,7 @@ export default function ResultTable({ result, fullWidth = false, onRowDrill }) {
     return (
       <div className="bi-table-panel">
         <div className="bi-empty-state">
-          <div className="bi-empty-icon">📭</div>
+          <div className="bi-empty-icon"><TbInbox className="w-8 h-8" /></div>
           <div className="bi-empty-title">No rows returned</div>
           <div className="bi-empty-sub">This query ran successfully but matched no data. Try a broader question or a different filter.</div>
         </div>

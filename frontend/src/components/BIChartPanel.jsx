@@ -7,7 +7,7 @@ import {
   TbArrowBarUp, TbArrowBarDown, TbSortAscendingNumbers, TbSortDescendingNumbers,
   TbArrowsMaximize, TbArrowsMinimize, TbRefresh, TbDownload,
   TbEye, TbEyeOff, TbPercentage, TbDots, TbStar, TbX,
-  TbAlertTriangle, TbLayoutGrid, TbFilter
+  TbAlertTriangle, TbLayoutGrid, TbFilter, TbChevronRight, TbArrowUp
 } from 'react-icons/tb';
 import { recommendChartType, getChartCompatibility, suggestAlternatives, CHART_TYPE_GROUPS, ALL_CHART_TYPES } from '../utils/chartRecommender';
 import { buildEChartsOption, prepareChartData } from '../utils/echartsBuilder';
@@ -252,7 +252,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
             {ALL_CHART_TYPES.find(t => t.id === effectiveType)?.label || effectiveType}
           </span>
           {compatibility[effectiveType]?.recommended && !activeType && (
-            <span className="bi-recommended-badge">★ Recommended</span>
+            <span className="bi-recommended-badge"><TbStar className="w-3 h-3 inline -mt-0.5" /> Recommended</span>
           )}
           {recommendation.confidence > 0 && !activeType && (
             <span className="text-[10px] text-gray-600 hidden sm:inline">
@@ -392,7 +392,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
                     <Icon size={14} />
                     <span>{ct.label}</span>
                     {isDisabled && <span className="bi-more-disabled-hint">—</span>}
-                    {compat?.recommended && <span className="bi-more-rec">★</span>}
+                    {compat?.recommended && <span className="bi-more-rec"><TbStar className="w-3 h-3" /></span>}
                   </button>
                 );
               })}
@@ -414,13 +414,15 @@ export default function BIChartPanel({ result, intent, query = '' }) {
           <button onClick={() => setDrillPath([])} className="bi-breadcrumb-item">All</button>
           {drillPath.map((p, i) => (
             <span key={i} className="flex items-center gap-1">
-              <span className="text-gray-600">›</span>
+              <TbChevronRight className="w-3.5 h-3.5 text-zinc-600" />
               <button onClick={() => setDrillPath(prev => prev.slice(0, i + 1))} className="bi-breadcrumb-item active">
                 {p}
               </button>
             </span>
           ))}
-          <button onClick={handleDrillUp} className="bi-breadcrumb-up">↑ Up</button>
+          <button onClick={handleDrillUp} className="bi-breadcrumb-up inline-flex items-center gap-1">
+            <TbArrowUp className="w-3.5 h-3.5" /> Up
+          </button>
         </div>
       )}
 
@@ -428,7 +430,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       {crossFilter && (
         <div className="bi-crossfilter-badge">
           <span>Filtered: <strong>{crossFilter}</strong></span>
-          <button onClick={() => setCrossFilter(null)}>✕</button>
+          <button onClick={() => setCrossFilter(null)}><TbX className="w-3.5 h-3.5" /></button>
         </div>
       )}
 
@@ -550,7 +552,7 @@ function KpiCardFallback({ analysis }) {
 function EmptyState() {
   return (
     <div className="bi-empty-state">
-      <div className="bi-empty-icon">📊</div>
+      <div className="bi-empty-icon"><TbChartBar className="w-8 h-8" /></div>
       <p className="bi-empty-title">No chart available</p>
       <p className="bi-empty-sub">The result doesn't have numeric data that can be visualized.</p>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getModels, clearCache } from '../services/api';
 import { useVoiceInput, useSpeechOutput } from '../hooks/useVoice';
-import { TbMicrophone, TbMicrophoneOff, TbSend, TbSettings, TbHistory, TbX, TbSparkles, TbHeadset, TbStar, TbStarFilled } from 'react-icons/tb';
+import { TbMicrophone, TbMicrophoneOff, TbSend, TbSettings, TbHistory, TbX, TbSparkles, TbHeadset, TbStar, TbStarFilled, TbVolume, TbDots, TbCheck } from 'react-icons/tb';
 
 const DEFAULT_SETTINGS = {
   model: '',
@@ -183,7 +183,7 @@ export default function QueryInput({
             <span className={`absolute w-24 h-24 rounded-full border border-[#9C4A2A]/25 ${!isLoading ? 'animate-ping' : ''}`} />
             <span className="absolute w-[70px] h-[70px] rounded-full border border-[#9C4A2A]/25" />
             <span className="relative w-12 h-12 rounded-full bg-[#9C4A2A] text-white text-base flex items-center justify-center shadow-[0_10px_24px_rgba(156,74,42,0.25)]">
-              {isListening ? '🎙' : isLoading ? '⋯' : isSpeaking ? '🔊' : '🎙'}
+              {isListening ? <TbMicrophone className="w-5 h-5" /> : isLoading ? <TbDots className="w-5 h-5" /> : isSpeaking ? <TbVolume className="w-5 h-5" /> : <TbMicrophone className="w-5 h-5" />}
             </span>
           </div>
           <p className="text-xs text-center text-[#9C4A2A] flex items-center justify-center gap-1.5">
@@ -285,7 +285,7 @@ export default function QueryInput({
                     disabled={isLoading}
                     className="text-xs font-medium text-zinc-400 hover:text-[#9C4A2A] transition-colors"
                   >
-                    {cacheCleared ? 'Cache Cleared ✓' : 'Clear System Cache'}
+                    {cacheCleared ? <span className="inline-flex items-center gap-1">Cache Cleared <TbCheck className="w-3.5 h-3.5" /></span> : 'Clear System Cache'}
                   </button>
                 </div>
               </div>
