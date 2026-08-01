@@ -9,7 +9,7 @@ import { BI_COLORS, getPalette, getColor, hexToRgba, ECHARTS_TOOLTIP_STYLE, ECHA
 /* ═══════════════════════════════════════════════════════════
    FORMATTERS
 ═══════════════════════════════════════════════════════════ */
-const fmt = (v) => {
+export const fmt = (v) => {
   if (v == null || Number.isNaN(v)) return '—';
   const n = Number(v);
   if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
@@ -348,44 +348,9 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
           selectedMode: true,
         },
         toolbox,
-        // Center text for donut
-        ...(isDonut ? {
-          graphic: [{
-            type: 'group',
-            left: 'center',
-            top: 'middle',
-            children: [
-              {
-                type: 'text',
-                style: {
-                  text: fmt(pieTotal),
-                  fill: '#1B2430',
-                  fontSize: 22,
-                  fontWeight: 700,
-                  fontFamily: 'JetBrains Mono, monospace',
-                  textAlign: 'center',
-                },
-                left: 'center',
-                top: -12,
-              },
-              {
-                type: 'text',
-                style: {
-                  text: 'Total',
-                  fill: '#8A8272',
-                  fontSize: 11,
-                  fontFamily: 'Inter, system-ui, sans-serif',
-                  textAlign: 'center',
-                },
-                left: 'center',
-                top: 14,
-              },
-            ],
-          }],
-        } : {}),
         series: [{
           name: datasets[0]?.label || 'Value', type: 'pie',
-          radius: isDonut ? ['42%', '70%'] : '70%',
+          radius: isDonut ? ['58%', '70%'] : '70%',
           center: ['42%', '54%'],
           data: pieData,
           label: {

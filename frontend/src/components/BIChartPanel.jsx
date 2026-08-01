@@ -10,7 +10,7 @@ import {
   TbAlertTriangle, TbLayoutGrid, TbFilter, TbChevronRight, TbArrowUp
 } from 'react-icons/tb';
 import { recommendChartType, getChartCompatibility, suggestAlternatives, CHART_TYPE_GROUPS, ALL_CHART_TYPES } from '../utils/chartRecommender';
-import { buildEChartsOption, prepareChartData } from '../utils/echartsBuilder';
+import { buildEChartsOption, prepareChartData, fmt } from '../utils/echartsBuilder';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 import { analyzeResult, formatStatValue, periodComparison } from '../utils/resultAnalytics';
 import { detectKpiMetrics } from './KPICard';
@@ -435,17 +435,25 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       )}
 
       {/* ── Chart Area ── */}
-      <div className="bi-chart-area" style={{ height: chartHeight }}>
+      <div className="bi-chart-area" style={{ height: chartHeight, position: 'relative', containerType: 'inline-size' }}>
         {echartsOption ? (
-          <ReactECharts
-            key={effectiveType}
-            ref={chartRef}
-            option={echartsOption}
-            style={{ width: '100%', height: '100%' }}
-            onEvents={{ click: handleChartClick, dblclick: () => { setCrossFilter(null); setDrillPath([]); } }}
-            notMerge={true}
-            lazyUpdate={false}
-          />
+          <>
+            <ReactECharts
+              key={effectiveType}
+              ref={chartRef}
+              option={echartsOption}
+              style={{ width: '100%', height: '100%' }}
+              onEvents={{ click: handleChartClick, dblclick: () => { setCrossFilter(null); setDrillPath([]); } }}
+              notMerge={true}
+              lazyUpdate={false}
+            />
+            {effectiveType === 'donut' && processedData && (
+              <DonutCenterOverlay 
+                total={processedData.datasets[0].data.reduce((s, v) => s + Math.abs(v), 0)}
+                labelColName={chartData?.labelCol}
+              />
+            )}
+          </>
         ) : isUnsupported ? (
           <UnsupportedChart
             type={effectiveType}
@@ -555,6 +563,59 @@ function EmptyState() {
       <div className="bi-empty-icon"><TbChartBar className="w-8 h-8" /></div>
       <p className="bi-empty-title">No chart available</p>
       <p className="bi-empty-sub">The result doesn't have numeric data that can be visualized.</p>
+    </div>
+  );
+}
+
+function DonutCenterOverlay({ total, labelColName }) {
+  return (
+    <div 
+      className="donut-center-overlay"
+      style={{
+        position: 'absolute',
+        left: '42%',
+        top: '54%',
+        transform: 'translate(-50%, -50%)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        width: '35%',
+        textAlign: 'center',
+        padding: '0 8px',
+        zIndex: 10
+      }}
+    >
+      <span style={{
+        fontSize: 'clamp(10px, 1.5cqi, 14px)',
+        color: 'var(--color-zinc-500, #8A8272)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        marginBottom: '2px',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%'
+      }}>
+        Total {labelColName || 'Items'}
+      </span>
+      <span style={{
+        fontSize: 'clamp(16px, 4cqi, 36px)',
+        fontWeight: 700,
+        color: 'var(--color-zinc-100, #1B2430)',
+        fontFamily: 'JetBrains Mono, monospace',
+        lineHeight: 1.2
+      }}>
+        {fmt(total)}
+      </span>
+      <span style={{
+        fontSize: 'clamp(10px, 1.2cqi, 12px)',
+        color: 'var(--color-zinc-500, #8A8272)',
+        fontFamily: 'Inter, system-ui, sans-serif',
+        marginTop: '2px'
+      }}>
+        100%
+      </span>
     </div>
   );
 }
