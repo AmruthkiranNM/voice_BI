@@ -13,6 +13,7 @@ import ResultsDashboard from './components/ResultsDashboard';
 import DataQualityPage from './components/DataQualityPage';
 import LoginPage from './components/LoginPage';
 import SkeletonLoader from './components/SkeletonLoader';
+import AIProcessingScreen from './components/AIProcessingScreen';
 import TablePreviewCard from './components/TablePreviewCard';
 import TabbedTables from './components/TabbedTables';
 import { useTablePreviews } from './hooks/useTablePreviews';
@@ -53,6 +54,10 @@ export default function App() {
 
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSimulatingLoading, setIsSimulatingLoading] = useState(false);
+  const [pendingResponse, setPendingResponse] = useState(null);
+  const [pendingError, setPendingError] = useState(null);
+  const [currentQuery, setCurrentQuery] = useState('');
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
 
@@ -174,8 +179,12 @@ export default function App() {
     }
 
     setIsLoading(true);
+    setIsSimulatingLoading(true);
+    setCurrentQuery(query);
     setError(null);
     setResponse(null);
+    setPendingResponse(null);
+    setPendingError(null);
 
     try {
       const result = await submitQuery(query, {
@@ -185,22 +194,32 @@ export default function App() {
         fastMode: settings.fastMode,
         skipInsight: settings.skipInsight,
       });
-      setResponse(result);
-      if (result.success) {
-        addEntry({
-          query,
-          rowCount: result.result?.row_count,
-          summary: result.insight?.slice(0, 100),
-        });
-      } else {
-        setError(result.error);
-      }
+      setPendingResponse(result);
     } catch (err) {
-      setError(err.message);
+      setPendingError(err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [settings, hasData, scopeTableNames, addEntry]);
+  }, [settings, hasData, scopeTableNames]);
+
+  const handleSimulatedLoadingComplete = useCallback(() => {
+    setIsSimulatingLoading(false);
+    
+    if (pendingError) {
+      setError(pendingError);
+    } else if (pendingResponse) {
+      setResponse(pendingResponse);
+      if (pendingResponse.success) {
+        addEntry({
+          query: currentQuery,
+          rowCount: pendingResponse.result?.row_count,
+          summary: pendingResponse.insight?.slice(0, 100),
+        });
+      } else {
+        setError(pendingResponse.error);
+      }
+    }
+  }, [pendingError, pendingResponse, currentQuery, addEntry]);
 
   const hasResults = response && (
     response.sql || response.result?.row_count > 0 || response.insight
@@ -410,9 +429,17 @@ export default function App() {
 
                 {error && <ErrorPanel error={error} />}
 
-                {isLoading && <SkeletonLoader />}
+                {isLoading && !isSimulatingLoading && <SkeletonLoader />}
 
-                {hasResults && !isLoading && (
+                {isSimulatingLoading && (
+                  <AIProcessingScreen 
+                    query={currentQuery}
+                    isBackendFinished={!isLoading}
+                    onComplete={handleSimulatedLoadingComplete}
+                  />
+                )}
+
+                {hasResults && !isLoading && !isSimulatingLoading && (
                   <ResultsDashboard
                     response={response}
                     sourceLabel={activeSource?.label}
