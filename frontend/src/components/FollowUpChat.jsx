@@ -4,6 +4,7 @@ import { TbMessageCircle, TbSend, TbRobot, TbUser, TbMicrophone, TbAlertCircle }
 import { useVoiceInput } from '../hooks/useVoice';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { applyFollowUpDelay, FOLLOWUP_DELAY_ENABLED } from '../utils/delayConfig';
 
 export default function FollowUpChat({
   query, sql, result, insight, model, tableName, tableNames,
@@ -11,6 +12,7 @@ export default function FollowUpChat({
 }) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isWaiting, setIsWaiting] = useState(false);
   const scrollRef = useRef(null);
 
   // Auto-scroll to bottom of chat
@@ -35,13 +37,20 @@ export default function FollowUpChat({
   }, [pendingQuestion]);
 
   const handleSend = async (overrideInput = null) => {
+    if (isWaiting) return;
     const text = (overrideInput || input).trim();
     if (!text) return;
 
     setInput('');
-    const newMsgs = [...messages, { role: 'user', content: text }];
-    onMessagesChange(newMsgs);
-    setIsTyping(true);
+    const userMsg = { role: 'user', content: text };
+    const currentHistory = [...messages, userMsg];
+    onMessagesChange(currentHistory);
+    
+    if (!FOLLOWUP_DELAY_ENABLED) {
+      setIsTyping(true);
+    } else {
+      setIsWaiting(true);
+    }
 
     try {
       const response = await sendChatMessage(text, {
@@ -49,14 +58,16 @@ export default function FollowUpChat({
         sql,
         result,
         insight: insight || result?.insight,
-        history: newMsgs.slice(-5),
+        history: currentHistory.slice(-5),
         model,
         tableName,
         tableNames,
       });
 
+      await applyFollowUpDelay();
+
       const aiMsg = { role: 'assistant', content: response.reply };
-      onMessagesChange([...newMsgs, aiMsg]);
+      onMessagesChange(prev => [...prev, aiMsg]);
 
       // Speak AI response if autoSpeak is enabled
       if (autoSpeak && window.speechSynthesis) {
@@ -66,9 +77,10 @@ export default function FollowUpChat({
         window.speechSynthesis.speak(utterance);
       }
     } catch (err) {
-      onMessagesChange([...newMsgs, { role: 'assistant', content: 'Sorry, I encountered an error: ' + err.message, isError: true }]);
+      onMessagesChange(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error: ' + err.message, isError: true }]);
     } finally {
       setIsTyping(false);
+      setIsWaiting(false);
     }
   };
 
