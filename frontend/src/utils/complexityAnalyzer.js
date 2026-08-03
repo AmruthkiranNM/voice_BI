@@ -60,11 +60,11 @@ export function analyzeComplexity(query) {
   if (hasRanking) score += 1;
 
   if (score >= 6 || hasForecast) {
-    return { level: 'hard', targetDurationMs: 45000 }; // 45s
+    return { level: 'hard', targetDurationMs: 50000 }; // 50s
   } else if (score >= 3 || hasComparison || hasTrend) {
-    return { level: 'medium', targetDurationMs: 36000 }; // 36s
+    return { level: 'medium', targetDurationMs: 45000 }; // 45s
   } else {
-    return { level: 'simple', targetDurationMs: 30000 }; // 30s
+    return { level: 'simple', targetDurationMs: 40000 }; // 40s
   }
 }
 

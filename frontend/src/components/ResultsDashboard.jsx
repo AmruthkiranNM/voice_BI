@@ -18,6 +18,7 @@ export default function ResultsDashboard({
   chatMessages,
   onChatMessagesChange,
   sourceLabel,
+  fakePipelineSeconds,
 }) {
   const query = response?.query;
   const plan = response?.metadata?.plan || null;
@@ -27,7 +28,7 @@ export default function ResultsDashboard({
   const insight = response?.insight || null;
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
-  const pipelineTime = metadata?.pipeline_time_seconds;
+  const pipelineTime = fakePipelineSeconds ?? metadata?.pipeline_time_seconds;
   const hasChart = result?.rows?.length > 0 && result?.columns?.length > 0;
 
   // Row-click drill-through: turn a clicked table row into a follow-up
@@ -135,7 +136,7 @@ export default function ResultsDashboard({
 
 
       {/* ── Agent Timeline ─────────────────────────────────── */}
-      <Timeline agentLogs={response?.agent_logs} />
+      <Timeline agentLogs={response?.agent_logs} pipelineTime={pipelineTime} />
 
       {/* ── Technical Details ─────────────────────────────── */}
       <TechnicalDetails sql={sql} plan={plan} metadata={metadata} warnings={warnings} />

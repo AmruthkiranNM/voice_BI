@@ -11,6 +11,7 @@ import {
 } from 'react-icons/tb';
 import { recommendChartType, getChartCompatibility, suggestAlternatives, CHART_TYPE_GROUPS, ALL_CHART_TYPES } from '../utils/chartRecommender';
 import { buildEChartsOption, prepareChartData, fmt } from '../utils/echartsBuilder';
+import { useThemeTick } from '../hooks/useTheme';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 import { analyzeResult, formatStatValue, periodComparison } from '../utils/resultAnalytics';
 import { detectKpiMetrics } from './KPICard';
@@ -174,6 +175,7 @@ export default function BIChartPanel({ result, intent, query = '' }) {
     return { labels, datasets };
   }, [chartData, sortMode, normalize, topN]);
 
+  const themeTick = useThemeTick();
   const echartsOption = useMemo(() => {
     if (!processedData) return null;
     if (effectiveType === 'kpiCard') return null;
@@ -183,7 +185,8 @@ export default function BIChartPanel({ result, intent, query = '' }) {
       showLabels,
       labelCol: chartData?.labelCol,
     });
-  }, [processedData, effectiveType, showLabels, compatibility, chartData?.labelCol]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processedData, effectiveType, showLabels, compatibility, chartData?.labelCol, themeTick]);
 
   const analysis = useMemo(() => analyzeResult(result), [result]);
   const kpis = useMemo(() => detectKpiMetrics(result), [result]);

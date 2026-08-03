@@ -175,7 +175,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn-secondary {
   background: transparent;
-  color: #55493A;
+  color: var(--color-zinc-300);
   border: 1px solid var(--color-border);
   font-weight: 500;
   border-radius: 10px;
@@ -281,7 +281,7 @@ h1, h2, h3, h4, h5, h6 {
 .bi-tag.accent { color: var(--color-accent); border-color: rgba(156, 74, 42,0.25); background: rgba(156, 74, 42,0.1); }
 .bi-export-btn {
   font-size: 12px; font-weight: 500; padding: 5px 16px; border: 1px solid rgba(27, 36, 48, 0.1);
-  background: rgba(27, 36, 48, 0.03); color: #55493A;
+  background: rgba(27, 36, 48, 0.03); color: var(--color-zinc-300);
   border-radius: 6px; cursor: pointer; transition: all 0.2s ease;
 }
 .bi-export-btn:hover { border-color: var(--color-accent); color: var(--color-accent); background: rgba(156, 74, 42,0.05); }
@@ -722,7 +722,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: all 0.2s ease;
 }
 .bi-topn-select:hover, .bi-topn-select:focus { background: rgba(27, 36, 48, 0.05); color: var(--color-ink); }
-.bi-topn-select option { background: var(--color-card); color: #55493A; }
+.bi-topn-select option { background: var(--color-card); color: var(--color-zinc-300); }
 
 /* ── Breadcrumb drill-down ── */
 .bi-breadcrumb {
@@ -938,7 +938,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .bi-contrib-title { font-size: 11px; color: #9C7A3E; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
 .bi-contrib-row { display: grid; grid-template-columns: 1fr 2fr auto; align-items: center; gap: 12px; margin-bottom: 8px; }
-.bi-contrib-label { font-size: 12px; color: #55493A; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bi-contrib-label { font-size: 12px; color: var(--color-zinc-300); display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bi-contrib-rank { font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; color: #8A8272; flex-shrink: 0; }
 .bi-contrib-bar-wrap { height: 6px; background: rgba(27, 36, 48, 0.05); border-radius: 99px; overflow: hidden; }
 .bi-contrib-bar { height: 100%; border-radius: 99px; transition: width 0.8s cubic-bezier(0.2,0.8,0.2,1); }
@@ -1083,7 +1083,7 @@ h1, h2, h3, h4, h5, h6 {
 .bi-tr.highlighted { background: rgba(156, 74, 42,0.05); }
 .bi-td {
   padding: 10px 16px;
-  color: #55493A;
+  color: var(--color-zinc-300);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
@@ -1116,7 +1116,7 @@ h1, h2, h3, h4, h5, h6 {
 .bi-total {
   background: var(--color-card);
   border-top: 1px solid var(--color-border);
-  font-size: 13px; color: #55493A;
+  font-size: 13px; color: var(--color-zinc-300);
   padding: 10px 16px;
 }
 .bi-total.numeric.highlight {

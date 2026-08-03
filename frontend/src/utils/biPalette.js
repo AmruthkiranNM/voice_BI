@@ -38,28 +38,55 @@ export function getPalette(count) {
   return Array.from({ length: count }, (_, i) => BI_COLORS[i % BI_COLORS.length]);
 }
 
-/** ECharts-compatible rich tooltip theme */
-export const ECHARTS_TOOLTIP_STYLE = {
-  backgroundColor: 'rgba(255,255,255,0.98)',
-  borderColor: '#DCD4C4',
-  borderWidth: 1,
-  textStyle: { color: '#1B2430', fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
-  padding: [10, 14],
-  extraCssText: 'box-shadow: 0 10px 25px -5px rgba(27,36,48,0.15); border-radius: 8px;',
-};
+/** Whether the app's dark theme is currently active (see index.css `[data-theme="dark"]`). */
+export function isDarkTheme() {
+  return typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+}
 
-export const ECHARTS_AXIS_STYLE = {
-  axisLine: { lineStyle: { color: 'rgba(27,36,48,0.12)' } },
-  axisTick: { show: false },
-  axisLabel: { color: '#9C7A3E', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
-  splitLine: { lineStyle: { color: 'rgba(27,36,48,0.06)', type: 'dashed' } },
-  nameTextStyle: { color: '#8A8272', fontSize: 11 },
-};
+/** Main body/ink text color, theme-aware — for chart titles, tooltip values, gauge readouts. */
+export function themeInk() {
+  return isDarkTheme() ? '#F3ECE0' : '#1B2430';
+}
 
-export const ECHARTS_LEGEND_STYLE = {
-  textStyle: { color: '#9C7A3E', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
-  itemWidth: 10,
-  itemHeight: 10,
-  icon: 'roundRect',
-  pageTextStyle: { color: '#9C7A3E' },
-};
+/** Muted secondary text color, theme-aware — axis names, subtext, tooltip labels. */
+export function themeMuted() {
+  return isDarkTheme() ? '#B9AE9D' : '#8A8272';
+}
+
+/** Hairline border/gridline color as rgba, theme-aware (inverts base so it stays subtle on either background). */
+export function themeLineRgba(alpha = 0.1) {
+  return isDarkTheme() ? `rgba(243,236,224,${alpha})` : `rgba(27,36,48,${alpha})`;
+}
+
+/** ECharts-compatible rich tooltip theme, computed fresh so it follows the current light/dark theme. */
+export function ECHARTS_TOOLTIP_STYLE() {
+  const dark = isDarkTheme();
+  return {
+    backgroundColor: dark ? 'rgba(44,38,32,0.98)' : 'rgba(255,255,255,0.98)',
+    borderColor: dark ? '#463C30' : '#DCD4C4',
+    borderWidth: 1,
+    textStyle: { color: themeInk(), fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
+    padding: [10, 14],
+    extraCssText: `box-shadow: 0 10px 25px -5px ${themeLineRgba(0.15)}; border-radius: 8px;`,
+  };
+}
+
+export function ECHARTS_AXIS_STYLE() {
+  return {
+    axisLine: { lineStyle: { color: themeLineRgba(0.12) } },
+    axisTick: { show: false },
+    axisLabel: { color: '#9C7A3E', fontSize: 11, fontFamily: 'JetBrains Mono, monospace' },
+    splitLine: { lineStyle: { color: themeLineRgba(0.06), type: 'dashed' } },
+    nameTextStyle: { color: themeMuted(), fontSize: 11 },
+  };
+}
+
+export function ECHARTS_LEGEND_STYLE() {
+  return {
+    textStyle: { color: '#9C7A3E', fontSize: 11, fontFamily: 'Inter, system-ui, sans-serif' },
+    itemWidth: 10,
+    itemHeight: 10,
+    icon: 'roundRect',
+    pageTextStyle: { color: '#9C7A3E' },
+  };
+}

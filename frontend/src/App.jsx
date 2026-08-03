@@ -18,6 +18,7 @@ import TablePreviewCard from './components/TablePreviewCard';
 import TabbedTables from './components/TabbedTables';
 import { useTablePreviews } from './hooks/useTablePreviews';
 import { useTheme } from './hooks/useTheme';
+import { analyzeComplexity } from './utils/complexityAnalyzer';
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
@@ -58,6 +59,10 @@ export default function App() {
   const [pendingResponse, setPendingResponse] = useState(null);
   const [pendingError, setPendingError] = useState(null);
   const [currentQuery, setCurrentQuery] = useState('');
+  // Faked pipeline duration (seconds) matching the AI processing loader's
+  // simulated timing, so the results page doesn't reveal the real (much
+  // faster, API-backed) response time.
+  const [fakePipelineSeconds, setFakePipelineSeconds] = useState(null);
   const [response, setResponse] = useState(null);
   const [error, setError] = useState(null);
 
@@ -181,6 +186,7 @@ export default function App() {
     setIsLoading(true);
     setIsSimulatingLoading(true);
     setCurrentQuery(query);
+    setFakePipelineSeconds(analyzeComplexity(query).targetDurationMs / 1000);
     setError(null);
     setResponse(null);
     setPendingResponse(null);
@@ -194,13 +200,29 @@ export default function App() {
         fastMode: settings.fastMode,
         skipInsight: settings.skipInsight,
       });
-      setPendingResponse(result);
+      if (result?.metadata?.cache_hit) {
+        // Already-cached answers come back near-instantly — skip the fake
+        // "AI thinking" loader instead of sitting through the full simulation.
+        setIsSimulatingLoading(false);
+        setResponse(result);
+        if (result.success) {
+          addEntry({
+            query,
+            rowCount: result.result?.row_count,
+            summary: result.insight?.slice(0, 100),
+          });
+        } else {
+          setError(result.error);
+        }
+      } else {
+        setPendingResponse(result);
+      }
     } catch (err) {
       setPendingError(err.message);
     } finally {
       setIsLoading(false);
     }
-  }, [settings, hasData, scopeTableNames]);
+  }, [settings, hasData, scopeTableNames, addEntry]);
 
   const handleSimulatedLoadingComplete = useCallback(() => {
     setIsSimulatingLoading(false);
@@ -442,6 +464,7 @@ export default function App() {
                 {hasResults && !isLoading && !isSimulatingLoading && (
                   <ResultsDashboard
                     response={response}
+                    fakePipelineSeconds={fakePipelineSeconds}
                     sourceLabel={activeSource?.label}
                     datasetInfo={{
                       has_data: hasData,
