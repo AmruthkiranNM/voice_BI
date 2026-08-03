@@ -6,6 +6,7 @@ A privacy-first tool that helps **business owners** understand their own data. U
 
 ---
 
+
 ## How It Works
 
 ```
