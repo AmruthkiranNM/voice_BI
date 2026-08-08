@@ -159,6 +159,23 @@ export async function sendChatMessage(message, { query, sql, result, insight, hi
   }
 }
 
+/** Autonomously drill into why an already-answered query's result looks the way it does */
+export async function investigateQuery(query, { sql, result, model = null, tableNames = null } = {}) {
+  try {
+    const { data } = await api.post('/investigate', {
+      query,
+      sql: sql || null,
+      result,
+      model: model || null,
+      table_names: tableNames && tableNames.length ? tableNames : null,
+    });
+    return data;
+  } catch (error) {
+    const msg = error.response?.data?.detail || error.message || 'Investigation failed.';
+    throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg), { cause: error });
+  }
+}
+
 /** Get uploaded datasets and tailored suggestions */
 export async function getDatasets() {
   try {

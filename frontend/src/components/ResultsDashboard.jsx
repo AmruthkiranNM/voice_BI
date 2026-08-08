@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { TbSearch } from 'react-icons/tb';
 import InsightPanel from './InsightPanel';
 import BIChartPanel from './BIChartPanel';
 import ResultTable from './ResultTable';
@@ -8,8 +9,10 @@ import FollowUpChat from './FollowUpChat';
 import AnomalyCallouts from './AnomalyCallouts';
 import Timeline from './Timeline';
 import BIInsightsPanel from './BIInsightsPanel';
+import InvestigationTrail from './InvestigationTrail';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 import { showToast } from '../utils/toast';
+import { investigateQuery } from '../services/api';
 
 export default function ResultsDashboard({
   response,
@@ -38,6 +41,30 @@ export default function ResultsDashboard({
   const handleRowDrill = (row, cols) => {
     const parts = cols.slice(0, 4).map(c => `${c.replace(/_/g, ' ')}: ${row[c]}`);
     setPendingQuestion(`Tell me more about this row — ${parts.join(', ')}.`);
+  };
+
+  // Autonomous multi-hop drill-down — the system decides its own follow-up
+  // questions to explain *why* this result looks the way it does, instead
+  // of the user having to ask each step manually.
+  const [investigation, setInvestigation] = useState(null);
+  const [isInvestigating, setIsInvestigating] = useState(false);
+  useEffect(() => { setInvestigation(null); setIsInvestigating(false); }, [query]);
+
+  const handleInvestigate = async () => {
+    setIsInvestigating(true);
+    try {
+      const outcome = await investigateQuery(query, {
+        sql,
+        result,
+        model: settings?.model,
+        tableNames: datasetInfo?.tableNames,
+      });
+      setInvestigation(outcome);
+    } catch (err) {
+      showToast(err.message || 'Investigation failed.');
+    } finally {
+      setIsInvestigating(false);
+    }
   };
 
   return (
@@ -79,6 +106,19 @@ export default function ResultsDashboard({
               insight={insight}
               autoSpeak={settings.speakInsight && !settings.skipInsight}
             />
+          )}
+          {insight && !investigation && !isInvestigating && (
+            <button
+              type="button"
+              onClick={handleInvestigate}
+              className="no-print flex items-center gap-1.5 text-xs font-medium text-[#9C4A2A] hover:underline"
+            >
+              <TbSearch className="w-3.5 h-3.5" />
+              Investigate further — why is this the case?
+            </button>
+          )}
+          {(isInvestigating || investigation) && (
+            <InvestigationTrail investigation={investigation} isLoading={isInvestigating} />
           )}
           <AnomalyCallouts result={result} />
         </div>

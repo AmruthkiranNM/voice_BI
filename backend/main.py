@@ -97,12 +97,14 @@ from routes.datasets import router as datasets_router
 from routes.chat import router as chat_router
 from routes.connections import router as connections_router
 from routes.auth import router as auth_router
+from routes.investigate import router as investigate_router
 app.include_router(auth_router)
 app.include_router(query_router)
 app.include_router(upload_router)
 app.include_router(datasets_router)
 app.include_router(chat_router)
 app.include_router(connections_router)
+app.include_router(investigate_router)
 
 
 # ── Root Endpoint ──

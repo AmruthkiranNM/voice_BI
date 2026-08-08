@@ -2,8 +2,12 @@ import { useMemo, useState, useCallback, useRef } from 'react';
 import {
   TbTrophy, TbAlertTriangle, TbTrendingUp, TbCircleFilled,
   TbBulb, TbSearch, TbLink, TbChartBar, TbBrain, TbChevronUp, TbChevronDown,
+  TbHourglassLow, TbUserOff,
 } from 'react-icons/tb';
-import { analyzeResult, formatStatValue, buildCallouts, periodComparison } from '../utils/resultAnalytics';
+import {
+  analyzeResult, formatStatValue, buildCallouts, periodComparison,
+  thresholdProjection, recencyRisk,
+} from '../utils/resultAnalytics';
 import { BI_COLORS } from '../utils/biPalette';
 
 const INSIGHT_ICONS = {
@@ -15,12 +19,16 @@ const INSIGHT_ICONS = {
   pattern: TbSearch,
   correlation: TbLink,
   neutral: TbChartBar,
+  forecast: TbHourglassLow,
+  churnRisk: TbUserOff,
 };
 
 export default function BIInsightsPanel({ result, intent = '', query = '' }) {
   const analysis = useMemo(() => analyzeResult(result, intent, query), [result, intent, query]);
   const callouts = useMemo(() => buildCallouts(result), [result]);
   const trend = useMemo(() => periodComparison(result), [result]);
+  const projection = useMemo(() => thresholdProjection(result), [result]);
+  const atRisk = useMemo(() => recencyRisk(result), [result]);
   const [expanded, setExpanded] = useState(true);
 
   if (!analysis) return null;
@@ -102,6 +110,37 @@ export default function BIInsightsPanel({ result, intent = '', query = '' }) {
       sub: `${formatStatValue(trend.previous)} → ${formatStatValue(trend.current)}`,
       accent: trend.direction === 'up' ? '#3E7A4D' : '#9C4A2A',
       badge: trend.direction === 'up' ? 'Positive' : 'Negative',
+    });
+  }
+
+  // Predictive: threshold projection — "at this rate, hits zero in ~N days/months"
+  if (projection) {
+    cards.push({
+      type: 'forecast',
+      title: 'Projection',
+      icon: INSIGHT_ICONS.forecast,
+      label: projection.column,
+      value: `~${projection.periodsAway} ${projection.unit}`,
+      sub: `At the current rate of decline, this reaches zero in about ${projection.periodsAway} ${projection.unit} (currently ${formatStatValue(projection.lastValue)}).`,
+      accent: '#9C4A2A',
+      badge: 'Predicted',
+    });
+  }
+
+  // Predictive: recency risk — entities that have gone quiet vs. their own normal pace
+  if (atRisk.length > 0) {
+    const top = atRisk[0];
+    cards.push({
+      type: 'churnRisk',
+      title: 'At Risk',
+      icon: INSIGHT_ICONS.churnRisk,
+      label: `${atRisk.length} gone quiet`,
+      value: top.label,
+      sub: `"${top.label}" hasn't shown up in ${top.daysSince} days (normally every ~${top.avgGap}). ${
+        atRisk.length > 1 ? `${atRisk.length - 1} other${atRisk.length > 2 ? 's' : ''} also flagged.` : ''
+      }`,
+      accent: '#9C4A2A',
+      badge: 'Predicted',
     });
   }
 

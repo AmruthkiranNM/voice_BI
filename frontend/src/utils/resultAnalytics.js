@@ -237,6 +237,122 @@ export function nextLabels(labels, periods = 3) {
 }
 
 /**
+ * Project a declining numeric time series forward to the period where it
+ * crosses zero (using the same least-squares trend as linearForecast).
+ * Turns "here's a trend line" into an actionable statement — "at this rate,
+ * you'll run out / hit zero in ~N periods" — without requiring the user to
+ * define a target threshold. Only surfaces for a real decline within a
+ * plausible horizon; a flat or growing trend, or a projection decades out,
+ * isn't useful to say out loud.
+ */
+export function thresholdProjection(result) {
+  if (!result?.rows?.length || !result?.columns?.length) return null;
+  const { columns, rows } = result;
+  const dateCol = detectDateColumn(columns, rows);
+  if (!dateCol) return null;
+
+  const numericCols = columns.filter(c => c !== dateCol && rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
+  if (!numericCols.length) return null;
+  const valueCol = numericCols[0];
+
+  const sorted = [...rows].sort((a, b) => String(a[dateCol]).localeCompare(String(b[dateCol])));
+  const values = sorted.map(r => Number(r[valueCol]) || 0);
+  if (values.length < 4) return null;
+
+  const { slope, intercept } = linearForecast(values, 1);
+  const lastValue = values[values.length - 1];
+  if (slope >= 0 || lastValue <= 0) return null; // only meaningful for a real decline heading toward zero
+
+  const zeroCrossIndex = -intercept / slope;
+  const periodsAway = Math.round(zeroCrossIndex - (values.length - 1));
+  if (periodsAway <= 0 || periodsAway > 24) return null; // not a plausible near-term horizon
+
+  const lastLabel = String(sorted[sorted.length - 1][dateCol]);
+  const unit = /^\d{4}-\d{1,2}-\d{1,2}$/.test(lastLabel) ? 'days'
+    : /^\d{4}-\d{1,2}$/.test(lastLabel) ? 'months'
+    : 'periods';
+
+  return {
+    column: valueCol.replace(/_/g, ' '),
+    periodsAway,
+    unit,
+    lastValue,
+  };
+}
+
+/**
+ * Flag entities (customers, accounts, stores — any repeated categorical
+ * column) that have gone quiet relative to their own historical pace, using
+ * only recency math (no ML model) — a classic RFM-style "at risk" signal.
+ * Needs a repeated entity-like column and a date column; gracefully returns
+ * an empty list on datasets that don't have that shape (e.g. one row per
+ * entity, or no dates).
+ */
+export function recencyRisk(result, maxResults = 5) {
+  if (!result?.rows?.length || !result?.columns?.length) return [];
+  const { columns, rows } = result;
+  const dateCol = detectDateColumn(columns, rows);
+  if (!dateCol) return [];
+
+  const numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
+  const valueCol = numericCols.find(c => c !== dateCol) || null;
+
+  // Pick the non-numeric, non-date column with the most repeat structure —
+  // that's the "entity" (customer/account/store), not a unique row ID.
+  const candidateCols = columns.filter(c => c !== dateCol && !numericCols.includes(c));
+  let entityCol = null;
+  let bestRepeatRatio = 1;
+  for (const c of candidateCols) {
+    const uniques = new Set(rows.map(r => r[c])).size;
+    if (uniques < 2 || uniques === rows.length) continue; // no repeats, not a usable entity axis
+    const repeatRatio = rows.length / uniques;
+    if (repeatRatio > bestRepeatRatio) {
+      bestRepeatRatio = repeatRatio;
+      entityCol = c;
+    }
+  }
+  if (!entityCol || bestRepeatRatio < 2) return []; // need real repeat structure to say anything about "recency"
+
+  const parseDate = (v) => {
+    const d = new Date(String(v));
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const byEntity = new Map();
+  let datasetMaxDate = null;
+  for (const r of rows) {
+    const d = parseDate(r[dateCol]);
+    if (!d) continue;
+    if (!datasetMaxDate || d > datasetMaxDate) datasetMaxDate = d;
+    const key = String(r[entityCol] ?? '—');
+    if (!byEntity.has(key)) byEntity.set(key, { dates: [], total: 0 });
+    const entry = byEntity.get(key);
+    entry.dates.push(d);
+    entry.total += valueCol ? (Number(r[valueCol]) || 0) : 1;
+  }
+  if (!datasetMaxDate) return [];
+
+  const DAY_MS = 86400000;
+  const atRisk = [];
+  for (const [label, { dates, total }] of byEntity) {
+    if (dates.length < 2) continue; // need at least 2 visits to know a "normal" pace
+    dates.sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 1; i < dates.length; i++) gaps.push((dates[i] - dates[i - 1]) / DAY_MS);
+    const avgGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    const lastSeen = dates[dates.length - 1];
+    const daysSince = (datasetMaxDate - lastSeen) / DAY_MS;
+
+    // Quiet relative to their OWN normal pace, not an arbitrary global cutoff.
+    if (daysSince > Math.max(avgGap * 2, 14)) {
+      atRisk.push({ label, daysSince: Math.round(daysSince), avgGap: Math.round(avgGap), total });
+    }
+  }
+
+  return atRisk.sort((a, b) => b.total - a.total).slice(0, maxResults);
+}
+
+/**
  * Build a list of plain-English callouts about the result — period change,
  * outliers, correlation — computed directly from the data (not the LLM),
  * so they're always accurate even on a small local model.
