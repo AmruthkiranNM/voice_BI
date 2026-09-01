@@ -55,32 +55,54 @@ def _call_groq(prompt: str) -> str:
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.1,
     }
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(data).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {config.GROQ_API_KEY}",
-            # Groq's Cloudflare WAF blocks the default urllib User-Agent (error 1010).
-            "User-Agent": "Mozilla/5.0 (compatible; voice-bi/1.0)",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=config.GROQ_TIMEOUT_SECONDS) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            text = result["choices"][0]["message"]["content"].strip()
-            logger.debug("Groq response (first 200 chars): %s", text[:200])
-            return text
-    except (socket.timeout, TimeoutError) as e:
-        logger.error("Groq API call timed out after %ss", config.GROQ_TIMEOUT_SECONDS)
-        raise RuntimeError(f"Groq did not respond within {config.GROQ_TIMEOUT_SECONDS}s.") from e
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")
-        logger.error("Groq API call failed: %s %s", e.code, body)
-        raise RuntimeError(f"Groq call failed ({e.code}): {body}") from e
-    except urllib.error.URLError as e:
-        logger.error("Groq API call failed: %s", str(e))
-        raise RuntimeError(f"Groq call failed: {e}") from e
+    
+    import time
+    max_retries = 3
+    base_delay = 5
+
+    for attempt in range(max_retries):
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(data).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {config.GROQ_API_KEY}",
+                # Groq's Cloudflare WAF blocks the default urllib User-Agent (error 1010).
+                "User-Agent": "Mozilla/5.0 (compatible; voice-bi/1.0)",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=config.GROQ_TIMEOUT_SECONDS) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                text = result["choices"][0]["message"]["content"].strip()
+                logger.debug("Groq response (first 200 chars): %s", text[:200])
+                return text
+        except (socket.timeout, TimeoutError) as e:
+            if attempt == max_retries - 1:
+                logger.error("Groq API call timed out after %ss", config.GROQ_TIMEOUT_SECONDS)
+                raise RuntimeError(f"Groq did not respond within {config.GROQ_TIMEOUT_SECONDS}s.") from e
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            if e.code == 429 and attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                try:
+                    error_data = json.loads(body)
+                    error_msg = error_data.get("error", {}).get("message", "")
+                    match = re.search(r"in (\d+(?:\.\d+)?)s", error_msg)
+                    if match:
+                        delay = float(match.group(1)) + 1.0 # Add 1s buffer
+                except Exception:
+                    pass
+                logger.warning("Groq rate limit hit. Retrying in %.2fs...", delay)
+                time.sleep(delay)
+                continue
+            logger.error("Groq API call failed: %s %s", e.code, body)
+            raise RuntimeError(f"Groq call failed ({e.code}): {body}") from e
+        except urllib.error.URLError as e:
+            if attempt == max_retries - 1:
+                logger.error("Groq API call failed: %s", str(e))
+                raise RuntimeError(f"Groq call failed: {e}") from e
+            time.sleep(base_delay)
 
 
 def _call_ollama(prompt: str, expect_json: bool = False) -> str:
@@ -136,6 +158,10 @@ def _clean_json_response(text: str) -> str:
     Clean LLM response to extract valid JSON.
     Small models sometimes output extra conversational text alongside the JSON.
     """
+    import re
+    # Remove reasoning tags
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    
     # Remove markdown code fences if the model output them
     text = re.sub(r"```(?:json)?\s*", "", text)
     text = re.sub(r"```\s*", "", text)

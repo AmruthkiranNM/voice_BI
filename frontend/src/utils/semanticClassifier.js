@@ -131,6 +131,7 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
   }
 
   const columnsProfile = classifyColumns(result, intent, query);
+  const qLower = (query || '').toLowerCase();
   
   // 1. Identify primary dimension
   let primaryDimension = null;
@@ -189,9 +190,60 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
     c => c.type === 'string' && c.column !== primaryDimension.column,
   );
 
+  // ── 3. Detect hierarchical grouping ──
+  // Patterns: "top 3 products within each country", "best items for each region",
+  //           "top N X in each Y", "rank Y then show X"
+  const HIERARCHY_PATTERNS = [
+    /within\s+each/i,
+    /for\s+each/i,
+    /in\s+each/i,
+    /per\s+each/i,
+    /in\s+the\s+top/i,
+    /within\s+the\s+top/i,
+    /\bthen\s+show\b/i,
+    /\bby\s+\w+\s*,?\s*then\s+by\b/i,
+    /top\s+\d+\s+\w+\s+(?:in|within|for|per)\b/i,
+  ];
+  const queryIndicatesHierarchy = HIERARCHY_PATTERNS.some(p => p.test(qLower));
+
+  // Structural detection: two string columns + at least one measure column,
+  // where the first string column has fewer unique values (groups) than the
+  // second (items within groups).
+  let isHierarchical = false;
+  let groupDimension = null;
+  let itemDimension = null;
+
+  if (secondaryDimension && primaryMeasure) {
+    const primaryUniques = new Set(result.rows.map(r => r[primaryDimension.column])).size;
+    const secondaryUniques = new Set(result.rows.map(r => r[secondaryDimension.column])).size;
+
+    // Structural heuristic: the group dimension has fewer unique values
+    // (e.g. 3 countries vs 9 products) AND query hints at hierarchy
+    const structuralHierarchy = primaryUniques < secondaryUniques && primaryUniques <= 10;
+
+    if (queryIndicatesHierarchy || structuralHierarchy) {
+      isHierarchical = true;
+      // The dimension with fewer unique values is the group (outer) dimension
+      if (primaryUniques <= secondaryUniques) {
+        groupDimension = primaryDimension.column;
+        itemDimension = secondaryDimension.column;
+      } else {
+        groupDimension = secondaryDimension.column;
+        itemDimension = primaryDimension.column;
+      }
+    }
+  }
+
+  // Generate a dynamic title
+  let hierarchyTitle = null;
+  if (isHierarchical && groupDimension && itemDimension && primaryMeasure) {
+    const metricLabel = _humanize(primaryMeasure.column);
+    const groupLabel = _humanize(groupDimension);
+    const itemLabel = _humanize(itemDimension);
+    hierarchyTitle = `${metricLabel} by ${itemLabel} within ${groupLabel}`;
+  }
+
   // Determine intent / chart
-  // Use the existing logic but override with our clean semantic mappings
-  // Create a mock "result" for chartRecommender that only includes the semantic columns
   const semanticColumns = [];
   if (primaryDimension) semanticColumns.push(primaryDimension.column);
   if (primaryMeasure) semanticColumns.push(primaryMeasure.column);
@@ -204,6 +256,9 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
 
   const chartRec = recommendChartType(mockResult, intent, query);
 
+  // Override chart recommendation for hierarchical grouping → horizontal bar
+  const recommendedChart = isHierarchical ? 'horizontalBar' : chartRec.type;
+
   const spec = {
     intent: intent || 'auto',
     dimension: primaryDimension?.column,
@@ -211,19 +266,38 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
     primaryMeasure: primaryMeasure?.column,
     secondaryMeasures: secondaryMeasures.map(m => m.column),
     excludedFields: excludedFields.map(m => m.column),
-    recommendedChart: chartRec.type,
+    recommendedChart,
     columnsProfile,
+    // Hierarchical grouping metadata
+    isHierarchical,
+    groupDimension,
+    itemDimension,
+    hierarchyTitle,
   };
 
   console.log('--- VISUALIZATION DECISION ENGINE ---');
   console.log('Query:', query);
   console.log('Intent:', intent);
   console.log('Dimension:', spec.dimension);
+  console.log('Secondary Dimension:', spec.secondaryDimension);
   console.log('Primary Measure:', spec.primaryMeasure);
   console.log('Excluded (IDs):', spec.excludedFields);
   console.log('Recommended Chart:', spec.recommendedChart);
+  console.log('Is Hierarchical:', spec.isHierarchical);
+  console.log('Group Dimension:', spec.groupDimension);
+  console.log('Item Dimension:', spec.itemDimension);
+  console.log('Hierarchy Title:', spec.hierarchyTitle);
   console.log('Profiles:', columnsProfile);
   console.log('---------------------------------------');
 
   return spec;
 }
+
+/** Convert column_name or camelCase to "Column Name" */
+function _humanize(str) {
+  return (str || '')
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+

@@ -40,7 +40,7 @@ const ALL_STAGES = [
 export function analyzeComplexity(query) {
   const q = query.toLowerCase();
   const wordCount = query.split(/\s+/).length;
-  
+
   const hasAggregation = /(sum|total|average|avg|count|min|max)/.test(q);
   const hasComparison = /(compare|versus|vs|difference|between|than)/.test(q);
   const hasTrend = /(trend|growth|over time|history|historical)/.test(q);
@@ -51,7 +51,7 @@ export function analyzeComplexity(query) {
   let score = 0;
   if (wordCount > 10) score += 1;
   if (wordCount > 20) score += 2;
-  
+
   if (hasAggregation) score += 1;
   if (hasComparison) score += 2;
   if (hasTrend) score += 2;
@@ -60,18 +60,18 @@ export function analyzeComplexity(query) {
   if (hasRanking) score += 1;
 
   if (score >= 6 || hasForecast) {
-    return { level: 'hard', targetDurationMs: 50000 }; // 50s
+    return { level: 'hard', targetDurationMs: 50 }; // 50ms
   } else if (score >= 3 || hasComparison || hasTrend) {
-    return { level: 'medium', targetDurationMs: 45000 }; // 45s
+    return { level: 'medium', targetDurationMs: 45 }; // 45ms
   } else {
-    return { level: 'simple', targetDurationMs: 40000 }; // 40s
+    return { level: 'simple', targetDurationMs: 40 }; // 40ms
   }
 }
 
 // Generate the specific pipeline for this query
 export function generatePipeline(complexityLevel, targetDurationMs) {
   let selectedStages = [];
-  
+
   if (complexityLevel === 'simple') {
     selectedStages = [
       STAGE_TYPES.UNDERSTANDING,
@@ -107,7 +107,7 @@ export function generatePipeline(complexityLevel, targetDurationMs) {
   });
 
   const totalWeight = baseWeights.reduce((a, b) => a + b, 0);
-  
+
   const pipeline = selectedStages.map((stageName, index) => {
     const weight = baseWeights[index];
     const durationMs = Math.floor((weight / totalWeight) * targetDurationMs);

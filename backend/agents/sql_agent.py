@@ -335,6 +335,7 @@ def _clean_sql(sql: str) -> str:
     """Clean LLM output to extract just the SQL query."""
     import re
 
+    sql = re.sub(r"<think>.*?</think>", "", sql, flags=re.DOTALL | re.IGNORECASE)
     sql = re.sub(r"```sql\s*", "", sql)
     sql = re.sub(r"```\s*", "", sql)
 

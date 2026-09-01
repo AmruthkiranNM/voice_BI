@@ -1,4 +1,4 @@
-export const FOLLOWUP_DELAY_ENABLED = true;
+export const FOLLOWUP_DELAY_ENABLED = false;
 export const FOLLOWUP_DELAY_MIN = 20; // seconds
 export const FOLLOWUP_DELAY_MAX = 30; // seconds
 

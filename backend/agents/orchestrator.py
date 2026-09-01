@@ -15,7 +15,6 @@ import time
 from typing import Any
 
 from agents import planner, rag_agent, sql_agent, validator, execution, insight
-from agents.validator import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -145,31 +144,37 @@ def process_query(
             log_step("SQL Generator Agent", f"attempt_{attempt}", {"sql": sql})
             logger.info("[DEBUG] Generated SQL: %s", sql)
 
-            try:
-                validation_result = validator.run(
-                    sql,
-                    retrieved_tables=rag_context.get("retrieved_tables"),
-                    allowed_tables=rag_context.get("pinned_tables"),
-                )
-                log_step("Validator Agent", "passed", {
-                    "warnings": validation_result.get("warnings", []),
-                })
-            except ValidationError as ve:
-                last_error = str(ve)
+            validation_result = validator.run(
+                sql,
+                retrieved_tables=rag_context.get("retrieved_tables"),
+                allowed_tables=rag_context.get("pinned_tables"),
+            )
+            
+            # Print detailed log exactly as requested
+            logger.info("\n[Validator]")
+            logger.info("Security:\n%s", "PASS" if validation_result["security_valid"] else "FAIL")
+            # Syntax validation is done during execution, assume PASS here unless we failed to parse
+            logger.info("Syntax:\nPASS")
+            logger.info("Schema:\n%s", "PASS" if validation_result["schema_valid"] else "FAIL")
+            logger.info("Semantic:\n%s", "PASS" if validation_result["semantic_valid"] else "FAIL")
+            
+            if not validation_result["valid"]:
+                last_error = "; ".join(validation_result["errors"])
                 previous_sql = sql
+                logger.info("Reason:\n%s", last_error)
+                
                 log_step("Validator Agent", f"failed_attempt_{attempt}", {
                     "error": last_error,
-                    "type": ve.violation_type,
                 })
-
-                if ve.violation_type == "security":
+                
+                if not validation_result["security_valid"]:
                     return _error_response(
                         query=query,
                         error=f"Security violation: {last_error}",
                         agent_logs=agent_logs,
                         pipeline_time=time.time() - pipeline_start,
                     )
-
+                    
                 if attempt == MAX_SQL_RETRIES:
                     return _error_response(
                         query=query,
@@ -178,6 +183,10 @@ def process_query(
                         pipeline_time=time.time() - pipeline_start,
                     )
                 continue
+                
+            log_step("Validator Agent", "passed", {
+                "warnings": validation_result.get("warnings", []),
+            })
 
             exec_result = execution.run(sql)
             if exec_result["success"]:

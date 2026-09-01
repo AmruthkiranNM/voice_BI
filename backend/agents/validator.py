@@ -18,15 +18,6 @@ from services.database import get_all_table_names, get_table_schema
 logger = logging.getLogger(__name__)
 
 
-class ValidationError(Exception):
-    """Raised when SQL validation fails."""
-
-    def __init__(self, reason: str, violation_type: str):
-        self.reason = reason
-        self.violation_type = violation_type  # "security" or "schema"
-        super().__init__(reason)
-
-
 def run(
     sql: str,
     retrieved_tables: list[str] | None = None,
@@ -44,39 +35,38 @@ def run(
 
     Returns:
         Dictionary with validation status and details.
-
-    Raises:
-        ValidationError: If the SQL fails any check.
     """
     logger.info("[Validator Agent] Validating SQL: %s", sql[:120])
 
     result = {
-        "is_valid": True,
-        "security_check": "passed",
-        "schema_check": "passed",
+        "valid": True,
+        "security_valid": True,
+        "syntax_valid": True,
+        "schema_valid": True,
+        "semantic_valid": True,
+        "errors": [],
         "warnings": [],
         "validated_sql": sql,
     }
 
     # ── Step 1: Security Validation ──
-    _check_security(sql)
-    logger.info("[Validator Agent] Security check passed.")
+    _check_security(sql, result)
 
     # ── Step 2: Ensure it's a SELECT statement ──
-    _check_select_only(sql)
-    logger.info("[Validator Agent] SELECT-only check passed.")
+    _check_select_only(sql, result)
 
     # ── Step 3: Schema Validation ──
-    warnings = _check_schema(sql, retrieved_tables, allowed_tables)
-    if warnings:
-        result["warnings"] = warnings
-        logger.warning("[Validator Agent] Schema warnings: %s", warnings)
+    if result["security_valid"]:
+        _check_schema(sql, retrieved_tables, allowed_tables, result)
 
-    logger.info("[Validator Agent] Validation complete — SQL is safe.")
+    if result["errors"]:
+        result["valid"] = False
+
+    logger.info("[Validator Agent] Validation complete. Valid: %s", result["valid"])
     return result
 
 
-def _check_security(sql: str) -> None:
+def _check_security(sql: str, result: dict[str, Any]) -> None:
     """
     Check for dangerous SQL keywords that could indicate injection
     or destructive operations.
@@ -88,44 +78,35 @@ def _check_security(sql: str) -> None:
         # e.g., "UPDATED_AT" should not trigger "UPDATE"
         pattern = r'\b' + re.escape(keyword) + r'\b'
         if re.search(pattern, sql_upper):
-            raise ValidationError(
-                reason=f"Blocked SQL keyword detected: '{keyword}'. "
-                       f"Only SELECT queries are allowed.",
-                violation_type="security",
-            )
+            result["security_valid"] = False
+            result["errors"].append(f"Blocked SQL keyword detected: '{keyword}'. Only SELECT queries are allowed.")
 
     # Check for multiple statements (semicolon injection)
     # Remove trailing semicolon first, then check for others
     cleaned = sql.strip().rstrip(";").strip()
     if ";" in cleaned:
-        raise ValidationError(
-            reason="Multiple SQL statements detected. Only single SELECT queries are allowed.",
-            violation_type="security",
-        )
+        result["security_valid"] = False
+        result["errors"].append("Multiple SQL statements detected. Only single SELECT queries are allowed.")
 
 
-def _check_select_only(sql: str) -> None:
-    """Ensure the query is a SELECT statement."""
+def _check_select_only(sql: str, result: dict[str, Any]) -> None:
+    """Ensure the query is a SELECT statement (or starts with WITH for CTEs)."""
     stripped = sql.strip().upper()
-    if not stripped.startswith("SELECT"):
-        raise ValidationError(
-            reason=f"Query must start with SELECT. Got: '{stripped[:20]}...'",
-            violation_type="security",
-        )
+    if not (stripped.startswith("SELECT") or stripped.startswith("WITH")):
+        result["security_valid"] = False
+        result["errors"].append(f"Query must start with SELECT or WITH. Got: '{stripped[:20]}...'")
 
 
 def _check_schema(
     sql: str,
-    retrieved_tables: list[str] | None = None,
-    allowed_tables: list[str] | None = None,
-) -> list[str]:
+    retrieved_tables: list[str] | None,
+    allowed_tables: list[str] | None,
+    result: dict[str, Any]
+) -> None:
     """
     Validate that tables and columns referenced in SQL exist in the database
     and (when a scope is given) stay within the active data source.
-
-    Returns a list of warning messages (non-fatal).
     """
-    warnings = []
     db_tables = get_all_table_names()
     db_tables_lower = {t.lower() for t in db_tables}
     allowed_lower = {t.lower() for t in allowed_tables} if allowed_tables else None
@@ -135,17 +116,11 @@ def _check_schema(
 
     for table in sql_tables:
         if table.lower() not in db_tables_lower:
-            raise ValidationError(
-                reason=f"Table '{table}' does not exist in the database. "
-                       f"Available tables: {db_tables}",
-                violation_type="schema",
-            )
-        if allowed_lower is not None and table.lower() not in allowed_lower:
-            raise ValidationError(
-                reason=f"Table '{table}' is outside the selected data source. "
-                       f"This query may only use: {allowed_tables}",
-                violation_type="schema",
-            )
+            result["schema_valid"] = False
+            result["errors"].append(f"Table '{table}' does not exist in the database. Available tables: {db_tables}")
+        elif allowed_lower is not None and table.lower() not in allowed_lower:
+            result["schema_valid"] = False
+            result["errors"].append(f"Table '{table}' is outside the selected data source. This query may only use: {allowed_tables}")
 
     # Validate columns for each known table
     for table in sql_tables:
@@ -173,17 +148,44 @@ def _check_schema(
                         tbl.lower() == table.lower()
                         and col_name.lower() not in column_names
                     ):
-                        warnings.append(
+                        result["warnings"].append(
                             f"Column '{col_name}' may not exist in table '{actual_name}'"
                         )
 
-    return warnings
+
+def _extract_cte_names(sql: str) -> set[str]:
+    """
+    Extract CTE (Common Table Expression) alias names from WITH clauses.
+
+    For example, given:
+        WITH country_rev AS (...), top_countries AS (...)
+        SELECT ...
+
+    Returns: {'country_rev', 'top_countries'}
+
+    These are virtual table names defined inline in the query — they do NOT
+    need to exist as real database tables, so the schema checker must skip them.
+    """
+    sql_no_comments = re.sub(r'--.*$', '', sql, flags=re.MULTILINE)
+    sql_no_comments = re.sub(r'/\*.*?\*/', '', sql_no_comments, flags=re.DOTALL)
+
+    cte_names: set[str] = set()
+
+    # Match the alias name before each AS ( in a WITH block.
+    # Pattern: WITH <name> AS (...), <name> AS (...), ...
+    # We match both the first CTE after WITH and subsequent ones after commas.
+    pattern = r'(?:(?:\bWITH\b|,)\s*)(\w+)\s+AS\s*\('
+    for m in re.finditer(pattern, sql_no_comments, re.IGNORECASE):
+        cte_names.add(m.group(1).lower())
+
+    return cte_names
 
 
 def _extract_tables_from_sql(sql: str) -> list[str]:
     """
     Extract table names referenced in FROM and JOIN clauses.
-    Uses regex-based extraction.
+    Uses regex-based extraction.  CTE alias names are excluded because
+    they are virtual tables defined within the query itself.
     """
     # Remove SQL comments before extraction to avoid false positives
     # e.g. "-- Assuming the question is asking for conditions from last year"
@@ -210,6 +212,10 @@ def _extract_tables_from_sql(sql: str) -> list[str]:
         "else", "end", "between", "like", "is", "null",
     }
     tables = {t for t in tables if t.lower() not in sql_keywords}
+
+    # Exclude CTE alias names — they are virtual, not real database tables
+    cte_names = _extract_cte_names(sql)
+    tables = {t for t in tables if t.lower() not in cte_names}
 
     return list(tables)
 

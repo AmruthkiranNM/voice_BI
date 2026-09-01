@@ -595,9 +595,68 @@ export function prepareChartData(result, spec = null) {
     rows.some(r => TIME_PATTERN.test(String(r[labelCol] ?? ''))) ||
     DATE_COL_NAMES.test(labelCol);
 
-  // Two-dimension result (e.g. rows grouped by month AND country): pivot the
-  // secondary category into its own series instead of showing one bar per
-  // row with a repeated x-axis label.
+  // ── Hierarchical grouping path ──
+  // When the spec says "isHierarchical", do NOT pivot into multi-series.
+  // Instead: create compound labels "Group — Item", use only actual result rows
+  // (no fake zero filling), and sort by group then by metric within group.
+  if (spec?.isHierarchical && spec.groupDimension && spec.itemDimension) {
+    const groupCol = spec.groupDimension;
+    const itemCol = spec.itemDimension;
+    const measureCol = numericCols[0];
+
+    // Preserve original row order (SQL already ranked them),
+    // but ensure groups are contiguous.
+    const groups = [...new Set(rows.map(r => String(r[groupCol] ?? '')))];
+
+    const sortedRows = [];
+    for (const group of groups) {
+      const groupRows = rows
+        .filter(r => String(r[groupCol] ?? '') === group)
+        .sort((a, b) => Number(b[measureCol]) - Number(a[measureCol]));
+      sortedRows.push(...groupRows);
+    }
+
+    const labels = sortedRows.map(r => {
+      const group = String(r[groupCol] ?? '');
+      const item = String(r[itemCol] ?? '');
+      return `${group} — ${item}`;
+    });
+
+    const datasets = [{
+      label: (measureCol || 'Value').replace(/_/g, ' '),
+      originalColumn: measureCol,
+      data: sortedRows.map(r => Number(r[measureCol]) || 0),
+    }];
+
+    // Include group boundaries so the chart builder can render visual separators
+    const groupBoundaries = [];
+    let idx = 0;
+    for (const group of groups) {
+      const count = sortedRows.filter(r => String(r[groupCol] ?? '') === group).length;
+      groupBoundaries.push({ group, startIndex: idx, count });
+      idx += count;
+    }
+
+    const metricLabel = (measureCol || 'Value').replace(/_/g, ' ');
+    const groupLabel = (groupCol || 'Group').replace(/_/g, ' ');
+    const itemLabel = (itemCol || 'Item').replace(/_/g, ' ');
+
+    return {
+      labels,
+      datasets,
+      isTime: false,
+      labelCol: `${itemLabel} by ${groupLabel}`,
+      numericCols,
+      isHierarchical: true,
+      groupBoundaries,
+      metricLabel,
+      hierarchyTitle: spec.hierarchyTitle,
+    };
+  }
+
+  // ── Two-dimension pivot path (non-hierarchical) ──
+  // e.g. rows grouped by month AND country: pivot the secondary category into
+  // its own series instead of showing one bar per row with a repeated x-axis label.
   const secondaryCol = spec?.secondaryDimension;
   if (secondaryCol && columns.includes(secondaryCol)) {
     const measureCol = numericCols[0];
@@ -616,6 +675,7 @@ export function prepareChartData(result, spec = null) {
     return { labels, datasets, isTime, labelCol: labelCol.replace(/_/g, ' '), numericCols };
   }
 
+  // ── Standard single-dimension path ──
   let displayRows = isTime
     ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol])))
     : [...rows].sort((a, b) => Number(b[numericCols[0]]) - Number(a[numericCols[0]]));
@@ -629,3 +689,4 @@ export function prepareChartData(result, spec = null) {
 
   return { labels, datasets, isTime, labelCol: labelCol.replace(/_/g, ' '), numericCols };
 }
+
