@@ -245,6 +245,7 @@ export default function App() {
 
   const hasResults = response && (
     response.sql || response.result?.row_count > 0 || response.insight
+    || response.result?.pipeline_type === 'PREDICTIVE'
   );
 
   // Preview only makes sense for the source it came from.

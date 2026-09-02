@@ -14,7 +14,7 @@ import re
 import time
 from typing import Any
 
-from agents import planner, rag_agent, sql_agent, validator, execution, insight
+from agents import planner, rag_agent, sql_agent, validator, execution, insight, router, ml_agent
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,31 @@ def process_query(
         logger.info("[Orchestrator] %s → %s", agent_name, status)
 
     try:
+        # ════════════════════════════════════════════
+        # STEP 0: Router Agent
+        # ════════════════════════════════════════════
+        pipeline_type = router.run(query)
+        log_step("Router Agent", "completed", {"pipeline_type": pipeline_type})
+        
+        if pipeline_type == "PREDICTIVE":
+            logger.info("[Orchestrator] Routing query to PREDICTIVE pipeline.")
+            ml_result = ml_agent.run(query)
+            log_step("ML Agent", "completed", {"prediction_made": True})
+            
+            return {
+                "success": True,
+                "query": query,
+                "sql": None, # ML queries don't use SQL
+                "result": ml_result.get("result", {}),
+                "insight": ml_result.get("insight"),
+                "llm_mode": "local (ML)",
+                "metadata": {
+                    "pipeline_type": "PREDICTIVE",
+                    "execution_time_ms": round((time.time() - pipeline_start) * 1000, 2),
+                },
+                "agent_logs": agent_logs,
+            }
+
         # ════════════════════════════════════════════
         # STEP 1: Planner Agent (or fast heuristic plan)
         # ════════════════════════════════════════════

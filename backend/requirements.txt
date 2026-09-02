@@ -11,6 +11,9 @@ python-multipart==0.0.9
 # Data processing
 pandas>=2.0.0
 
+# Machine Learning (Predictive Analytics pipeline)
+scikit-learn>=1.5.0
+
 # Embeddings
 # torch is pulled in by sentence-transformers; pin the CPU-only build so
 # pip doesn't grab a multi-GB CUDA wheel. Embeddings run on CPU (see

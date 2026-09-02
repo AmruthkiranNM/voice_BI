@@ -1,0 +1,172 @@
+"""
+Prediction Package — Service (Facade)
+
+High-level public API for the prediction package.
+
+This is the ONLY module that outside code (e.g. agents/ml_agent.py)
+should import. It hides the internal module boundaries and provides
+simple train() / predict() / detect() entry points.
+"""
+
+import logging
+from typing import Any
+
+import pandas as pd
+
+from prediction.schemas import (
+    DetectionResult,
+    TrainedModelArtifact,
+    PredictionResult,
+    ForecastingResult,
+    EvaluationResult,
+)
+from prediction import detector, trainer, predictor
+
+logger = logging.getLogger(__name__)
+
+
+# ────────────────────────────────────────────────────────────
+# Data Loading (uses the existing database service)
+# ────────────────────────────────────────────────────────────
+
+def _load_table(table_name: str) -> pd.DataFrame:
+    """Load a SQLite table into a DataFrame via the existing DB service."""
+    from services.database import get_connection
+    conn = get_connection()
+    try:
+        return pd.read_sql_query(f"SELECT * FROM [{table_name}]", conn)
+    finally:
+        conn.close()
+
+
+# ────────────────────────────────────────────────────────────
+# Public API
+# ────────────────────────────────────────────────────────────
+
+def detect_problem(table_name: str, target_hint: str | None = None) -> DetectionResult:
+    """
+    Scan a table and determine if it contains a viable
+    classification or regression problem.
+
+    Args:
+        table_name:  SQLite table name.
+        target_hint: Optional explicit target column name.
+
+    Returns:
+        DetectionResult describing the problem (or why it's not suitable).
+    """
+    df = _load_table(table_name)
+    return detector.detect(df, table_name, target_hint=target_hint)
+
+
+def train_models(
+    table_name: str,
+    target_col: str | None = None,
+    selection_metric: str | None = None,
+) -> dict[str, Any]:
+    """
+    Train all candidate models on the given table and select the best.
+
+    Args:
+        table_name:       SQLite table name.
+        target_col:       Optional explicit target column (auto-detected if None).
+        selection_metric: Metric to use for best model selection (e.g., roc_auc, f1_score).
+
+    Returns:
+        Dict with models and their training results.
+    """
+    df = _load_table(table_name)
+    experiment = trainer.train_all(df, table_name, target_col=target_col, selection_metric=selection_metric)
+
+    models_info = []
+    for artifact in experiment.models:
+        models_info.append({
+            "model_type": artifact.model_type,
+            "target_column": artifact.target_column,
+            "feature_count": len(artifact.feature_names),
+        })
+
+    return {
+        "best_model": experiment.best_model_key,
+        "selection_metric": experiment.selection_metric,
+        "models": models_info,
+        "training_results": experiment.training_results,
+    }
+
+
+def predict_rows(
+    table_name: str,
+    target_col: str | None = None,
+    customer_id: Any | None = None,
+    filters: dict[str, Any] | None = None,
+    risk_thresholds: dict[str, float] | None = None,
+    rank_by_probability: bool = False,
+    is_forecast: bool = False,
+    forecast_steps: int = 12,
+    forecast_frequency: str = "months",
+) -> PredictionResult | ForecastingResult:
+    """
+    Run inference on specific row(s) from a table.
+
+    If no model exists yet, trains one first (lazy training).
+
+    Args:
+        table_name:          SQLite table name.
+        target_col:          Optional explicit target column.
+        customer_id:         Shortcut to filter by ID column.
+        filters:             {column: value} filters.
+        risk_thresholds:     Optional configurable mapping for 'High' and 'Medium' risk boundaries.
+        rank_by_probability: Whether to sort the final result by probability descending.
+        is_forecast:         Whether to run a forecasting prediction.
+        forecast_steps:      Number of periods to forecast if is_forecast is True.
+        forecast_frequency:  Temporal frequency for the forecast (months, days, etc.).
+
+    Returns:
+        PredictionResult with per-row predictions, or ForecastingResult.
+    """
+    df = _load_table(table_name)
+
+    # Always detect to resolve target_col (which might be a semantic hint) and problem type
+    problem_hint = "forecasting" if is_forecast else None
+    detection = detector.detect(df, table_name, target_hint=target_col, problem_type_hint=problem_hint)
+    
+    if not detection.is_suitable:
+        raise ValueError(f"Table '{table_name}' is not suitable for this task: {detection.reason}")
+        
+    resolved_target_col = detection.target_column
+
+    # Load or train
+    artifact = trainer.load_artifact(table_name, resolved_target_col)
+    if artifact is None or (is_forecast and getattr(artifact, "problem_type", None) != "forecasting"):
+        logger.info("[Service] No saved model or wrong type; training models now...")
+        experiment = trainer.train_all(df, table_name, target_col=resolved_target_col, forecast_frequency=forecast_frequency, problem_type_hint=problem_hint)
+        artifact = experiment.models[0]  # Just use the first one for lazy predict fallback
+
+    if is_forecast:
+        return predictor.forecast(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
+
+    # Locate target rows
+    row_indices = None
+    if customer_id is not None or filters:
+        row_indices = predictor.find_rows_by_filter(
+            df, filters=filters, customer_id=customer_id,
+        )
+        if not row_indices:
+            is_classification = getattr(artifact, 'problem_type', 'classification') == 'classification'
+            accuracy_metric = artifact.evaluation.accuracy if is_classification else artifact.evaluation.r2
+            return PredictionResult(
+                predictions=[],
+                model_accuracy=accuracy_metric,
+                target_column=resolved_target_col,
+                table_name=table_name,
+                count=0,
+            )
+
+    return predictor.predict(
+        df, 
+        artifact, 
+        row_indices=row_indices, 
+        risk_thresholds=risk_thresholds, 
+        rank_by_probability=rank_by_probability
+    )
+

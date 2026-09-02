@@ -10,6 +10,7 @@ import AnomalyCallouts from './AnomalyCallouts';
 import Timeline from './Timeline';
 import BIInsightsPanel from './BIInsightsPanel';
 import InvestigationTrail from './InvestigationTrail';
+import PredictionPanel from './PredictionPanel';
 import { resolveVisualizationSpec } from '../utils/semanticClassifier';
 import { showToast } from '../utils/toast';
 import { investigateQuery } from '../services/api';
@@ -66,6 +67,45 @@ export default function ResultsDashboard({
       setIsInvestigating(false);
     }
   };
+
+  // ── PREDICTIVE pipeline: render a dedicated prediction UI ──
+  const isPredictive = result?.pipeline_type === 'PREDICTIVE';
+  if (isPredictive) {
+    return (
+      <section className="bi-dashboard animate-in">
+        {/* Header */}
+        <div className="bi-header-bar">
+          <div className="min-w-0">
+            <p className="bi-header-eyebrow">Predictive Analytics{sourceLabel ? ` / ${sourceLabel}` : ''}</p>
+            <h2 className="bi-header-title">{query}</h2>
+          </div>
+          <div className="bi-header-tags">
+            <span className="bi-tag accent">Prediction</span>
+            {pipelineTime != null && (
+              <span className="bi-tag">{pipelineTime.toFixed(2)}s</span>
+            )}
+          </div>
+        </div>
+
+        {/* AI Explanation */}
+        {insight && (
+          <InsightPanel
+            insight={insight}
+            autoSpeak={settings.speakInsight && !settings.skipInsight}
+          />
+        )}
+
+        {/* Prediction Visualization */}
+        <PredictionPanel result={result} insight={insight} />
+
+        {/* Agent Timeline */}
+        <Timeline agentLogs={response?.agent_logs} pipelineTime={pipelineTime} />
+
+        {/* Footer */}
+        <FooterTrace agentLogs={response?.agent_logs} pipelineTime={pipelineTime} />
+      </section>
+    );
+  }
 
   return (
     <section className="bi-dashboard animate-in">
