@@ -149,6 +149,33 @@ class ForecastingResult:
     count: int = 0
 
 
+@dataclasses.dataclass
+class TrendDirectionResult:
+    """
+    Result for trend direction forecasting.
+    """
+    target_column: str
+    date_column: str
+    direction: str  # "increase", "decrease", "stable"
+    horizon: int
+    historical: list[ForecastingRow]
+    forecast: list[ForecastingRow]
+    table_name: str
+
+
+@dataclasses.dataclass
+class GroupedForecastingResult:
+    """
+    Result for grouped forecasting.
+    """
+    target_column: str
+    date_column: str
+    group_column: str
+    horizon: int
+    table_name: str
+    predictions: list[dict[str, Any]] # e.g. [{"group": "India", "forecast": [ForecastingRow...], "final_value": 1500, "historical": [...]}]
+    best_group: str | None = None
+
 
 @dataclasses.dataclass
 class TrainingExperimentResult:

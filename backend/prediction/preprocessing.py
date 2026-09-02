@@ -186,6 +186,46 @@ def prepare_forecasting_data(
     return series_ts
 
 
+def prepare_grouped_forecasting_data(
+    df: pd.DataFrame,
+    date_col: str,
+    target_col: str,
+    group_col: str,
+    frequency: str = "months",
+) -> dict[str, pd.Series]:
+    """
+    Preprocess time-series data grouped by a dimension.
+    Returns a dictionary mapping group names to their aggregated Series.
+    """
+    df_ts = df[[date_col, target_col, group_col]].copy()
+    df_ts[date_col] = pd.to_datetime(df_ts[date_col], errors="coerce")
+    df_ts[target_col] = pd.to_numeric(df_ts[target_col], errors="coerce")
+    df_ts = df_ts.dropna(subset=[date_col, target_col, group_col])
+    
+    freq_map = {
+        "months": "M", "month": "M",
+        "days": "D", "day": "D",
+        "years": "Y", "year": "Y",
+        "weeks": "W", "week": "W",
+        "periods": "M", "period": "M",
+    }
+    rule = freq_map.get(frequency.lower(), "M")
+
+    grouped_series = {}
+    
+    # Iterate over unique groups
+    for group_name, group_df in df_ts.groupby(group_col):
+        # Sort chronologically
+        g_df = group_df.sort_values(date_col)
+        # Set index and aggregate
+        g_df = g_df.set_index(date_col)
+        s = g_df[target_col].resample(rule).sum()
+        
+        # Keep only groups with at least a few points
+        if len(s) >= 3:
+            grouped_series[str(group_name)] = s
+            
+    return grouped_series
 
 def _get_feature_names_out(pipeline: Pipeline, numeric_features: list[str], categorical_features: list[str]) -> list[str]:
     """

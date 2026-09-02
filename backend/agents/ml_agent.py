@@ -74,10 +74,14 @@ def _extract_customer_id(query: str) -> str | None:
 def _extract_target_hint(query: str) -> str | None:
     """
     Try to extract a target metric from the query.
-    Examples:
-      - "Predict sales revenue" -> "sales revenue"
-      - "Forecast the number of customers" -> "customers"
     """
+    # 1. Check explicit keywords first
+    keywords = ["sales", "revenue", "amount", "customers", "boxes", "salary", "churn", "exited"]
+    for kw in keywords:
+        if re.search(rf"\b{kw}\b", query, re.IGNORECASE):
+            return kw
+            
+    # 2. Fallback to patterns
     patterns = [
         r"predict\s+(?:the\s+)?(?:number\s+of\s+)?([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,3})",
         r"forecast\s+(?:the\s+)?(?:number\s+of\s+)?([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,3})",
@@ -99,6 +103,7 @@ def _extract_target_hint(query: str) -> str | None:
                 
             if words:
                 return " ".join(words)
+                
     return None
 
 
@@ -131,6 +136,59 @@ def _extract_forecast_horizon(query: str) -> tuple[int, str] | None:
             
     # Default overall
     return None
+
+
+def _extract_task_type(query: str) -> str:
+    """
+    Identify the specific predictive task type from the query.
+    """
+    q = query.lower()
+    
+    if re.search(r"increase\s+or\s+decrease|go\s+up\s+or\s+down|trend", q):
+        return "trend_direction_forecast"
+        
+    has_group = bool(re.search(r"\b(each|every|by|which)\b", q))
+    has_rank = bool(re.search(r"\b(highest|lowest|most|least|top|bottom)\b", q))
+    has_forecast = bool(re.search(r"\b(forecast|predict\s+next|future|next\s+(day|month|year|period|week))\b", q))
+    
+    if has_group and has_rank and has_forecast:
+        return "grouped_ranking"
+    elif has_group and has_forecast:
+        return "grouped_forecasting"
+    elif has_forecast:
+        return "forecasting"
+        
+    return "classification"
+
+
+def _extract_group_hint(query: str) -> str | None:
+    """
+    Extract the grouping dimension from queries.
+    Examples:
+      - "for each product category" -> "product category"
+      - "by country" -> "country"
+      - "Which sales team" -> "sales team"
+    """
+    patterns = [
+        r"(?:each|every|by)\s+([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,2})",
+        r"which\s+([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,2})\s+(?:is|will|likely)",
+    ]
+    stop_words = {"next", "month", "year", "highest", "lowest", "most", "the", "to", "have", "generate", "is", "will"}
+    
+    for pat in patterns:
+        match = re.search(pat, query, re.IGNORECASE)
+        if match:
+            raw = match.group(1).strip().lower()
+            words = raw.split()
+            # Remove stop words from ends
+            while words and words[-1] in stop_words:
+                words.pop()
+            while words and words[0] in stop_words:
+                words.pop(0)
+            if words:
+                return " ".join(words)
+    return None
+
 
 
 def _generate_explanation(query: str, prediction_result) -> str:
@@ -204,16 +262,38 @@ Write the explanation now:"""
         )
 
 
-def _generate_forecasting_explanation(query: str, forecast_result) -> str:
+def _generate_forecasting_explanation(query: str, forecast_result, task_type: str = "forecasting") -> str:
     """Generate an explanation for forecasting results."""
-    target = forecast_result.target_column
-    forecast_rows = forecast_result.forecast
-    if not forecast_rows:
-        return "No forecast could be generated."
-        
-    last_forecast = forecast_rows[-1]
     
-    prompt = f"""You are a Business Advisor AI. A time-series forecasting model has analyzed data.
+    if task_type == "trend_direction_forecast":
+        direction = forecast_result.direction
+        prompt = f"""You are a Business Advisor AI. A time-series model has forecasted the trend direction.
+The user asked: "{query}"
+FORECAST RESULT: Target: {forecast_result.target_column}, Direction: {direction} over {forecast_result.horizon} periods.
+Write a clear, friendly explanation.
+Rules:
+1. State the forecasted direction clearly (increase/decrease/stable).
+2. Keep it under 50 words.
+Write the explanation now:"""
+    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+        best = forecast_result.best_group
+        prompt = f"""You are a Business Advisor AI. A time-series model has forecasted multiple groups.
+The user asked: "{query}"
+FORECAST RESULT: Target: {forecast_result.target_column}, Top forecasted group: {best}.
+Write a clear, friendly explanation.
+Rules:
+1. State the top forecasted group.
+2. Keep it under 50 words.
+Write the explanation now:"""
+    else:
+        target = forecast_result.target_column
+        forecast_rows = forecast_result.forecast
+        if not forecast_rows:
+            return "No forecast could be generated."
+            
+        last_forecast = forecast_rows[-1]
+        
+        prompt = f"""You are a Business Advisor AI. A time-series forecasting model has analyzed data.
 
 The user asked: "{query}"
 
@@ -235,11 +315,12 @@ Write the explanation now:"""
         return explanation.strip()
     except Exception as e:
         logger.warning("[ML Agent] LLM explanation failed: %s. Using fallback.", e)
-        return (
-            f"**Forecast for {target}:**\n\n"
-            f"The model has predicted {len(forecast_rows)} future periods. "
-            f"The final forecasted value is **{last_forecast.value:,.2f}** for **{last_forecast.date}**."
-        )
+        if task_type == "trend_direction_forecast":
+            return f"The model expects a **{forecast_result.direction}** in {forecast_result.target_column} over the next {forecast_result.horizon} periods."
+        elif task_type in ("grouped_forecasting", "grouped_ranking"):
+            return f"The model predicts **{forecast_result.best_group}** will have the highest {forecast_result.target_column}."
+        return "Forecast complete."
+
 
 
 def run(query: str) -> dict[str, Any]:
@@ -277,7 +358,10 @@ def run(query: str) -> dict[str, Any]:
     is_single_customer = customer_id is not None
     logger.info("[ML Agent] Extracted customer ID: %s, target hint: %s", customer_id, target_hint)
     
-    is_forecast = bool(re.search(r"\b(forecast|predict\s+next|future)\b", query.lower()))
+    task_type = _extract_task_type(query)
+    group_hint = _extract_group_hint(query) if task_type in ("grouped_forecasting", "grouped_ranking") else None
+    
+    logger.info("[ML Agent] Extracted task_type: %s, group_hint: %s", task_type, group_hint)
     
     forecast_horizon = 12
     forecast_frequency = "months"
@@ -292,7 +376,8 @@ def run(query: str) -> dict[str, Any]:
             target_col=target_hint,
             customer_id=customer_id,
             rank_by_probability=not is_single_customer,
-            is_forecast=is_forecast,
+            task_type=task_type,
+            group_hint=group_hint,
             forecast_steps=forecast_horizon,
             forecast_frequency=forecast_frequency,
         )
@@ -308,15 +393,16 @@ def run(query: str) -> dict[str, Any]:
         }
 
     # For batch queries (no specific customer), show top 20 ranked by probability
+    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking")
     max_display = 20
-    if not is_forecast and not is_single_customer and prediction_result.count > max_display:
+    if not is_forecast and not is_single_customer and getattr(prediction_result, "count", 0) > max_display:
         prediction_result.predictions = prediction_result.predictions[:max_display]
         prediction_result.count = max_display
         prediction_result.truncated = True
 
     # 4. Generate explanation
     if is_forecast:
-        explanation = _generate_forecasting_explanation(query, prediction_result)
+        explanation = _generate_forecasting_explanation(query, prediction_result, task_type)
     else:
         explanation = _generate_explanation(query, prediction_result)
 
@@ -324,7 +410,7 @@ def run(query: str) -> dict[str, Any]:
     pred_dict = dataclasses.asdict(prediction_result)
 
     # 6. Build visualization metadata
-    viz_metadata = _build_visualization_metadata(prediction_result, is_single_customer, is_forecast)
+    viz_metadata = _build_visualization_metadata(prediction_result, is_single_customer, task_type)
 
     result = {
         "pipeline_type": "PREDICTIVE",
@@ -336,7 +422,17 @@ def run(query: str) -> dict[str, Any]:
     }
 
     # Build a simple table representation for backward compatibility
-    if is_forecast:
+    if task_type == "trend_direction_forecast":
+        result["rows"].append({"metric": "Trend Direction", "value": prediction_result.direction.title()})
+        result["rows"].append({"metric": "Horizon", "value": f"{prediction_result.horizon} periods"})
+    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+        for p in prediction_result.predictions[:5]:
+            val = p.get("final_value")
+            result["rows"].append({
+                "metric": p["group"],
+                "value": f"{val:,.2f}" if val is not None else "N/A"
+            })
+    elif task_type == "forecasting":
         for f in prediction_result.forecast[:5]:
             result["rows"].append({
                 "metric": f.date,
@@ -376,18 +472,30 @@ def run(query: str) -> dict[str, Any]:
     }
 
 
-def _build_visualization_metadata(prediction_result, is_single_customer: bool, is_forecast: bool = False) -> dict[str, Any]:
+def _build_visualization_metadata(prediction_result, is_single_customer: bool, task_type: str = "classification") -> dict[str, Any]:
     """
     Build structured visualization metadata from the prediction result.
     
     This tells the frontend what kind of charts to render and with what data,
     without the frontend needing to understand the ML internals.
     """
-    if is_forecast:
+    if task_type == "forecasting":
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
             "charts": [_build_forecasting_charts(prediction_result)],
+        }
+    elif task_type == "trend_direction_forecast":
+        return {
+            "mode": "forecast",
+            "problem_type": "forecasting",
+            "charts": [_build_forecasting_charts(prediction_result, title=f"Trend: {prediction_result.direction.title()}")],
+        }
+    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+        return {
+            "mode": "forecast",
+            "problem_type": "forecasting",
+            "charts": [_build_grouped_forecasting_charts(prediction_result)],
         }
 
     predictions = prediction_result.predictions
@@ -424,26 +532,45 @@ def _build_visualization_metadata(prediction_result, is_single_customer: bool, i
     }
 
 
-def _build_forecasting_charts(forecast_result) -> dict:
+def _build_forecasting_charts(forecast_result, title: str | None = None) -> dict:
     """Build a time-series line chart for forecasting."""
-    historical = [{"date": r.date, "value": r.value} for r in forecast_result.historical[-50:]] # limit to last 50 points to avoid huge charts
+    historical = [{"date": r.date, "value": r.value} for r in forecast_result.historical[-50:]]
     
     forecast = []
     for r in forecast_result.forecast:
         forecast.append({
             "date": r.date,
             "value": r.value,
-            "lower": r.lower_bound,
-            "upper": r.upper_bound,
+            "lower": getattr(r, "lower_bound", None),
+            "upper": getattr(r, "upper_bound", None),
         })
         
     return {
         "type": "time_series_forecast",
-        "title": f"Forecast: {forecast_result.target_column}",
+        "title": title or f"Forecast: {forecast_result.target_column}",
         "data": {
             "historical": historical,
             "forecast": forecast,
         }
+    }
+
+def _build_grouped_forecasting_charts(forecast_result) -> dict:
+    """Build a bar chart for grouped forecasting ranking."""
+    ranking_data = []
+    for p in forecast_result.predictions:
+        ranking_data.append({
+            "group": str(p["group"]),
+            "value": round(float(p["final_value"]), 2) if p["final_value"] is not None else 0.0,
+            "color": "#6366f1",
+        })
+        
+    return {
+        "type": "value_ranking",
+        "title": f"Top {forecast_result.group_column} by Predicted {forecast_result.target_column}",
+        "dimension": "group",
+        "metric": "value",
+        "sort": "descending",
+        "data": ranking_data[:20],
     }
 
 

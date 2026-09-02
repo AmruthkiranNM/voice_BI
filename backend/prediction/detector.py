@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ── Known target column names, ordered by priority ──
 _TARGET_HINTS = [
-    "exited", "churn", "churned", "attrition", "target",
+    "amount", "sales", "revenue", "exited", "churn", "churned", "attrition", "target",
     "label", "is_churned", "defaulted", "cancelled",
 ]
 
@@ -289,3 +289,92 @@ def _find_target_column(df: pd.DataFrame, hint: str | None = None, problem_type_
             continue
 
     return None
+
+
+def detect_group_dimension(group_hint: str, base_table: str) -> dict[str, str] | None:
+    """
+    Find the table, column, and join key for a grouped forecasting hint.
+    
+    Returns:
+        A dict with:
+          - target_table: e.g. "geo"
+          - group_column: e.g. "geo"
+          - join_key_base: e.g. "geoid"
+          - join_key_target: e.g. "geoid"
+        Or None if no matching dimension found.
+    """
+    from services.database import get_all_table_names, get_table_schema
+
+    hint_lower = group_hint.lower().replace(" ", "")
+    tables = get_all_table_names()
+    
+    best_score = 0.0
+    best_match = None
+    
+    # Semantic mapping for common dimension names
+    dim_aliases = {
+        "country": ["geo", "region", "country", "nation"],
+        "region": ["geo", "region"],
+        "product": ["product", "item"],
+        "category": ["category", "type", "class", "productcategory"],
+        "team": ["team", "salesteam", "group"],
+        "salesperson": ["salesperson", "rep", "agent"],
+    }
+    
+    expanded_hint = set([hint_lower])
+    for key, aliases in dim_aliases.items():
+        if hint_lower in aliases or hint_lower == key:
+            expanded_hint.update(aliases)
+
+    base_schema = get_table_schema(base_table)
+    base_columns = [c["column_name"].lower() for c in base_schema]
+
+    for table in tables:
+        if table == base_table:
+            continue
+            
+        schema = get_table_schema(table)
+        target_columns = [c["column_name"].lower() for c in schema]
+        
+        for col in target_columns:
+            score = 0.0
+            
+            # Exact match
+            if col in expanded_hint:
+                score += 100.0
+                
+            # Substring match
+            for eh in expanded_hint:
+                if len(eh) >= 3 and (eh in col or col in eh):
+                    score += 20.0
+                    
+            if score > best_score:
+                # To be a valid dimension, we need a join key.
+                # Look for a common ID column.
+                # E.g., 'geoid' in both tables, or 'pid' in both tables, or table+'id'
+                possible_keys = [table + "id", table[0] + "id"]
+                join_key = None
+                
+                # Check for direct ID match in base table
+                for bc in base_columns:
+                    if bc in possible_keys or bc == table + "id":
+                        join_key = bc
+                        break
+                        
+                # Check for identical column names ending in 'id'
+                if not join_key:
+                    for tc in target_columns:
+                        if tc.endswith("id") and tc in base_columns:
+                            join_key = tc
+                            break
+                            
+                if join_key:
+                    best_score = score
+                    best_match = {
+                        "target_table": table,
+                        "group_column": col,
+                        "join_key_base": join_key,
+                        "join_key_target": join_key,
+                    }
+                    
+    return best_match

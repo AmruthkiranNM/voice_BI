@@ -101,10 +101,11 @@ def predict_rows(
     filters: dict[str, Any] | None = None,
     risk_thresholds: dict[str, float] | None = None,
     rank_by_probability: bool = False,
-    is_forecast: bool = False,
+    task_type: str = "classification",
+    group_hint: str | None = None,
     forecast_steps: int = 12,
     forecast_frequency: str = "months",
-) -> PredictionResult | ForecastingResult:
+) -> Any:
     """
     Run inference on specific row(s) from a table.
 
@@ -117,14 +118,17 @@ def predict_rows(
         filters:             {column: value} filters.
         risk_thresholds:     Optional configurable mapping for 'High' and 'Medium' risk boundaries.
         rank_by_probability: Whether to sort the final result by probability descending.
-        is_forecast:         Whether to run a forecasting prediction.
-        forecast_steps:      Number of periods to forecast if is_forecast is True.
-        forecast_frequency:  Temporal frequency for the forecast (months, days, etc.).
+        task_type:           Type of task (e.g., forecasting, trend_direction_forecast, grouped_forecasting).
+        group_hint:          Optional hint for grouped tasks (e.g., 'country').
+        forecast_steps:      Number of periods to forecast.
+        forecast_frequency:  Temporal frequency for the forecast.
 
     Returns:
-        PredictionResult with per-row predictions, or ForecastingResult.
+        PredictionResult, ForecastingResult, TrendDirectionResult, or GroupedForecastingResult.
     """
     df = _load_table(table_name)
+    
+    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking")
 
     # Always detect to resolve target_col (which might be a semantic hint) and problem type
     problem_hint = "forecasting" if is_forecast else None
@@ -137,12 +141,46 @@ def predict_rows(
 
     # Load or train
     artifact = trainer.load_artifact(table_name, resolved_target_col)
-    if artifact is None or (is_forecast and getattr(artifact, "problem_type", None) != "forecasting"):
+    expected_problem_type = "forecasting" if is_forecast else "classification"
+    
+    # If it's a regression task but expected was classification, allow it (legacy behavior).
+    # But if it's forecasting vs non-forecasting, we must retrain.
+    needs_retrain = False
+    if artifact is None:
+        needs_retrain = True
+    elif is_forecast and getattr(artifact, "problem_type", None) != "forecasting":
+        needs_retrain = True
+    elif not is_forecast and getattr(artifact, "problem_type", None) == "forecasting":
+        needs_retrain = True
+
+    if needs_retrain:
         logger.info("[Service] No saved model or wrong type; training models now...")
         experiment = trainer.train_all(df, table_name, target_col=resolved_target_col, forecast_frequency=forecast_frequency, problem_type_hint=problem_hint)
         artifact = experiment.models[0]  # Just use the first one for lazy predict fallback
 
-    if is_forecast:
+    if task_type == "trend_direction_forecast":
+        return predictor.predict_trend_direction(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
+        
+    if task_type in ("grouped_forecasting", "grouped_ranking") and group_hint:
+        dim_info = detector.detect_group_dimension(group_hint, table_name)
+        if not dim_info:
+            raise ValueError(f"Could not find a valid grouping dimension for '{group_hint}' connected to {table_name}.")
+            
+        dim_df = _load_table(dim_info["target_table"])
+        
+        return predictor.predict_grouped_forecast(
+            df=df,
+            dim_df=dim_df,
+            target_col=resolved_target_col,
+            group_col=dim_info["group_column"],
+            join_key_base=dim_info["join_key_base"],
+            join_key_target=dim_info["join_key_target"],
+            steps=forecast_steps,
+            frequency=forecast_frequency,
+            table_name=table_name,
+        )
+
+    if task_type == "forecasting":
         return predictor.forecast(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
 
     # Locate target rows

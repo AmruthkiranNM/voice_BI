@@ -187,6 +187,124 @@ def forecast(
     )
 
 
+def predict_trend_direction(
+    df: pd.DataFrame,
+    artifact: TrainedModelArtifact,
+    steps: int = 3,
+    frequency: str = "months",
+):
+    """Run a forecast and determine whether the overall trend is increase, decrease, or stable."""
+    from prediction.schemas import TrendDirectionResult
+    
+    # 1. Get the forecast using existing function
+    forecast_result = forecast(df, artifact, steps=steps, frequency=frequency)
+    
+    historical = forecast_result.historical
+    forecast_rows = forecast_result.forecast
+    
+    if len(historical) < steps:
+        baseline_avg = sum(r.value for r in historical if r.value is not None) / len(historical) if historical else 0
+    else:
+        baseline_avg = sum(r.value for r in historical[-steps:] if r.value is not None) / steps
+
+    if forecast_rows:
+        forecast_avg = sum(r.value for r in forecast_rows if r.value is not None) / len(forecast_rows)
+    else:
+        forecast_avg = baseline_avg
+
+    if baseline_avg == 0:
+        direction = "increase" if forecast_avg > 0 else "stable"
+    else:
+        diff_pct = (forecast_avg - baseline_avg) / abs(baseline_avg)
+        if diff_pct > 0.02:
+            direction = "increase"
+        elif diff_pct < -0.02:
+            direction = "decrease"
+        else:
+            direction = "stable"
+            
+    return TrendDirectionResult(
+        target_column=forecast_result.target_column,
+        date_column=forecast_result.date_column,
+        direction=direction,
+        horizon=steps,
+        historical=historical,
+        forecast=forecast_rows,
+        table_name=forecast_result.table_name,
+    )
+
+
+def predict_grouped_forecast(
+    df: pd.DataFrame,
+    dim_df: pd.DataFrame,
+    target_col: str,
+    group_col: str,
+    join_key_base: str,
+    join_key_target: str,
+    steps: int = 1,
+    frequency: str = "months",
+    table_name: str = "",
+):
+    """Run forecasting on multiple groups by joining with a dimension table."""
+    from prediction.schemas import GroupedForecastingResult
+    
+    detection = detector.detect(df, table_name, target_hint=target_col, problem_type_hint="forecasting")
+    date_col = detection.date_column
+    
+    # 1. Join tables
+    merged_df = pd.merge(df, dim_df, left_on=join_key_base, right_on=join_key_target, how="inner")
+    
+    # 2. Preprocess grouped data
+    grouped_series = preprocessing.prepare_grouped_forecasting_data(
+        merged_df,
+        date_col=date_col,
+        target_col=detection.target_column,
+        group_col=group_col,
+        frequency=frequency
+    )
+    
+    # 3. Forecast each group
+    from prediction.models import create_model
+    predictions = []
+    
+    for group_name, ts_data in grouped_series.items():
+        try:
+            model = create_model(problem_type="forecasting")
+            model.fit(ts_data)
+            forecast_mean, _ = model.predict(steps=steps)
+            
+            # Format historical
+            hist_rows = [{"date": str(d), "value": float(v) if pd.notna(v) else None} for d, v in ts_data.items()]
+            
+            # Format forecast
+            fc_rows = [{"date": str(d), "value": float(v) if pd.notna(v) else None} for d, v in forecast_mean.items()]
+            
+            final_val = fc_rows[-1]["value"] if fc_rows else None
+            
+            predictions.append({
+                "group": str(group_name),
+                "historical": hist_rows,
+                "forecast": fc_rows,
+                "final_value": final_val,
+            })
+        except Exception as e:
+            logger.warning(f"Failed to forecast group {group_name}: {e}")
+            
+    # Rank them
+    predictions.sort(key=lambda x: x.get("final_value", 0) or 0, reverse=True)
+    best_group = predictions[0]["group"] if predictions else None
+            
+    return GroupedForecastingResult(
+        target_column=detection.target_column,
+        date_column=date_col,
+        group_column=group_col,
+        horizon=steps,
+        predictions=predictions,
+        best_group=best_group,
+        table_name=table_name,
+    )
+
+
 def find_rows_by_filter(
     df: pd.DataFrame,
     filters: dict[str, Any] | None = None,
