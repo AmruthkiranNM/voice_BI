@@ -170,10 +170,11 @@ class GroupedForecastingResult:
     """
     target_column: str
     date_column: str
-    group_column: str
+    group_dimensions: list[str]
     horizon: int
     table_name: str
     predictions: list[dict[str, Any]] # e.g. [{"group": "India", "forecast": [ForecastingRow...], "final_value": 1500, "historical": [...]}]
+    ranking_metric: str = "sum"
     best_group: str | None = None
 
 

@@ -236,30 +236,40 @@ def predict_trend_direction(
 
 def predict_grouped_forecast(
     df: pd.DataFrame,
-    dim_df: pd.DataFrame,
+    dimensions: list[dict[str, Any]],
     target_col: str,
-    group_col: str,
-    join_key_base: str,
-    join_key_target: str,
     steps: int = 1,
     frequency: str = "months",
     table_name: str = "",
+    ranking_metric: str = "sum",
 ):
-    """Run forecasting on multiple groups by joining with a dimension table."""
+    """Run forecasting on multiple groups by joining with dimension tables."""
     from prediction.schemas import GroupedForecastingResult
     
     detection = detector.detect(df, table_name, target_hint=target_col, problem_type_hint="forecasting")
     date_col = detection.date_column
     
-    # 1. Join tables
-    merged_df = pd.merge(df, dim_df, left_on=join_key_base, right_on=join_key_target, how="inner")
+    # 1. Join tables iteratively
+    merged_df = df
+    group_cols = []
+    semantic_dimensions = []
+    
+    for dim in dimensions:
+        dim_df = dim["dim_df"]
+        join_key_base = dim["join_key_base"]
+        join_key_target = dim["join_key_target"]
+        group_col = dim["group_column"]
+        
+        merged_df = pd.merge(merged_df, dim_df, left_on=join_key_base, right_on=join_key_target, how="inner")
+        group_cols.append(group_col)
+        semantic_dimensions.append(dim.get("semantic_hint", group_col))
     
     # 2. Preprocess grouped data
     grouped_series = preprocessing.prepare_grouped_forecasting_data(
         merged_df,
         date_col=date_col,
         target_col=detection.target_column,
-        group_col=group_col,
+        group_cols=group_cols,
         frequency=frequency
     )
     
@@ -279,7 +289,21 @@ def predict_grouped_forecast(
             # Format forecast
             fc_rows = [{"date": str(d), "value": float(v) if pd.notna(v) else None} for d, v in forecast_mean.items()]
             
-            final_val = fc_rows[-1]["value"] if fc_rows else None
+            if not fc_rows:
+                continue
+                
+            # Ranking Calculation
+            if ranking_metric == "growth":
+                baseline_len = min(len(hist_rows), steps)
+                baseline_total = sum(r["value"] for r in hist_rows[-baseline_len:] if r["value"])
+                forecast_total = sum(r["value"] for r in fc_rows if r["value"])
+                
+                if baseline_total and baseline_total > 0:
+                    final_val = ((forecast_total - baseline_total) / baseline_total) * 100
+                else:
+                    final_val = 0.0
+            else:
+                final_val = sum(r["value"] for r in fc_rows if r["value"])
             
             predictions.append({
                 "group": str(group_name),
@@ -297,11 +321,12 @@ def predict_grouped_forecast(
     return GroupedForecastingResult(
         target_column=detection.target_column,
         date_column=date_col,
-        group_column=group_col,
+        group_dimensions=semantic_dimensions,
         horizon=steps,
-        predictions=predictions,
-        best_group=best_group,
         table_name=table_name,
+        predictions=predictions,
+        ranking_metric=ranking_metric,
+        best_group=best_group,
     )
 
 

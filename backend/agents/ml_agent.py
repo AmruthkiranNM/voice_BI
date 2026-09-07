@@ -148,10 +148,12 @@ def _extract_task_type(query: str) -> str:
         return "trend_direction_forecast"
         
     has_group = bool(re.search(r"\b(each|every|by|which)\b", q))
-    has_rank = bool(re.search(r"\b(highest|lowest|most|least|top|bottom)\b", q))
+    has_rank = bool(re.search(r"\b(highest|lowest|most|least|top|bottom|strongest|weakest)\b", q))
     has_forecast = bool(re.search(r"\b(forecast|predict\s+next|future|next\s+(day|month|year|period|week))\b", q))
     
     if has_group and has_rank and has_forecast:
+        if bool(re.search(r"\bgrowth\b", q)):
+            return "growth_analysis"
         return "grouped_ranking"
     elif has_group and has_forecast:
         return "grouped_forecasting"
@@ -161,33 +163,41 @@ def _extract_task_type(query: str) -> str:
     return "classification"
 
 
-def _extract_group_hint(query: str) -> str | None:
+def _normalize_group_phrase(phrase: str) -> str:
+    """Strip grammatical connectors from a phrase."""
+    # Remove leading operators
+    phrase = re.sub(r"^(?:for each|for every|within each|in each|across|by|per|for)\s+", "", phrase, flags=re.IGNORECASE)
+    # Remove trailing operators if accidentally captured (like "country for")
+    phrase = re.sub(r"\s+(?:for|in|is|will|likely|has)$", "", phrase, flags=re.IGNORECASE)
+    return phrase.strip()
+
+
+def _extract_group_hints(query: str) -> list[str]:
     """
-    Extract the grouping dimension from queries.
-    Examples:
-      - "for each product category" -> "product category"
-      - "by country" -> "country"
-      - "Which sales team" -> "sales team"
+    Extract the grouping dimensions from queries and return as a list.
+    Handles multiple dimensions e.g. "by country and product category" -> ["country", "product category"]
     """
     patterns = [
-        r"(?:each|every|by)\s+([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,2})",
-        r"which\s+([a-zA-Z_]+(?:\s+[a-zA-Z_]+){0,2})\s+(?:is|will|likely)",
+        r"(?:for each|for every|within each|in each|across|by|per)\s+([a-zA-Z_\s]+?(?:\s+and\s+[a-zA-Z_\s]+?)?)(?=\s+(?:for|in|is|will|likely|has|over|next|month|year|highest|lowest|$))",
+        r"which\s+([a-zA-Z_\s]+?(?:\s+and\s+[a-zA-Z_\s]+?)?)\s+(?:is|will|likely|has)",
     ]
-    stop_words = {"next", "month", "year", "highest", "lowest", "most", "the", "to", "have", "generate", "is", "will"}
     
     for pat in patterns:
         match = re.search(pat, query, re.IGNORECASE)
         if match:
             raw = match.group(1).strip().lower()
-            words = raw.split()
-            # Remove stop words from ends
-            while words and words[-1] in stop_words:
-                words.pop()
-            while words and words[0] in stop_words:
-                words.pop(0)
-            if words:
-                return " ".join(words)
-    return None
+            
+            # Split by "and" or ","
+            parts = re.split(r"\s+and\s+|,", raw)
+            
+            dims = []
+            for part in parts:
+                clean = _normalize_group_phrase(part)
+                if clean:
+                    dims.append(clean)
+            if dims:
+                return dims
+    return []
 
 
 
@@ -275,7 +285,7 @@ Rules:
 1. State the forecasted direction clearly (increase/decrease/stable).
 2. Keep it under 50 words.
 Write the explanation now:"""
-    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+    elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
         best = forecast_result.best_group
         prompt = f"""You are a Business Advisor AI. A time-series model has forecasted multiple groups.
 The user asked: "{query}"
@@ -317,7 +327,7 @@ Write the explanation now:"""
         logger.warning("[ML Agent] LLM explanation failed: %s. Using fallback.", e)
         if task_type == "trend_direction_forecast":
             return f"The model expects a **{forecast_result.direction}** in {forecast_result.target_column} over the next {forecast_result.horizon} periods."
-        elif task_type in ("grouped_forecasting", "grouped_ranking"):
+        elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
             return f"The model predicts **{forecast_result.best_group}** will have the highest {forecast_result.target_column}."
         return "Forecast complete."
 
@@ -359,9 +369,9 @@ def run(query: str) -> dict[str, Any]:
     logger.info("[ML Agent] Extracted customer ID: %s, target hint: %s", customer_id, target_hint)
     
     task_type = _extract_task_type(query)
-    group_hint = _extract_group_hint(query) if task_type in ("grouped_forecasting", "grouped_ranking") else None
+    group_hints = _extract_group_hints(query) if task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis") else []
     
-    logger.info("[ML Agent] Extracted task_type: %s, group_hint: %s", task_type, group_hint)
+    logger.info("[ML Agent] Extracted task_type: %s, group_hints: %s", task_type, group_hints)
     
     forecast_horizon = 12
     forecast_frequency = "months"
@@ -377,7 +387,7 @@ def run(query: str) -> dict[str, Any]:
             customer_id=customer_id,
             rank_by_probability=not is_single_customer,
             task_type=task_type,
-            group_hint=group_hint,
+            group_hints=group_hints,
             forecast_steps=forecast_horizon,
             forecast_frequency=forecast_frequency,
         )
@@ -393,7 +403,7 @@ def run(query: str) -> dict[str, Any]:
         }
 
     # For batch queries (no specific customer), show top 20 ranked by probability
-    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking")
+    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking", "growth_analysis")
     max_display = 20
     if not is_forecast and not is_single_customer and getattr(prediction_result, "count", 0) > max_display:
         prediction_result.predictions = prediction_result.predictions[:max_display]
@@ -425,7 +435,7 @@ def run(query: str) -> dict[str, Any]:
     if task_type == "trend_direction_forecast":
         result["rows"].append({"metric": "Trend Direction", "value": prediction_result.direction.title()})
         result["rows"].append({"metric": "Horizon", "value": f"{prediction_result.horizon} periods"})
-    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+    elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
         for p in prediction_result.predictions[:5]:
             val = p.get("final_value")
             result["rows"].append({
@@ -491,11 +501,11 @@ def _build_visualization_metadata(prediction_result, is_single_customer: bool, t
             "problem_type": "forecasting",
             "charts": [_build_forecasting_charts(prediction_result, title=f"Trend: {prediction_result.direction.title()}")],
         }
-    elif task_type in ("grouped_forecasting", "grouped_ranking"):
+    elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
-            "charts": [_build_grouped_forecasting_charts(prediction_result)],
+            "charts": [_build_grouped_forecasting_charts(prediction_result, task_type)],
         }
 
     predictions = prediction_result.predictions
@@ -554,7 +564,7 @@ def _build_forecasting_charts(forecast_result, title: str | None = None) -> dict
         }
     }
 
-def _build_grouped_forecasting_charts(forecast_result) -> dict:
+def _build_grouped_forecasting_charts(forecast_result, task_type: str = "grouped_ranking") -> dict:
     """Build a bar chart for grouped forecasting ranking."""
     ranking_data = []
     for p in forecast_result.predictions:
@@ -564,9 +574,16 @@ def _build_grouped_forecasting_charts(forecast_result) -> dict:
             "color": "#6366f1",
         })
         
+    group_label = " and ".join(forecast_result.group_dimensions) if hasattr(forecast_result, "group_dimensions") else getattr(forecast_result, "group_column", "Group")
+        
+    if task_type == "growth_analysis":
+        title = f"Expected Growth % by {group_label}"
+    else:
+        title = f"Predicted {forecast_result.target_column} by {group_label}"
+        
     return {
         "type": "value_ranking",
-        "title": f"Top {forecast_result.group_column} by Predicted {forecast_result.target_column}",
+        "title": title,
         "dimension": "group",
         "metric": "value",
         "sort": "descending",

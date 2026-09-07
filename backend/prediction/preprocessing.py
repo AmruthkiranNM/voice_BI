@@ -190,17 +190,19 @@ def prepare_grouped_forecasting_data(
     df: pd.DataFrame,
     date_col: str,
     target_col: str,
-    group_col: str,
+    group_cols: list[str],
     frequency: str = "months",
 ) -> dict[str, pd.Series]:
     """
-    Preprocess time-series data grouped by a dimension.
-    Returns a dictionary mapping group names to their aggregated Series.
+    Preprocess time-series data grouped by multiple dimensions.
+    Returns a dictionary mapping concatenated group names (e.g. 'USA - Bars') to their aggregated Series.
     """
-    df_ts = df[[date_col, target_col, group_col]].copy()
+    cols_to_keep = [date_col, target_col] + group_cols
+    df_ts = df[cols_to_keep].copy()
+    
     df_ts[date_col] = pd.to_datetime(df_ts[date_col], errors="coerce")
     df_ts[target_col] = pd.to_numeric(df_ts[target_col], errors="coerce")
-    df_ts = df_ts.dropna(subset=[date_col, target_col, group_col])
+    df_ts = df_ts.dropna(subset=[date_col, target_col] + group_cols)
     
     freq_map = {
         "months": "M", "month": "M",
@@ -213,8 +215,14 @@ def prepare_grouped_forecasting_data(
 
     grouped_series = {}
     
-    # Iterate over unique groups
-    for group_name, group_df in df_ts.groupby(group_col):
+    # Iterate over unique group combinations
+    for group_vals, group_df in df_ts.groupby(group_cols):
+        # Format the composite key (e.g. "India - Bars")
+        if isinstance(group_vals, tuple):
+            group_name = " - ".join([str(v) for v in group_vals])
+        else:
+            group_name = str(group_vals)
+            
         # Sort chronologically
         g_df = group_df.sort_values(date_col)
         # Set index and aggregate
@@ -223,7 +231,7 @@ def prepare_grouped_forecasting_data(
         
         # Keep only groups with at least a few points
         if len(s) >= 3:
-            grouped_series[str(group_name)] = s
+            grouped_series[group_name] = s
             
     return grouped_series
 

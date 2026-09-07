@@ -97,20 +97,20 @@ def train_models(
 def predict_rows(
     table_name: str,
     target_col: str | None = None,
-    customer_id: Any | None = None,
+    customer_id: str | None = None,
     filters: dict[str, Any] | None = None,
     risk_thresholds: dict[str, float] | None = None,
     rank_by_probability: bool = False,
     task_type: str = "classification",
-    group_hint: str | None = None,
+    group_hints: list[str] | None = None,
     forecast_steps: int = 12,
     forecast_frequency: str = "months",
 ) -> Any:
     """
     Run inference on specific row(s) from a table.
-
+    
     If no model exists yet, trains one first (lazy training).
-
+    
     Args:
         table_name:          SQLite table name.
         target_col:          Optional explicit target column.
@@ -119,16 +119,16 @@ def predict_rows(
         risk_thresholds:     Optional configurable mapping for 'High' and 'Medium' risk boundaries.
         rank_by_probability: Whether to sort the final result by probability descending.
         task_type:           Type of task (e.g., forecasting, trend_direction_forecast, grouped_forecasting).
-        group_hint:          Optional hint for grouped tasks (e.g., 'country').
+        group_hints:         Optional hints for grouped tasks (e.g., ['country', 'product category']).
         forecast_steps:      Number of periods to forecast.
         forecast_frequency:  Temporal frequency for the forecast.
-
+        
     Returns:
         PredictionResult, ForecastingResult, TrendDirectionResult, or GroupedForecastingResult.
     """
     df = _load_table(table_name)
     
-    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking")
+    is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking", "growth_analysis")
 
     # Always detect to resolve target_col (which might be a semantic hint) and problem type
     problem_hint = "forecasting" if is_forecast else None
@@ -161,23 +161,25 @@ def predict_rows(
     if task_type == "trend_direction_forecast":
         return predictor.predict_trend_direction(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
         
-    if task_type in ("grouped_forecasting", "grouped_ranking") and group_hint:
-        dim_info = detector.detect_group_dimension(group_hint, table_name)
-        if not dim_info:
-            raise ValueError(f"Could not find a valid grouping dimension for '{group_hint}' connected to {table_name}.")
+    if task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis") and group_hints:
+        dim_info_list = detector.detect_group_dimensions(group_hints, table_name)
+        if not dim_info_list:
+            raise ValueError(f"Could not find valid grouping dimensions for '{group_hints}' connected to {table_name}.")
             
-        dim_df = _load_table(dim_info["target_table"])
+        # Add the dataframe instances directly into the dim_info dictionaries
+        for dim_info in dim_info_list:
+            dim_info["dim_df"] = _load_table(dim_info["target_table"])
+        
+        ranking_metric = "growth" if task_type == "growth_analysis" else "sum"
         
         return predictor.predict_grouped_forecast(
             df=df,
-            dim_df=dim_df,
+            dimensions=dim_info_list,
             target_col=resolved_target_col,
-            group_col=dim_info["group_column"],
-            join_key_base=dim_info["join_key_base"],
-            join_key_target=dim_info["join_key_target"],
             steps=forecast_steps,
             frequency=forecast_frequency,
             table_name=table_name,
+            ranking_metric=ranking_metric,
         )
 
     if task_type == "forecasting":

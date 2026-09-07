@@ -291,25 +291,21 @@ def _find_target_column(df: pd.DataFrame, hint: str | None = None, problem_type_
     return None
 
 
-def detect_group_dimension(group_hint: str, base_table: str) -> dict[str, str] | None:
+def detect_group_dimensions(group_hints: list[str], base_table: str) -> list[dict[str, str]]:
     """
-    Find the table, column, and join key for a grouped forecasting hint.
+    Find the tables, columns, and join keys for a list of grouped forecasting hints.
     
     Returns:
-        A dict with:
+        A list of dicts, each with:
           - target_table: e.g. "geo"
           - group_column: e.g. "geo"
           - join_key_base: e.g. "geoid"
           - join_key_target: e.g. "geoid"
-        Or None if no matching dimension found.
+          - semantic_hint: e.g. "country"
     """
     from services.database import get_all_table_names, get_table_schema
 
-    hint_lower = group_hint.lower().replace(" ", "")
     tables = get_all_table_names()
-    
-    best_score = 0.0
-    best_match = None
     
     # Semantic mapping for common dimension names
     dim_aliases = {
@@ -321,60 +317,69 @@ def detect_group_dimension(group_hint: str, base_table: str) -> dict[str, str] |
         "salesperson": ["salesperson", "rep", "agent"],
     }
     
-    expanded_hint = set([hint_lower])
-    for key, aliases in dim_aliases.items():
-        if hint_lower in aliases or hint_lower == key:
-            expanded_hint.update(aliases)
-
     base_schema = get_table_schema(base_table)
     base_columns = [c["column_name"].lower() for c in base_schema]
-
-    for table in tables:
-        if table == base_table:
-            continue
-            
-        schema = get_table_schema(table)
-        target_columns = [c["column_name"].lower() for c in schema]
+    
+    results = []
+    
+    for hint in group_hints:
+        hint_lower = hint.lower().replace(" ", "")
+        best_score = 0.0
+        best_match = None
         
-        for col in target_columns:
-            score = 0.0
+        expanded_hint = set([hint_lower])
+        for key, aliases in dim_aliases.items():
+            if hint_lower in aliases or hint_lower == key:
+                expanded_hint.update(aliases)
+
+        for table in tables:
+            if table == base_table:
+                continue
+                
+            schema = get_table_schema(table)
+            target_columns = [c["column_name"].lower() for c in schema]
             
-            # Exact match
-            if col in expanded_hint:
-                score += 100.0
+            for col in target_columns:
+                score = 0.0
                 
-            # Substring match
-            for eh in expanded_hint:
-                if len(eh) >= 3 and (eh in col or col in eh):
-                    score += 20.0
+                # Exact match
+                if col in expanded_hint:
+                    score += 100.0
                     
-            if score > best_score:
-                # To be a valid dimension, we need a join key.
-                # Look for a common ID column.
-                # E.g., 'geoid' in both tables, or 'pid' in both tables, or table+'id'
-                possible_keys = [table + "id", table[0] + "id"]
-                join_key = None
-                
-                # Check for direct ID match in base table
-                for bc in base_columns:
-                    if bc in possible_keys or bc == table + "id":
-                        join_key = bc
-                        break
+                # Substring match
+                for eh in expanded_hint:
+                    if len(eh) >= 3 and (eh in col or col in eh):
+                        score += 20.0
                         
-                # Check for identical column names ending in 'id'
-                if not join_key:
-                    for tc in target_columns:
-                        if tc.endswith("id") and tc in base_columns:
-                            join_key = tc
+                if score > best_score:
+                    # To be a valid dimension, we need a join key.
+                    possible_keys = [table + "id", table[0] + "id"]
+                    join_key = None
+                    
+                    # Check for direct ID match in base table
+                    for bc in base_columns:
+                        if bc in possible_keys or bc == table + "id":
+                            join_key = bc
                             break
                             
-                if join_key:
-                    best_score = score
-                    best_match = {
-                        "target_table": table,
-                        "group_column": col,
-                        "join_key_base": join_key,
-                        "join_key_target": join_key,
-                    }
-                    
-    return best_match
+                    # Check for identical column names ending in 'id'
+                    if not join_key:
+                        for tc in target_columns:
+                            if tc.endswith("id") and tc in base_columns:
+                                join_key = tc
+                                break
+                                
+                    if join_key:
+                        best_score = score
+                        best_match = {
+                            "target_table": table,
+                            "group_column": col,
+                            "join_key_base": join_key,
+                            "join_key_target": join_key,
+                            "semantic_hint": hint,
+                        }
+        
+        if best_match:
+            results.append(best_match)
+            
+    return results
