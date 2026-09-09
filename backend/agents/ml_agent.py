@@ -502,10 +502,14 @@ def _build_visualization_metadata(prediction_result, is_single_customer: bool, t
             "charts": [_build_forecasting_charts(prediction_result, title=f"Trend: {prediction_result.direction.title()}")],
         }
     elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
+        charts = [_build_grouped_forecasting_line_chart(prediction_result)]
+        if task_type in ("grouped_ranking", "growth_analysis"):
+            charts.append(_build_grouped_forecasting_ranking_chart(prediction_result, task_type))
+            
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
-            "charts": [_build_grouped_forecasting_charts(prediction_result, task_type)],
+            "charts": charts,
         }
 
     predictions = prediction_result.predictions
@@ -564,7 +568,26 @@ def _build_forecasting_charts(forecast_result, title: str | None = None) -> dict
         }
     }
 
-def _build_grouped_forecasting_charts(forecast_result, task_type: str = "grouped_ranking") -> dict:
+def _build_grouped_forecasting_line_chart(forecast_result) -> dict:
+    """Build a multi-line chart for grouped forecasting."""
+    group_label = " and ".join(forecast_result.group_dimensions) if hasattr(forecast_result, "group_dimensions") else getattr(forecast_result, "group_column", "Group")
+    
+    series_data = []
+    for p in forecast_result.predictions:
+        series_data.append({
+            "group": str(p["group"]),
+            "historical": p.get("historical", [])[-50:],
+            "forecast": p.get("forecast", []),
+        })
+        
+    return {
+        "type": "grouped_time_series_forecast",
+        "title": f"Forecast {forecast_result.target_column} by {group_label}",
+        "dimension": "group",
+        "data": series_data
+    }
+
+def _build_grouped_forecasting_ranking_chart(forecast_result, task_type: str = "grouped_ranking") -> dict:
     """Build a bar chart for grouped forecasting ranking."""
     ranking_data = []
     for p in forecast_result.predictions:
