@@ -8,7 +8,7 @@ import { applyFollowUpDelay, FOLLOWUP_DELAY_ENABLED } from '../utils/delayConfig
 
 export default function FollowUpChat({
   query, sql, result, insight, model, tableName, tableNames,
-  messages, onMessagesChange, autoSpeak, pendingQuestion, onPendingQuestionHandled,
+  messages, onMessagesChange, onResponseUpdate, autoSpeak, pendingQuestion, onPendingQuestionHandled,
 }) {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -68,6 +68,10 @@ export default function FollowUpChat({
 
       const aiMsg = { role: 'assistant', content: response.reply };
       onMessagesChange(prev => [...prev, aiMsg]);
+      
+      if (response.new_response && onResponseUpdate) {
+        onResponseUpdate(response.new_response);
+      }
 
       // Speak AI response if autoSpeak is enabled
       if (autoSpeak && window.speechSynthesis) {

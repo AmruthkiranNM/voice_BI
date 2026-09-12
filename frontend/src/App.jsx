@@ -476,6 +476,7 @@ export default function App() {
                     settings={settings}
                     chatMessages={chatMessages}
                     onChatMessagesChange={setChatMessages}
+                    onResponseUpdate={(updated) => setResponse(updated)}
                   />
                 )}
               </div>

@@ -41,6 +41,7 @@ class ChatResponse(BaseModel):
     success: bool
     reply: str | None = None
     error: str | None = None
+    new_response: dict | None = None
 
 
 @router.post(
@@ -58,7 +59,7 @@ def handle_chat(request: ChatRequest):
     try:
         from agents import followup_orchestrator
         
-        reply = followup_orchestrator.run_followup(
+        followup_outcome = followup_orchestrator.run_followup(
             message=request.message,
             context={
                 "query": request.query,
@@ -70,7 +71,15 @@ def handle_chat(request: ChatRequest):
             },
             history=[turn.model_dump() for turn in request.history],
         )
-        return ChatResponse(success=True, reply=reply)
+        reply = ""
+        new_response = None
+        if isinstance(followup_outcome, dict) and "reply" in followup_outcome:
+            reply = followup_outcome["reply"]
+            new_response = followup_outcome.get("new_response")
+        else:
+            reply = followup_outcome
+            
+        return ChatResponse(success=True, reply=reply, new_response=new_response)
     except Exception as e:
         logger.exception("Chat follow-up failed")
         raise HTTPException(status_code=500, detail=f"Chat failed: {e}")

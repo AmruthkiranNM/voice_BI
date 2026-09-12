@@ -21,6 +21,7 @@ export default function ResultsDashboard({
   settings,
   chatMessages,
   onChatMessagesChange,
+  onResponseUpdate,
   sourceLabel,
   fakePipelineSeconds,
 }) {
@@ -181,6 +182,7 @@ export default function ResultsDashboard({
           tableNames={datasetInfo?.tableNames}
           messages={chatMessages}
           onMessagesChange={onChatMessagesChange}
+          onResponseUpdate={onResponseUpdate}
           autoSpeak={settings.speakInsight}
           pendingQuestion={pendingQuestion}
           onPendingQuestionHandled={() => setPendingQuestion(null)}

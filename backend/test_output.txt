@@ -1,0 +1,22 @@
+
+[Final Reply Text]:
+**Why the current ranking looks the way it does**
+
+The observed data for this year show that New Zealand leads with a total revenue of **$1,195,250.00**, followed closely by Canada (**$1,184,841.00**) and India (**$1,171,023.00**).  
+- In New Zealand, the top product is **Dark Bites**, contributing **$413,273.00** (70 % of the country’s revenue).  
+- Canada’s top product is **After Nines** with **$412,482.00**.  
+- India’s top product is **Organic Choco Syrup**, generating **$402,269.00**.  
+
+These figures illustrate the current revenue distribution across the three markets. They are purely descriptive; the numbers themselves do not explain *why* customers chose these products or why one country outperforms another. Revenue data alone does not establish causal reasons such as marketing, pricing, or consumer preference.
+
+**Will the ranking be the same next year?**
+
+The forecast model projects a shift in the top three markets for the next year:  
+1. **Australia – Caramel Stuffed Bars**: predicted revenue **$948,289.28**  
+2. **New Zealand – Raspberry Choco**: predicted revenue **$665,039.55**  
+3. **Australia – Peanut Butter Cubes**: predicted revenue **$660,180.24**  
+
+Thus, New Zealand would move from first to second place, and Australia would take the lead. These predictions are deterministic outputs of the forecast model based on the data available; they do not imply any underlying causal mechanisms.
+
+[New Visualization Type]:
+grouped_time_series_forecast

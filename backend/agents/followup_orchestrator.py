@@ -26,10 +26,14 @@ INSTRUCTIONS:
 
 Return ONLY a JSON object with this exact structure:
 {{
-  "type": "FILTER_REFINEMENT" | "ENTITY_REFERENCE" | "COMPARISON" | "EXPLANATION" | "NEW_INDEPENDENT_QUESTION" | "NO_NEW_DATA",
+  "type": "FILTER_REFINEMENT" | "ENTITY_REFERENCE" | "COMPARISON" | "EXPLANATION" | "NEW_INDEPENDENT_QUESTION" | "NO_NEW_DATA" | "DIAGNOSTIC_PREDICTIVE" | "PREDICTIVE_FORECAST",
   "resolved_question": "The standalone, explicit question with all entities named",
   "needs_new_query": true/false
 }}
+
+NOTES ON TYPES:
+- DIAGNOSTIC_PREDICTIVE: Use when the user asks to explain the current data AND asks for a future prediction (e.g., "Why is it like this and will it be the same next year?").
+- PREDICTIVE_FORECAST: Use when the user asks a pure future prediction question based on the current context (e.g., "Will this remain the same next year?").
 """
 
 STRICT_ANSWER_PROMPT = """You are a Data Analyst answering a follow-up question.
@@ -66,6 +70,11 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     result = context.get("result") or {}
     rows = result.get("rows", [])
     
+    # 0. Predictive Routing
+    if result.get("pipeline_type") == "PREDICTIVE":
+        from agents import predictive_followup_agent
+        return predictive_followup_agent.run(message, context, history)
+
     # 1. Resolve context
     prompt = RESOLVER_PROMPT_TEMPLATE.format(
         original_query=context.get("query", ""),
@@ -87,8 +96,14 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
         
     resolved_question = parsed.get("resolved_question", message)
     needs_new_query = parsed.get("needs_new_query", True)
+    intent_type = parsed.get("type", "UNKNOWN")
     
-    logger.info(f"[FOLLOWUP:{req_id}] 09b Resolved Question: {resolved_question}, needs_new_query: {needs_new_query}")
+    logger.info(f"[FOLLOWUP:{req_id}] 09b Resolved Question: {resolved_question}, needs_new_query: {needs_new_query}, type: {intent_type}")
+    
+    # 1.5 Predictive Compound Routing
+    if intent_type in ("DIAGNOSTIC_PREDICTIVE", "PREDICTIVE_FORECAST"):
+        from agents import historical_to_predictive_agent
+        return historical_to_predictive_agent.run(message, context, history)
     
     if not needs_new_query:
         from agents.chat import run as run_chat
