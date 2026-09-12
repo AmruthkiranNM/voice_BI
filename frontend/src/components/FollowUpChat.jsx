@@ -46,6 +46,11 @@ export default function FollowUpChat({
     const currentHistory = [...messages, userMsg];
     onMessagesChange(currentHistory);
     
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      onMessagesChange(prev => [...prev, { role: 'assistant', content: 'Sorry, I lost the original context of this conversation. Please start a new analysis.', isError: true }]);
+      return;
+    }
+    
     if (!FOLLOWUP_DELAY_ENABLED) {
       setIsTyping(true);
     } else {
