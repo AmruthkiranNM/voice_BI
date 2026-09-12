@@ -18,21 +18,29 @@ Prediction Type: {task_type}
 
 Follow-up Question: "{message}"
 
-Determine what the user wants to do. Output a JSON object with:
-1. "intent": One of:
-   - "rank_highest": User wants to know which group/entity has the highest predicted value (e.g., "Which country has the highest predicted revenue?")
+Determine what the user wants to do. The user may be asking for multiple things at once (e.g. "Why is Australia highest, and will it remain highest next year?").
+
+Output a JSON object with:
+1. "intents": An array of intent objects. Each object must have an "intent" field, which is one of:
+   - "rank_highest": User wants to know which group/entity has the highest predicted value.
    - "rank_lowest": User wants to know which group/entity has the lowest predicted value.
    - "growth_highest": User wants to know which group has the highest predicted growth.
-   - "peak": User wants to know the highest point/date for a specific group (e.g. "When is the peak for Germany?")
-   - "change_horizon": User wants to change the forecast horizon (e.g., "What about the next 12 months?")
-   - "change_group": User wants to group by a different dimension (e.g., "Break it down by category instead")
-   - "change_target": User wants to predict a different metric (e.g., "Predict sales instead")
+   - "peak": User wants to know the highest point/date for a specific group.
+   - "change_horizon": User wants to change the forecast horizon.
+   - "change_group": User wants to group by a different dimension.
+   - "change_target": User wants to predict a different metric.
    - "explain": General question asking to explain the existing prediction further.
-2. "new_horizon": (int or null) If intent is change_horizon, extract the new number of periods.
-3. "new_frequency": (string or null) e.g., "months", "days", "years".
-4. "new_group": (list of strings or null) If intent is change_group, extract the new grouping dimension(s).
-5. "new_target": (string or null) If intent is change_target, extract the new target metric.
-6. "entity": (string or null) If intent is peak, extract the specific group entity mentioned (e.g. "Germany").
+   - "entity_detail": User asks about a specific entity (e.g., "What about India?").
+   - "comparison": User asks to compare two entities (e.g., "Compare India with Australia.").
+   - "future_comparison": User asks if the current ranking/entity will remain the same in the future (e.g., "Will Australia remain the highest next year?").
+
+For each intent object in the "intents" array, include these additional fields if applicable:
+- "new_horizon": (int or null) If intent is change_horizon or future_comparison.
+- "new_frequency": (string or null) e.g., "months", "days", "years".
+- "new_group": (list of strings or null) If intent is change_group.
+- "new_target": (string or null) If intent is change_target.
+- "entity": (string or null) If intent is peak, entity_detail, or future_comparison.
+- "entities": (list of strings or null) If intent is comparison.
 
 Respond ONLY with the JSON object.
 """
@@ -66,19 +74,38 @@ def run(message: str, context: dict[str, Any], history: list[dict[str, Any]]) ->
         intent_data = json.loads(raw_intent)
     except Exception as e:
         logger.error(f"Failed to parse followup intent: {e}")
-        intent_data = {"intent": "explain"}
+        intent_data = {"intents": [{"intent": "explain"}]}
 
-    intent = intent_data.get("intent")
-    logger.info(f"Predictive Follow-up Intent: {intent}")
+    intents_list = intent_data.get("intents", [])
+    if not intents_list and "intent" in intent_data:
+        # Fallback for old LLM output
+        intents_list = [intent_data]
+        
+    logger.info(f"Predictive Follow-up Intents: {[i.get('intent') for i in intents_list]}")
 
-    if intent in ("change_horizon", "change_group", "change_target"):
-        return _handle_parameter_change(message, intent_data, context)
-    elif intent in ("rank_highest", "rank_lowest", "growth_highest", "peak"):
-        return _handle_deterministic_calculation(message, intent_data, context)
-    else:
-        # Default fallback: Just use LLM to explain the existing context
-        explanation = _generate_explanation(message, "Look at the provided charts and data to answer.")
-        return {"reply": explanation, "new_response": None}
+    answers = []
+    final_new_result = None
+    
+    for intent_obj in intents_list:
+        intent = intent_obj.get("intent")
+        if intent in ("change_horizon", "change_group", "change_target", "future_comparison"):
+            res = _handle_parameter_change(message, intent_obj, context)
+            answers.append(res.get("_deterministic_text", res.get("reply", "")))
+            if res.get("new_response"):
+                final_new_result = res["new_response"]["result"]
+        elif intent in ("rank_highest", "rank_lowest", "growth_highest", "peak", "entity_detail", "comparison", "explain"):
+            res = _handle_deterministic_calculation(message, intent_obj, context)
+            answers.append(res.get("_deterministic_text", res.get("reply", "")))
+            if res.get("new_response") and not final_new_result:
+                final_new_result = res["new_response"]["result"]
+                
+    combined_answer_data = "\n\n".join(answers)
+    explanation = _generate_explanation(message, combined_answer_data)
+    
+    ret = {"reply": explanation}
+    if final_new_result:
+        ret["new_response"] = {"result": final_new_result, "insight": explanation}
+    return ret
 
 def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> dict:
     original_query = context.get("query", "")
@@ -135,9 +162,37 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
             "row_count": 0
         }
         
-        explanation = ml_agent._generate_forecasting_explanation(message, prediction_result, task_type)
+        intent = intent_data.get("intent")
+        if intent == "future_comparison":
+            # Compare current ranking (from pred_data) with new prediction_result
+            current_preds = pred_data.get("predictions", [])
+            if current_preds and hasattr(prediction_result, "predictions") and prediction_result.predictions:
+                curr_sorted = sorted(current_preds, key=lambda p: float(p.get("final_value") or 0.0), reverse=True)
+                new_sorted = sorted(prediction_result.predictions, key=lambda p: float(p.get("final_value") or 0.0), reverse=True)
+                
+                curr_top = curr_sorted[0]["group"] if curr_sorted else "Unknown"
+                new_top = new_sorted[0]["group"] if new_sorted else "Unknown"
+                
+                entity = intent_data.get("entity")
+                
+                explanation = f"New forecast generated for {horizon} periods. "
+                if curr_top == new_top:
+                    explanation += f"{curr_top} is projected to remain the highest ranked group."
+                else:
+                    explanation += f"The ranking is expected to change. {curr_top} falls from the top spot, and {new_top} takes the lead."
+                    
+                if entity:
+                    # Find entity's new rank
+                    for i, p in enumerate(new_sorted, 1):
+                        if entity.lower() in str(p["group"]).lower():
+                            explanation += f" {p['group']} is predicted to rank #{i} with a value of {float(p.get('final_value') or 0.0):,.2f}."
+                            break
+            else:
+                explanation = ml_agent._generate_forecasting_explanation(message, prediction_result, task_type)
+        else:
+            explanation = ml_agent._generate_forecasting_explanation(message, prediction_result, task_type)
         
-        return {"reply": explanation, "new_response": {"result": new_result, "insight": explanation}}
+        return {"_deterministic_text": explanation, "reply": explanation, "new_response": {"result": new_result, "insight": explanation}}
         
     except Exception as e:
         logger.exception("Failed to rerun prediction")
@@ -223,11 +278,40 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
             peak = max(fcst, key=lambda x: x["value"])
             answer_data = f"The peak for {target_pred['group']} is {peak['value']:,.2f} on {peak['date']}."
             
-    explanation = _generate_explanation(message, answer_data)
-    
-    response_dict = {"reply": explanation}
+    elif intent == "entity_detail":
+        entity = intent_data.get("entity")
+        if not entity:
+            answer_data = "I'm not sure which entity you are asking about."
+        else:
+            found = next((p for p in predictions if entity.lower() in str(p.get("group", "")).lower()), None)
+            if found:
+                answer_data = f"For {found['group']}, the predicted value is {float(found.get('final_value') or 0.0):,.2f}."
+            else:
+                answer_data = f"I couldn't find {entity} in the prediction results."
+                
+    elif intent == "comparison":
+        entities = intent_data.get("entities", [])
+        if len(entities) >= 2:
+            e1 = next((p for p in predictions if entities[0].lower() in str(p.get("group", "")).lower()), None)
+            e2 = next((p for p in predictions if entities[1].lower() in str(p.get("group", "")).lower()), None)
+            
+            if e1 and e2:
+                v1 = float(e1.get("final_value") or 0.0)
+                v2 = float(e2.get("final_value") or 0.0)
+                diff = abs(v1 - v2)
+                higher = e1['group'] if v1 > v2 else e2['group']
+                answer_data = f"{e1['group']} is predicted at {v1:,.2f} and {e2['group']} at {v2:,.2f}. {higher} is higher by {diff:,.2f}."
+            else:
+                answer_data = "I couldn't find both entities to compare."
+        else:
+            answer_data = "I need at least two entities to compare."
+            
+    elif intent == "explain":
+        answer_data = "The user asked for a general explanation of the current prediction."
+            
+    response_dict = {"_deterministic_text": answer_data, "reply": answer_data}
     if new_result:
-        response_dict["new_response"] = {"result": new_result, "insight": explanation}
+        response_dict["new_response"] = {"result": new_result, "insight": answer_data}
         
     return response_dict
 

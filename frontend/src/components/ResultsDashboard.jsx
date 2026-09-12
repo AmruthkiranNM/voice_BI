@@ -99,6 +99,25 @@ export default function ResultsDashboard({
         {/* Prediction Visualization */}
         <PredictionPanel result={result} insight={insight} />
 
+        {/* ── Follow-Up Chat ────────────────────────────────── */}
+        <div id="followup-chat" className="no-print mt-8 mb-8">
+          <FollowUpChat
+            query={query}
+            sql={sql}
+            result={result}
+            insight={insight}
+            model={settings.model}
+            tableName={datasetInfo?.tableName}
+            tableNames={datasetInfo?.tableNames}
+            messages={chatMessages}
+            onMessagesChange={onChatMessagesChange}
+            onResponseUpdate={onResponseUpdate}
+            autoSpeak={settings.speakInsight}
+            pendingQuestion={pendingQuestion}
+            onPendingQuestionHandled={() => setPendingQuestion(null)}
+          />
+        </div>
+
         {/* Agent Timeline */}
         <Timeline agentLogs={response?.agent_logs} pipelineTime={pipelineTime} />
 

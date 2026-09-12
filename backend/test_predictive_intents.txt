@@ -1,0 +1,10 @@
+
+=== Query: What about India? ===
+Reply: The predicted value for India is **490,000.00**.
+
+=== Query: Compare India with Australia ===
+Reply: India is predicted at 490,000.00, while Australia is predicted at 520,000.00 – Australia is higher by 30,000.00.
+
+=== Query: Why is Australia highest, and will it remain highest next year? ===
+Reply: Australia tops the list with a current value of 6,697,334.88, and the forecast shows it will stay #1 next year.
+New Viz: grouped_time_series_forecast
