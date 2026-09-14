@@ -114,6 +114,20 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
     table_name = pred_data.get("table_name") or context.get("table_name")
     
     if not table_name:
+        sql = context.get("sql", "")
+        if sql:
+            import re
+            match = re.search(r"FROM\s+\[?\"?([a-zA-Z0-9_]+)\"?\]?", sql, re.IGNORECASE)
+            if match:
+                table_name = match.group(1).strip()
+        if not table_name:
+            t_names = context.get("table_names")
+            if t_names and isinstance(t_names, list) and len(t_names) > 0:
+                table_name = t_names[0]
+            else:
+                table_name = "sales"
+    
+    if not table_name:
         return {"reply": "I need a valid dataset to run this prediction.", "new_response": None}
 
     # Recover previous parameters

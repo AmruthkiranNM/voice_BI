@@ -59,7 +59,29 @@ def run(message: str, context: dict[str, Any], history: list[dict[str, str]] | N
     result = context.get("result", {})
     rows = result.get("rows", [])
     columns = result.get("columns", [])
-    table_name = context.get("table_name", "sales")
+    
+    def _resolve_table_name(ctx: dict) -> str:
+        t_name = ctx.get("table_name")
+        if t_name:
+            return t_name
+            
+        sql = ctx.get("sql", "")
+        if sql:
+            import re
+            match = re.search(r"FROM\s+\[?\"?([a-zA-Z0-9_]+)\"?\]?", sql, re.IGNORECASE)
+            if match:
+                return match.group(1).strip()
+                
+        t_names = ctx.get("table_names")
+        if t_names and isinstance(t_names, list) and len(t_names) > 0:
+            return t_names[0]
+            
+        return "sales"
+        
+    table_name = _resolve_table_name(context)
+    
+    if not table_name:
+        return "I couldn't determine the correct dataset to run the forecast."
     
     if not rows or not columns:
         return "I don't have enough historical data to generate a forecast."
