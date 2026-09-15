@@ -436,7 +436,7 @@ def run(query: str) -> dict[str, Any]:
         result["rows"].append({"metric": "Trend Direction", "value": prediction_result.direction.title()})
         result["rows"].append({"metric": "Horizon", "value": f"{prediction_result.horizon} periods"})
     elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
-        for p in prediction_result.predictions[:5]:
+        for p in getattr(prediction_result, "raw_forecast_results", getattr(prediction_result, "predictions", []))[:5]:
             val = p.get("final_value")
             result["rows"].append({
                 "metric": p["group"],
@@ -570,10 +570,12 @@ def _build_forecasting_charts(forecast_result, title: str | None = None) -> dict
 
 def _build_grouped_forecasting_line_chart(forecast_result) -> dict:
     """Build a multi-line chart for grouped forecasting."""
-    group_label = " and ".join(forecast_result.group_dimensions) if hasattr(forecast_result, "group_dimensions") else getattr(forecast_result, "group_column", "Group")
+    group_label = " and ".join(forecast_result.dimensions) if getattr(forecast_result, "dimensions", None) else "Group"
     
     series_data = []
-    for p in forecast_result.predictions:
+    # fallback to predictions if raw_forecast_results isn't there
+    preds = getattr(forecast_result, "raw_forecast_results", getattr(forecast_result, "predictions", []))
+    for p in preds:
         series_data.append({
             "group": str(p["group"]),
             "historical": p.get("historical", [])[-50:],
@@ -590,14 +592,15 @@ def _build_grouped_forecasting_line_chart(forecast_result) -> dict:
 def _build_grouped_forecasting_ranking_chart(forecast_result, task_type: str = "grouped_ranking") -> dict:
     """Build a bar chart for grouped forecasting ranking."""
     ranking_data = []
-    for p in forecast_result.predictions:
+    preds = getattr(forecast_result, "forecast_ranking", getattr(forecast_result, "predictions", []))
+    for p in preds:
         ranking_data.append({
             "group": str(p["group"]),
             "value": round(float(p["final_value"]), 2) if p["final_value"] is not None else 0.0,
             "color": "#6366f1",
         })
         
-    group_label = " and ".join(forecast_result.group_dimensions) if hasattr(forecast_result, "group_dimensions") else getattr(forecast_result, "group_column", "Group")
+    group_label = " and ".join(forecast_result.dimensions) if getattr(forecast_result, "dimensions", None) else "Group"
         
     if task_type == "growth_analysis":
         title = f"Expected Growth % by {group_label}"

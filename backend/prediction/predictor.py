@@ -17,6 +17,7 @@ from prediction.schemas import (
     PredictionRow,
     PredictionResult,
     ForecastingResult,
+    UniversalPredictionResult,
     ForecastingRow,
 )
 from prediction import detector, preprocessing
@@ -42,7 +43,7 @@ def predict(
         rank_by_probability: If True, sorts the resulting predictions by probability descending.
 
     Returns:
-        PredictionResult with per-row predictions and metadata.
+        UniversalPredictionResult with per-row predictions and metadata.
     """
     # Rebuild detection metadata for column classification
     detection = detector.detect(df, artifact.table_name, target_hint=artifact.target_column)
@@ -54,8 +55,9 @@ def predict(
         subset = df.head(5)
 
     if subset.empty:
-        return PredictionResult(
-            predictions=[],
+        return UniversalPredictionResult(
+            task_type="classification" if getattr(artifact, "problem_type", "classification") == "classification" else "regression",
+            row_predictions=[],
             model_accuracy=artifact.evaluation.accuracy,
             target_column=artifact.target_column,
             table_name=artifact.table_name,
@@ -129,8 +131,9 @@ def predict(
 
     accuracy_or_r2 = artifact.evaluation.accuracy if is_classification else artifact.evaluation.r2
 
-    return PredictionResult(
-        predictions=results,
+    return UniversalPredictionResult(
+        task_type="classification" if is_classification else "regression",
+        row_predictions=results,
         model_accuracy=accuracy_or_r2,
         target_column=artifact.target_column,
         table_name=artifact.table_name,
@@ -143,7 +146,7 @@ def forecast(
     artifact: TrainedModelArtifact,
     steps: int = 12,
     frequency: str = "months",
-) -> ForecastingResult:
+) -> UniversalPredictionResult:
     """
     Run forecasting inference.
     """
@@ -176,10 +179,11 @@ def forecast(
             upper_bound=upper,
         ))
 
-    return ForecastingResult(
+    return UniversalPredictionResult(
+        task_type="forecasting",
         historical=historical_rows,
         forecast=forecast_rows,
-        model_accuracy=0.0,  # Or calculate MAPE/RMSE if held-out test was used
+        model_accuracy=0.0,
         target_column=artifact.target_column,
         date_column=detection.date_column,
         table_name=artifact.table_name,
@@ -223,7 +227,8 @@ def predict_trend_direction(
         else:
             direction = "stable"
             
-    return TrendDirectionResult(
+    return UniversalPredictionResult(
+        task_type="trend_direction_forecast",
         target_column=forecast_result.target_column,
         date_column=forecast_result.date_column,
         direction=direction,
@@ -242,7 +247,7 @@ def predict_grouped_forecast(
     frequency: str = "months",
     table_name: str = "",
     ranking_metric: str = "sum",
-):
+) -> UniversalPredictionResult:
     """Run forecasting on multiple groups by joining with dimension tables."""
     from prediction.schemas import GroupedForecastingResult
     
@@ -305,8 +310,16 @@ def predict_grouped_forecast(
             else:
                 final_val = sum(r["value"] for r in fc_rows if r["value"])
             
+            if isinstance(group_name, tuple):
+                group_dict = {dim: str(val) for dim, val in zip(semantic_dimensions, group_name)}
+                group_str = " - ".join(str(v) for v in group_name)
+            else:
+                group_dict = {semantic_dimensions[0]: str(group_name)}
+                group_str = str(group_name)
+            
             predictions.append({
-                "group": str(group_name),
+                "group": group_str,
+                "group_dict": group_dict,
                 "historical": hist_rows,
                 "forecast": fc_rows,
                 "final_value": final_val,
@@ -318,13 +331,15 @@ def predict_grouped_forecast(
     predictions.sort(key=lambda x: x.get("final_value", 0) or 0, reverse=True)
     best_group = predictions[0]["group"] if predictions else None
             
-    return GroupedForecastingResult(
+    return UniversalPredictionResult(
+        task_type="grouped_forecasting",
         target_column=detection.target_column,
         date_column=date_col,
-        group_dimensions=semantic_dimensions,
+        dimensions=semantic_dimensions,
         horizon=steps,
         table_name=table_name,
-        predictions=predictions,
+        raw_forecast_results=predictions,
+        forecast_ranking=predictions,
         ranking_metric=ranking_metric,
         best_group=best_group,
     )

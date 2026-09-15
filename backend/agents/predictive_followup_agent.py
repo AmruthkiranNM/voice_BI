@@ -165,6 +165,19 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
         
         # Build new response
         pred_dict = dataclasses.asdict(prediction_result)
+        config = getattr(prediction_result, "config", None) or pred_data.get("_config", {})
+        pred_dict["_config"] = dataclasses.asdict(config) if dataclasses.is_dataclass(config) else config
+        
+        # Context Immutability - Preserve previous results
+        context_history = pred_data.get("context_history", [])
+        context_history.append({
+            "dimensions": pred_data.get("dimensions", []),
+            "target": pred_data.get("target_column"),
+            "table_name": pred_data.get("table_name"),
+            "raw_forecast_results": pred_data.get("raw_forecast_results", []),
+            "_config": pred_data.get("_config", {}),
+        })
+        pred_dict["context_history"] = context_history
         viz_metadata = ml_agent._build_visualization_metadata(prediction_result, False, task_type)
         
         new_result = {
@@ -218,10 +231,7 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
     intent = intent_data.get("intent")
     
     # We must have predictions
-    if "predictions" not in pred_data:
-        return {"reply": "I don't have grouped prediction results to answer that.", "new_response": None}
-        
-    predictions = pred_data["predictions"]
+    predictions = pred_data.get("raw_forecast_results", pred_data.get("predictions"))
     if not predictions:
         return {"reply": "There are no predictions available to analyze.", "new_response": None}
         
@@ -238,9 +248,15 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
                 hist = p.get("historical", [])
                 fcst = p.get("forecast", [])
                 if not hist or not fcst: return 0.0
-                start_val = hist[-1]["value"]
-                end_val = fcst[-1]["value"]
-                return ((end_val - start_val) / max(0.0001, abs(start_val))) * 100
+                
+                horizon = len(fcst)
+                baseline_len = min(len(hist), horizon)
+                baseline_total = sum(r.get("value") or 0.0 for r in hist[-baseline_len:])
+                forecast_total = sum(r.get("value") or 0.0 for r in fcst)
+                
+                if baseline_total and baseline_total > 0:
+                    return ((forecast_total - baseline_total) / baseline_total) * 100
+                return 0.0
             else:
                 return float(p.get("final_value") or 0.0)
 
@@ -248,10 +264,12 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
         top_pred = sorted_preds[0]
         top_val = get_val(top_pred)
         
+        group_val = top_pred.get("group", "Unknown Group")
+        
         if is_growth:
-            answer_data = f"Top group is {top_pred['group']} with {top_val:.1f}% growth."
+            answer_data = f"Top group is {group_val} with {top_val:.1f}% growth."
         else:
-            answer_data = f"Group {top_pred['group']} has the value {top_val:,.2f}."
+            answer_data = f"Group {group_val} has the value {top_val:,.2f}."
             
         # Update visualization to be a bar chart ranking!
         # Create a dummy GroupedForecastingResult to pass to ml_agent formatter

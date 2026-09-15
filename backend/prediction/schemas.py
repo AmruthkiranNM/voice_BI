@@ -187,3 +187,38 @@ class TrainingExperimentResult:
     training_results: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     best_model_key: str = ""
     selection_metric: str = ""
+
+
+@dataclasses.dataclass
+class UniversalPredictionResult:
+    """
+    Unified result schema covering classification, regression, time-series, and grouped forecasting.
+    Replaces the fragmented PredictionResult, ForecastingResult, etc.
+    """
+    task_type: str
+    target_column: str
+    table_name: str
+    
+    # Classification / Regression row predictions
+    row_predictions: list[PredictionRow] = dataclasses.field(default_factory=list)
+    
+    # Time-series / Forecasting
+    date_column: str | None = None
+    historical: list[ForecastingRow] = dataclasses.field(default_factory=list)
+    forecast: list[ForecastingRow] = dataclasses.field(default_factory=list)
+    direction: str | None = None  # "increase", "decrease", "stable"
+    horizon: int = 0
+    
+    # Grouped Forecasting
+    dimensions: list[str] = dataclasses.field(default_factory=list)
+    historical_ranking: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    forecast_ranking: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    raw_forecast_results: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    available_granularities: list[list[str]] = dataclasses.field(default_factory=list)
+    
+    ranking_metric: str | None = None
+    best_group: str | None = None
+    
+    # Metadata
+    model_accuracy: float = 0.0
+    count: int = 0
