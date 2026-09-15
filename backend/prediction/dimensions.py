@@ -490,6 +490,181 @@ def resolve_dimensions(
     return resolution
 
 
+#: Function words, time words and quantity words. Purely linguistic — it
+#: contains no domain vocabulary, so it behaves identically on any dataset.
+_NON_DIMENSION_WORDS = {
+    "a", "an", "the", "of", "in", "on", "by", "for", "per", "to", "from", "at",
+    "and", "or", "with", "over", "across", "within", "each", "every", "is",
+    "are", "was", "were", "be", "will", "would", "could", "might", "shall",
+    "do", "does", "did", "show", "me", "us", "give", "list", "tell", "what",
+    "which", "who", "whom", "whose", "where", "when", "how", "why", "many",
+    "much", "most", "least", "best", "worst", "highest", "lowest", "top",
+    "bottom", "rank", "ranked", "lead", "leads", "leading", "leader", "grow",
+    "grows", "grow", "growth", "growing", "decline", "declining", "increase",
+    "decrease", "rise", "fall", "falling", "behind", "ahead", "change",
+    "expected", "expect", "likely", "projected", "project", "forecast",
+    "forecasted", "predict", "predicted", "prediction", "next", "last",
+    "coming", "upcoming", "future", "now", "then", "day", "days", "week",
+    "weeks", "month", "months", "quarter", "quarters", "year", "years",
+    "period", "periods", "total", "sum", "average", "count", "number",
+    "numbers", "amount", "value", "values", "have", "has", "had", "it",
+    "its", "they", "them", "their", "this", "that", "these", "those",
+    "remain", "stay", "same", "about", "instead", "into", "one", "two",
+    "three", "four", "five", "six", "seven", "eight", "nine", "ten", "twelve",
+}
+
+
+def _content_words(
+    question: str,
+    exclude_columns: set[str] | None = None,
+    exclude_words: set[str] | None = None,
+) -> list[str]:
+    """
+    Words from a question that could plausibly name a dimension.
+
+    Strips function, time and quantity words, plus anything already committed
+    as the target. What remains are the nouns worth resolving against the
+    schema. Adjacent survivors are also offered as a pair, so "sales team" and
+    "product category" resolve as phrases rather than as isolated words.
+    """
+    excluded = {c.lower() for c in (exclude_columns or set())}
+    # Words already consumed by the target ("revenue", "boxes sold") must not
+    # then be offered as groupings — a measure is not a dimension.
+    excluded |= {w.lower() for w in (exclude_words or set())}
+    raw = [w for w in re.split(r"[^a-z0-9]+", (question or "").lower()) if w]
+    kept = [
+        w for w in raw
+        if w not in _NON_DIMENSION_WORDS and w not in excluded and len(w) > 2
+    ]
+
+    phrases: list[str] = []
+    for i, word in enumerate(kept):
+        if i + 1 < len(kept):
+            phrases.append(f"{word} {kept[i + 1]}")
+    # Longer phrases first: "sales team" should win over "sales".
+    return phrases + kept
+
+
+#: Inference is a guess, so it needs a firmer bar than an explicit hint. A hint
+#: tells us a dimension was intended and only asks which; inference must also
+#: decide *whether* one was meant at all.
+MIN_INFERENCE_CONFIDENCE = 0.26
+
+
+def infer_dimensions(
+    question: str,
+    base_table: str,
+    exclude_columns: set[str] | None = None,
+    max_dimensions: int = 3,
+    exclude_words: set[str] | None = None,
+) -> list[ResolvedDimension]:
+    """
+    Find the groupings a free-text question is asking for, without being told.
+
+    Used when interpretation returns no dimensions. Every candidate column in
+    the reachable schema is scored against the question by the same layers used
+    for an explicit hint — its name, its values, and its embedded profile — and
+    those that clear a confidence bar are returned in the order they appear in
+    the question, so "revenue by country and category" keeps country first.
+
+    Scoring the question as a whole (rather than hunting for noun phrases)
+    keeps this free of grammar rules and of any particular phrasing.
+    """
+    if not question:
+        return []
+
+    reachable = joinable_tables(base_table)
+    catalog = build_dimension_catalog(
+        base_table, exclude_columns=exclude_columns, reachable=reachable,
+    )
+    if not catalog:
+        return []
+
+    question_tokens = _tokens(question)
+    hits: list[tuple[int, float, str, DimensionCandidate]] = []
+
+    for candidate in catalog:
+        column_tokens = _tokens(candidate.column)
+        score, method = 0.0, ""
+
+        # The question names the column outright.
+        if column_tokens and column_tokens <= question_tokens:
+            score, method = 1.0, "exact_name"
+        else:
+            # The question names one of the column's values ("in APAC").
+            for value in candidate.sample_values:
+                value_tokens = _tokens(value)
+                if value_tokens and value_tokens <= question_tokens:
+                    score, method = 0.95, "value_match"
+                    break
+
+        if score:
+            position = min(
+                (question.lower().find(t) for t in (column_tokens or {""})
+                 if question.lower().find(t) >= 0),
+                default=10_000,
+            )
+            hits.append((position, score, method, candidate))
+
+    if not hits:
+        # Nothing lexical matched. Embedding the whole sentence dilutes the
+        # signal badly, so score the question's *content words* individually
+        # through the ordinary hint resolver — the same path that connects
+        # "country" to a column of country names.
+        candidate_words = _content_words(question, exclude_columns, exclude_words)
+        if not candidate_words:
+            return []
+        resolution = resolve_dimensions(
+            candidate_words, base_table, exclude_columns=exclude_columns,
+        )
+        seen: set[str] = set()
+        for dimension in resolution.resolved:
+            if dimension.column in seen:
+                continue
+            if (dimension.method == "embedding"
+                    and dimension.confidence < MIN_INFERENCE_CONFIDENCE):
+                continue
+            seen.add(dimension.column)
+            position = question.lower().find(dimension.hint.lower())
+            hits.append((
+                position if position >= 0 else 10_000,
+                dimension.confidence, f"word_{dimension.method}",
+                DimensionCandidate(
+                    table=dimension.table, column=dimension.column,
+                    n_distinct=dimension.n_distinct,
+                    in_base_table=not dimension.requires_join,
+                ),
+            ))
+        if not hits:
+            return []
+
+    hits.sort(key=lambda h: h[0])
+    resolved: list[ResolvedDimension] = []
+    for _, score, method, candidate in hits[:max_dimensions]:
+        if candidate.in_base_table:
+            join_base = join_target = None
+            requires_join = False
+        else:
+            path = reachable.get(candidate.table)
+            if path is None:
+                continue
+            join_base, join_target = path
+            requires_join = True
+        resolved.append(ResolvedDimension(
+            hint=candidate.column, table=candidate.table, column=candidate.column,
+            n_distinct=candidate.n_distinct, requires_join=requires_join,
+            join_key_base=join_base, join_key_target=join_target,
+            method=f"inferred_{method}", confidence=score,
+        ))
+
+    if resolved:
+        logger.info(
+            "[Dimensions] Inferred %s from the question text.",
+            [d.column for d in resolved],
+        )
+    return resolved
+
+
 # ──────────────────────────────────────────────────────────
 # Hard dimensionality validation
 # ──────────────────────────────────────────────────────────

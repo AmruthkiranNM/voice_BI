@@ -17,49 +17,21 @@ PipelineType = Literal["ANALYTICAL", "PREDICTIVE"]
 
 def run(query: str) -> PipelineType:
     """
-    Determine the pipeline required for the given query.
-    
-    Currently uses heuristic keyword matching for fast, robust routing.
-    Can be upgraded to a fast LLM call if the complexity increases.
+    Decide whether a question is about the future (or about a model-predicted
+    quantity) rather than about what the data already records.
+
+    This is a semantic test, not a catalogue of phrasings. A question is
+    predictive when it uses future or expectation language, or names a
+    prediction task outright. The previous version listed twenty specific
+    patterns and so missed most natural phrasings — "Will these countries
+    remain the top 3?" and "Which market is likely to lead?" both fell through
+    to the historical SQL pipeline and were answered from past data.
     """
-    query_lower = query.lower()
-    
-    # ── Heuristic Patterns for Prediction ──
-    # These cover a broad range of natural-language prediction intents.
-    # Each pattern uses word boundaries (\b) to avoid false positives.
-    prediction_patterns = [
-        # Direct prediction verbs
-        r"\bpredict\b",
-        r"\bforecast\b",
-        # Churn / attrition / exit domain terms
-        r"\bchurn\b",
-        r"\battrition\b",
-        r"\bretention\b",
-        r"\bexited\b",
-        # Probabilistic language
-        r"\bprobability\b",
-        r"\bchance\s+of\b",
-        r"\blikelihood\b",
-        r"\blikely\s+to\b",
-        # "Will customer X ..." style
-        r"\bwill\s+(the\s+)?(customer|user|client|they)\b",
-        # Risk-oriented language
-        r"\b(high|at)\s+risk\b",
-        r"\brisk\s+of\s+(leaving|churning|exiting|losing)\b",
-        # "Who / which customers might leave" style
-        r"\b(likely|going|about)\s+to\s+(leave|churn|exit|cancel|stop|quit|abandon)\b",
-        r"\bmight\s+(leave|churn|exit|cancel|stop)\b",
-        r"\b(leave|churn|exit|cancel|abandon)\s+soon\b",
-        # "Identify / find / list ... at risk" style
-        r"\b(identify|find|list|show|flag|rank)\b.*\b(risk|churn|leave|exit|attrition)\b",
-    ]
-    
-    # If the user is specifically asking *if* something will happen or
-    # explicitly asking for a prediction/churn status, route to ML.
-    for pattern in prediction_patterns:
-        if re.search(pattern, query_lower):
-            logger.info("[Router Agent] Classified as PREDICTIVE query: '%s' matched pattern '%s'", query, pattern)
-            return "PREDICTIVE"
-            
-    logger.info("[Router Agent] Classified as ANALYTICAL query.")
-    return "ANALYTICAL"
+    from prediction.intent_markers import is_predictive_question
+
+    predictive, reason = is_predictive_question(query)
+    logger.info(
+        "[Router Agent] Classified as %s (%s)",
+        "PREDICTIVE" if predictive else "ANALYTICAL", reason,
+    )
+    return "PREDICTIVE" if predictive else "ANALYTICAL"

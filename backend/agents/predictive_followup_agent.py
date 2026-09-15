@@ -74,8 +74,36 @@ def _forecast_evidence(prediction_result, target: str | None, horizon: int) -> s
     return "\n".join(lines)
 
 def run(message: str, context: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, Any]:
-    original_query = context.get("query", "")
     result = context.get("result", {})
+
+    # ── Generic path ──
+    # When the previous turn carried a PredictionConfig, the follow-up is just
+    # another question resolved against it: the resolver inherits every slot
+    # and overrides only what this question restates. Target switches,
+    # dimension switches and horizon switches are all the same operation, so
+    # none of them needs its own handler.
+    stored_config = result.get("config") or context.get("prediction_config")
+    if stored_config:
+        from agents import prediction_agent
+
+        scope = context.get("table_names") or (
+            [context["table_name"]] if context.get("table_name") else None
+        )
+        outcome = prediction_agent.run(
+            message, table_names=scope, inherited_config=stored_config,
+        )
+        return {
+            "reply": outcome.get("insight", ""),
+            "new_response": {
+                "result": outcome.get("result", {}),
+                "insight": outcome.get("insight", ""),
+            },
+        }
+
+    # ── Legacy path ──
+    # Results produced before configs were carried still resolve through the
+    # original intent handlers.
+    original_query = context.get("query", "")
     pred_data = result.get("prediction", {})
     task_type = result.get("visualization", {}).get("problem_type", "classification")
     if result.get("visualization", {}).get("mode") == "forecast":

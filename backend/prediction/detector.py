@@ -61,8 +61,12 @@ def _score_column(col_name: str, hint: str, is_numeric: bool, problem_type_hint:
     if hint_lower.replace(" ", "") == col_lower:
         return 100.0
         
-    hint_words = set(hint_lower.split())
-    col_words = set(col_name.lower().replace("_", " ").split())
+    # Split on any non-alphanumeric so a SQL alias ("boxes_sold",
+    # "total-revenue") tokenises the same way a column name does. Splitting
+    # the column but not the hint meant aliases could never overlap.
+    import re as _re
+    hint_words = {w for w in _re.split(r"[^a-z0-9]+", hint_lower) if w}
+    col_words = {w for w in _re.split(r"[^a-z0-9]+", col_name.lower()) if w}
     
     # Expand hint words with aliases
     expanded_hint = set(hint_words)
@@ -111,12 +115,33 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
     # ── 1. Identify the date column and target column ──
     date_col = _find_date_column(df)
     target_col = _find_target_column(df, target_hint, problem_type_hint)
+
+    if target_col is None and problem_type_hint in ("forecasting", "regression"):
+        # A hint is an override, not a prerequisite. When one is absent — or
+        # when it is a SQL alias like "total_revenue" that names no physical
+        # column — fall back to the table's own best measure rather than
+        # refusing. Requiring a resolvable hint made every follow-up that did
+        # not restate the measure fail with "a hint must be provided", even
+        # though the table plainly contains forecastable quantities.
+        target_col = _best_measure(df, date_col)
+        if target_col:
+            logger.info(
+                "[Detector] Target hint %r did not resolve; using measure '%s'.",
+                target_hint, target_col,
+            )
+
     if target_col is None:
+        available = _measure_names(df, date_col)
         return DetectionResult(
             table_name=table_name,
             is_suitable=False,
             row_count=len(df),
-            reason="No viable target column found. For classification, need a binary column. For regression/forecasting, a hint must be provided.",
+            reason=(
+                "No viable target column found. "
+                + (f"Numeric measures available: {', '.join(available)}. "
+                   if available else "This table has no numeric measure. ")
+                + "For classification a binary column is required."
+            ),
         )
 
     # ── 2. Determine problem type ──
@@ -139,13 +164,27 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
                 reason="Forecasting requested but no date/time column found in dataset.",
             )
         if not pd.api.types.is_numeric_dtype(df[target_col]):
-            return DetectionResult(
-                table_name=table_name,
-                is_suitable=False,
-                target_column=target_col,
-                row_count=len(df),
-                reason=f"Target column '{target_col}' must be numeric for forecasting.",
-            )
+            # The hint resolved to something unforecastable — usually a SQL
+            # alias that collided with a key column. Prefer the table's own
+            # measure over refusing the request outright.
+            replacement = _best_measure(df, date_col)
+            if replacement:
+                logger.info(
+                    "[Detector] '%s' is not numeric; forecasting '%s' instead.",
+                    target_col, replacement,
+                )
+                target_col = replacement
+            else:
+                return DetectionResult(
+                    table_name=table_name,
+                    is_suitable=False,
+                    target_column=target_col,
+                    row_count=len(df),
+                    reason=(
+                        f"Target column '{target_col}' is not numeric and this table "
+                        "has no numeric measure to forecast instead."
+                    ),
+                )
         problem_type = "forecasting"
         unique_values = []
     elif target_spec.recommended_prediction_type == "classification":
@@ -223,6 +262,41 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
         class_distribution=class_dist_str,
         date_column=date_col,
     )
+
+
+def _measure_names(df: pd.DataFrame, date_col: str | None = None) -> list[str]:
+    """Columns this table could forecast, judged by their values."""
+    from prediction.target_resolution import resolve_target
+
+    names = []
+    for column in df.columns:
+        if date_col and column == date_col:
+            continue
+        spec = resolve_target(column, df, has_time_axis=bool(date_col))
+        if spec.semantic_role == "measure":
+            names.append(column)
+    return names
+
+
+def _best_measure(df: pd.DataFrame, date_col: str | None = None) -> str | None:
+    """
+    The most plausible default measure for a table.
+
+    Prefers the measure with the widest spread of values, which is the one
+    carrying the most information — not the first column alphabetically and
+    not a name from a list.
+    """
+    candidates = _measure_names(df, date_col)
+    if not candidates:
+        return None
+    if len(candidates) == 1:
+        return candidates[0]
+
+    def spread(column: str) -> float:
+        values = pd.to_numeric(df[column], errors="coerce").dropna()
+        return float(values.nunique()) if not values.empty else 0.0
+
+    return max(candidates, key=spread)
 
 
 def _find_date_column(df: pd.DataFrame) -> str | None:
@@ -306,6 +380,14 @@ def _find_target_column(df: pd.DataFrame, hint: str | None = None, problem_type_
         if best_col and best_score >= 20.0:
             logger.info("[Detector] Resolved target hint '%s' to column '%s' (score: %.1f)", hint, best_col, best_score)
             return best_col
+
+    # Steps 2 and 3 below look for a *binary* column — they are classification
+    # heuristics. Running them for a forecasting request picked whatever 0/1
+    # flag the table happened to contain (an "delayed"/"exited" column) and
+    # forecast that instead of a measure. When a quantity is wanted, the
+    # caller falls back to the table's best measure rather than to a label.
+    if problem_type_hint in ("forecasting", "regression"):
+        return None
 
     # 2. Known names (Fallback for no-hint classification)
     for name in _TARGET_HINTS:

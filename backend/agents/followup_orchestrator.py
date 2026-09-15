@@ -70,10 +70,40 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     result = context.get("result") or {}
     rows = result.get("rows", [])
     
-    # 0. Predictive Routing
-    if result.get("pipeline_type") == "PREDICTIVE":
-        from agents import predictive_followup_agent
-        return predictive_followup_agent.run(message, context, history)
+    # 0. Predictive routing.
+    #    Any follow-up that asks about the future goes to the prediction
+    #    engine, whether the turn before it was a forecast or an ordinary SQL
+    #    answer. Previously only follow-ups on an existing *prediction* took
+    #    that route; a predictive follow-up on a historical answer went to a
+    #    separate agent that reconstructed the target from the SQL result's
+    #    column aliases ("total_revenue", "GEO") — names no table has — and so
+    #    failed with "no viable target column found".
+    from prediction.intent_markers import is_predictive_question
+
+    predictive, why = is_predictive_question(message)
+    if predictive or result.get("pipeline_type") == "PREDICTIVE":
+        from agents import conversation_state, prediction_agent
+
+        seed = conversation_state.build_seed(context)
+        logger.info(
+            "[FOLLOWUP:%s] predictive follow-up (%s); inherited target=%s dims=%s",
+            req_id, why,
+            getattr(seed, "target", None), getattr(seed, "group_dimensions", None),
+        )
+        scope = context.get("table_names") or (
+            [context["table_name"]] if context.get("table_name") else None
+        )
+        outcome = prediction_agent.run(
+            message, table_names=scope,
+            inherited_config=seed.to_dict() if seed else None,
+        )
+        return {
+            "reply": outcome.get("insight", ""),
+            "new_response": {
+                "result": outcome.get("result", {}),
+                "insight": outcome.get("insight", ""),
+            },
+        }
 
     # 1. Resolve context
     prompt = RESOLVER_PROMPT_TEMPLATE.format(

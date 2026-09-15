@@ -94,9 +94,17 @@ def process_query(
         
         if pipeline_type == "PREDICTIVE":
             logger.info("[Orchestrator] Routing query to PREDICTIVE pipeline.")
-            ml_result = ml_agent.run(query)
-            log_step("ML Agent", "completed", {"prediction_made": True})
-            
+            from agents import prediction_agent
+
+            # The active data source is passed through, so a prediction is
+            # always scoped to the dataset the user is looking at rather than
+            # to whichever table in the database happens to match a keyword.
+            ml_result = prediction_agent.run(query, table_names=table_names)
+            log_step("Prediction Agent", "completed", {
+                "status": ml_result.get("result", {}).get("status"),
+                "config": ml_result.get("config", {}).get("prediction_type"),
+            })
+
             return {
                 "success": True,
                 "query": query,
@@ -106,6 +114,7 @@ def process_query(
                 "llm_mode": "local (ML)",
                 "metadata": {
                     "pipeline_type": "PREDICTIVE",
+                    "prediction_config": ml_result.get("config", {}),
                     "execution_time_ms": round((time.time() - pipeline_start) * 1000, 2),
                 },
                 "agent_logs": agent_logs,
