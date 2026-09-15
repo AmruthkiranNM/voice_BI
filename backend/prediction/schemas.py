@@ -93,8 +93,15 @@ class TrainedModelArtifact:
     evaluation: EvaluationResult = dataclasses.field(default_factory=EvaluationResult)
     feature_importances: list[tuple[str, float]] = dataclasses.field(default_factory=list)
     model_type: str = "RandomForestClassifier"
-    problem_type: str = "classification" # "classification" or "regression"
+    problem_type: str = "classification" # "classification", "regression" or "forecasting"
     version: int = 1
+
+    # ── Forecasting-only provenance ──
+    # The bucket size the model was fitted on. A forecasting artifact is only
+    # valid for the frequency it was trained at.
+    forecast_frequency: str | None = None
+    series_diagnostics: "SeriesDiagnostics | None" = None
+    selection_metadata: "ForecastModelMetadata | None" = None
 
 
 @dataclasses.dataclass
@@ -121,6 +128,97 @@ class PredictionResult:
     table_name: str
     count: int = 0
     truncated: bool = False
+
+
+@dataclasses.dataclass
+class SeriesDiagnostics:
+    """
+    Deterministic health report for one time series, produced *before* any
+    model is fitted. Every forecast carries the diagnostics of the series it
+    was built from, so a number can always be traced back to the amount and
+    quality of history behind it.
+
+    ``status`` is the gate: only "ok" and "fallback" series are forecast.
+    """
+    status: str = "ok"                # ok | fallback | no_data | insufficient_history | too_sparse
+    reason: str = ""                  # human-readable explanation when not "ok"
+
+    requested_frequency: str = ""     # what the question asked for
+    inferred_frequency: str = ""      # what the raw timestamps actually support
+    frequency_mismatch: bool = False  # requested finer than the data supports
+
+    first_period: str | None = None
+    last_period: str | None = None
+    n_periods: int = 0                # buckets spanned (observed + missing)
+    n_observed: int = 0               # buckets with a real value
+    n_missing: int = 0                # buckets with no data (NEVER coerced to zero)
+    missing_ratio: float = 0.0
+
+    n_trimmed_partial: int = 0        # leading/trailing incomplete buckets dropped
+    duplicate_timestamps: int = 0     # exact-duplicate raw timestamps seen before aggregation
+
+    is_constant: bool = False
+    is_all_zero: bool = False
+
+    n_outliers: int = 0               # robust MAD-based, reported not removed
+    outlier_periods: list[str] = dataclasses.field(default_factory=list)
+
+    seasonal_periods: int | None = None
+    seasonality_supported: bool = False   # >= 2 full cycles of history
+
+    horizon: int = 0
+    history_to_horizon_ratio: float = 0.0
+    horizon_exceeds_history: bool = False
+
+    warnings: list[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
+class ValidationFold:
+    """One chronological rolling-origin backtest fold for one candidate model."""
+    fold: int
+    train_end: str
+    n_train: int
+    n_validation: int
+    mae: float | None = None
+    rmse: float | None = None
+    mase: float | None = None
+
+
+@dataclasses.dataclass
+class CandidateScore:
+    """Aggregated backtest performance of one candidate model across all folds."""
+    model_key: str
+    model_label: str
+    eligible: bool = True
+    reason: str = ""
+    mae: float | None = None
+    rmse: float | None = None
+    mase: float | None = None          # < 1.0 means it beat the naive baseline
+    n_folds: int = 0
+    folds: list[ValidationFold] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
+class ForecastModelMetadata:
+    """
+    Everything needed to defend a forecast: which model won, how it was
+    chosen, what it scored against the naive baseline, and what was done
+    to the data before fitting.
+    """
+    selected_model_key: str = ""
+    selected_model_label: str = ""
+    selection_method: str = ""         # rolling_origin_backtest | fallback_no_validation | forced_constant
+    selection_metric: str = "mase"
+    selected_score: float | None = None
+    beats_naive: bool | None = None    # selected MASE < naive MASE
+    n_folds: int = 0
+    validation_horizon: int = 0
+    candidates: list[CandidateScore] = dataclasses.field(default_factory=list)
+    n_imputed_for_fit: int = 0         # internal gaps interpolated for FITTING only
+    floor_applied: bool = False        # forecasts clipped at 0 (series was non-negative)
+    interval_source: str = ""          # validation_residuals | in_sample_residuals | none
+    notes: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -221,7 +319,23 @@ class UniversalPredictionResult:
     
     ranking_metric: str | None = None
     best_group: str | None = None
-    
+
+    # ── Forecast provenance (populated by the forecasting engine) ──
+    # For an ungrouped forecast these describe the single series. For a
+    # grouped forecast they describe the pooled/base series, while each entry
+    # in raw_forecast_results carries its own "diagnostics" and "model".
+    series_diagnostics: SeriesDiagnostics | None = None
+    model_metadata: ForecastModelMetadata | None = None
+    # Groups that were deliberately NOT forecast, with the reason why.
+    excluded_groups: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    # How each requested dimension was resolved to a real column, including the
+    # join key used and how confident the match was. Lets a caller verify the
+    # forecast is grouped by what was actually asked for.
+    dimension_specs: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    # Populated only when the user explicitly restricted the group set;
+    # empty means every eligible combination was forecast before ranking.
+    restricted_to: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+
     # Metadata
     model_accuracy: float = 0.0
     count: int = 0

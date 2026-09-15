@@ -26,6 +26,12 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.feature_selection import VarianceThreshold
 
 from prediction.schemas import DetectionResult, PreparedData
+from prediction.series_validation import (
+    frequency_rule,
+    infer_frequency,
+    median_step_days,
+    normalize_frequency,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +151,122 @@ def prepare_inference_data(
     return preprocessor.transform(df)
 
 
+def _period_freq(rule: str) -> str | None:
+    """Map a resample rule onto the pandas Period alias used to test completeness."""
+    return {"W": "W", "ME": "M", "QE": "Q", "YE": "Y"}.get(rule)
+
+
+def _trim_partial_edges(
+    series: pd.Series,
+    raw_min: pd.Timestamp,
+    raw_max: pd.Timestamp,
+    rule: str,
+    step_days: float = 0.0,
+) -> tuple[pd.Series, int]:
+    """
+    Drop leading/trailing buckets the raw data does not meaningfully cover.
+
+    A quarter of data summed into an annual bucket is not an annual figure;
+    comparing it against complete years, or forecasting from it, understates
+    the level by construction.
+
+    The test is a tolerance, not an exact boundary match. A business with no
+    transaction on the 1st of the month still had a complete month, so an edge
+    bucket is only considered partial when the uncovered span exceeds both a
+    couple of the data's own reporting steps and 15% of the bucket length.
+    Daily buckets are never trimmed — a day with any data is a complete day.
+
+    Returns (series, number of buckets removed).
+    """
+    period_alias = _period_freq(rule)
+    if period_alias is None or len(series) == 0:
+        return series, 0
+
+    def uncovered_is_material(uncovered_days: float, period_days: float) -> bool:
+        tolerance = max(2.0 * step_days, 0.15 * period_days)
+        return uncovered_days > tolerance
+
+    trimmed = 0
+
+    # Leading bucket
+    first_period = series.index[0].to_period(period_alias)
+    period_days = (first_period.end_time - first_period.start_time).total_seconds() / 86400.0
+    lead_gap = (raw_min.normalize() - first_period.start_time.normalize()).total_seconds() / 86400.0
+    if lead_gap > 0 and uncovered_is_material(lead_gap, period_days):
+        series = series.iloc[1:]
+        trimmed += 1
+
+    # Trailing bucket
+    if len(series):
+        last_period = series.index[-1].to_period(period_alias)
+        period_days = (last_period.end_time - last_period.start_time).total_seconds() / 86400.0
+        tail_gap = (last_period.end_time.normalize() - raw_max.normalize()).total_seconds() / 86400.0
+        if tail_gap > 0 and uncovered_is_material(tail_gap, period_days):
+            series = series.iloc[:-1]
+            trimmed += 1
+
+    return series, trimmed
+
+
+def aggregate_time_series(
+    df: pd.DataFrame,
+    date_col: str,
+    target_col: str,
+    frequency: str = "months",
+) -> tuple[pd.Series, dict]:
+    """
+    Aggregate transactional rows into a regular, gap-aware time series.
+
+    Two properties matter more than anything else here:
+
+    * A period with no rows becomes **NaN, never 0**. ``resample().sum()``
+      returns 0.0 for an empty bucket, which is indistinguishable from a real
+      zero and silently drags trend models downward; ``min_count=1`` makes the
+      absence explicit so validation and the models can treat it as unknown.
+    * Incomplete leading/trailing periods are trimmed, so a partial month or
+      quarter is never compared against, or extrapolated from, full ones.
+
+    Returns:
+        (series indexed by period end, info dict with the facts validation needs)
+    """
+    rule = frequency_rule(frequency)
+
+    frame = df[[date_col, target_col]].copy()
+    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
+    frame[target_col] = pd.to_numeric(frame[target_col], errors="coerce")
+    frame = frame.dropna(subset=[date_col, target_col])
+
+    info = {
+        "rule": rule,
+        "frequency": normalize_frequency(frequency),
+        "inferred_frequency": "months",
+        "duplicate_timestamps": 0,
+        "n_trimmed_partial": 0,
+        "median_step_days": 0.0,
+        "n_rows": int(len(frame)),
+    }
+
+    if frame.empty:
+        return pd.Series(dtype=float), info
+
+    info["inferred_frequency"] = infer_frequency(frame[date_col])
+    info["median_step_days"] = median_step_days(frame[date_col])
+    info["duplicate_timestamps"] = int(frame.duplicated().sum())
+
+    raw_min, raw_max = frame[date_col].min(), frame[date_col].max()
+    frame = frame.sort_values(date_col).set_index(date_col)
+
+    # min_count=1 → empty buckets are NaN rather than a fabricated 0.0
+    series = frame[target_col].resample(rule).sum(min_count=1)
+
+    series, trimmed = _trim_partial_edges(
+        series, raw_min, raw_max, rule, step_days=info["median_step_days"],
+    )
+    info["n_trimmed_partial"] = trimmed
+
+    return series, info
+
+
 def prepare_forecasting_data(
     df: pd.DataFrame,
     detection: DetectionResult,
@@ -152,38 +274,14 @@ def prepare_forecasting_data(
 ) -> pd.Series:
     """
     Preprocess time-series data for forecasting.
-    Sorts chronologically, aggregates if needed, and returns a Series with a datetime index.
+
+    Thin wrapper over :func:`aggregate_time_series` kept for the existing
+    callers (trainer, predictor). Empty periods come back as NaN, not zero.
     """
-    date_col = detection.date_column
-    target_col = detection.target_column
-
-    # Convert to datetime and drop invalid
-    df_ts = df[[date_col, target_col]].copy()
-    df_ts[date_col] = pd.to_datetime(df_ts[date_col], errors="coerce")
-    df_ts = df_ts.dropna(subset=[date_col, target_col])
-
-    # Convert target to numeric
-    df_ts[target_col] = pd.to_numeric(df_ts[target_col], errors="coerce")
-    df_ts = df_ts.dropna(subset=[target_col])
-
-    # Sort chronologically
-    df_ts = df_ts.sort_values(date_col)
-
-    # Convert frequency string to Pandas offset alias
-    freq_map = {
-        "months": "M", "month": "M",
-        "days": "D", "day": "D",
-        "years": "Y", "year": "Y",
-        "weeks": "W", "week": "W",
-        "periods": "M", "period": "M",
-    }
-    rule = freq_map.get(frequency.lower(), "M")
-
-    # Set index and resample/aggregate
-    df_ts = df_ts.set_index(date_col)
-    series_ts = df_ts[target_col].resample(rule).sum()
-
-    return series_ts
+    series, _ = aggregate_time_series(
+        df, detection.date_column, detection.target_column, frequency=frequency
+    )
+    return series
 
 
 def prepare_grouped_forecasting_data(
@@ -192,47 +290,56 @@ def prepare_grouped_forecasting_data(
     target_col: str,
     group_cols: list[str],
     frequency: str = "months",
-) -> dict[str, pd.Series]:
+) -> dict[tuple, pd.Series]:
     """
-    Preprocess time-series data grouped by multiple dimensions.
-    Returns a dictionary mapping concatenated group names (e.g. 'USA - Bars') to their aggregated Series.
-    """
-    cols_to_keep = [date_col, target_col] + group_cols
-    df_ts = df[cols_to_keep].copy()
-    
-    df_ts[date_col] = pd.to_datetime(df_ts[date_col], errors="coerce")
-    df_ts[target_col] = pd.to_numeric(df_ts[target_col], errors="coerce")
-    df_ts = df_ts.dropna(subset=[date_col, target_col] + group_cols)
-    
-    freq_map = {
-        "months": "M", "month": "M",
-        "days": "D", "day": "D",
-        "years": "Y", "year": "Y",
-        "weeks": "W", "week": "W",
-        "periods": "M", "period": "M",
-    }
-    rule = freq_map.get(frequency.lower(), "M")
+    Aggregate one time series per group combination.
 
-    grouped_series = {}
-    
-    # Iterate over unique group combinations
-    for group_vals, group_df in df_ts.groupby(group_cols):
-        # Format the composite key (e.g. "India - Bars")
-        if isinstance(group_vals, tuple):
-            group_name = " - ".join([str(v) for v in group_vals])
-        else:
-            group_name = str(group_vals)
-            
-        # Sort chronologically
-        g_df = group_df.sort_values(date_col)
-        # Set index and aggregate
-        g_df = g_df.set_index(date_col)
-        s = g_df[target_col].resample(rule).sum()
-        
-        # Always add to grouped series so predictor can flag insufficient history
-        grouped_series[group_name] = s
-            
-    return grouped_series
+    Keys are **tuples** of the group values, one element per entry in
+    ``group_cols``, so a country x product forecast keeps both dimensions
+    addressable downstream. (They used to be pre-joined strings, which made
+    the product dimension unrecoverable once the series was built.)
+
+    Every group is returned, including ones too sparse to forecast — the
+    caller decides what to do with them and reports the reason.
+    """
+    series_by_group, _ = prepare_grouped_forecasting_data_with_info(
+        df, date_col, target_col, group_cols, frequency=frequency
+    )
+    return series_by_group
+
+
+def prepare_grouped_forecasting_data_with_info(
+    df: pd.DataFrame,
+    date_col: str,
+    target_col: str,
+    group_cols: list[str],
+    frequency: str = "months",
+) -> tuple[dict[tuple, pd.Series], dict[tuple, dict]]:
+    """Same as :func:`prepare_grouped_forecasting_data`, plus per-group aggregation facts."""
+    cols_to_keep = [date_col, target_col] + list(group_cols)
+    frame = df[cols_to_keep].copy()
+
+    frame[date_col] = pd.to_datetime(frame[date_col], errors="coerce")
+    frame[target_col] = pd.to_numeric(frame[target_col], errors="coerce")
+    frame = frame.dropna(subset=[date_col, target_col] + list(group_cols))
+
+    series_by_group: dict[tuple, pd.Series] = {}
+    info_by_group: dict[tuple, dict] = {}
+
+    if frame.empty:
+        return series_by_group, info_by_group
+
+    for group_vals, group_df in frame.groupby(list(group_cols), dropna=True):
+        key = group_vals if isinstance(group_vals, tuple) else (group_vals,)
+        key = tuple(str(v) for v in key)
+
+        series, info = aggregate_time_series(
+            group_df, date_col, target_col, frequency=frequency
+        )
+        series_by_group[key] = series
+        info_by_group[key] = info
+
+    return series_by_group, info_by_group
 
 def _get_feature_names_out(pipeline: Pipeline, numeric_features: list[str], categorical_features: list[str]) -> list[str]:
     """

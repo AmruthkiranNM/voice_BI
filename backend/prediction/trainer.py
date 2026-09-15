@@ -8,6 +8,7 @@ Persists trained model artifacts to disk so subsequent predictions
 are instant (no re-training).
 """
 
+import dataclasses
 import logging
 import pickle
 from pathlib import Path
@@ -26,14 +27,25 @@ MODEL_DIR = DATA_DIR / "ml_models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_model_path(table_name: str, target_col: str, model_key: str | None = None) -> Path:
-    """Return the on-disk path for a trained model artifact."""
+def get_model_path(
+    table_name: str,
+    target_col: str,
+    model_key: str | None = None,
+    frequency: str | None = None,
+) -> Path:
+    """
+    Return the on-disk path for a trained model artifact.
+
+    ``frequency`` is part of the key for forecasting models. Without it, a
+    model fitted on monthly buckets was reused to answer a question asked in
+    days, returning monthly periods for a daily request.
+    """
+    parts = [table_name, target_col]
+    if frequency:
+        parts.append(f"freq-{frequency}")
     if model_key:
-        safe_name = f"{table_name}__{target_col}__{model_key}.pkl"
-    else:
-        # Default path for the chosen best model
-        safe_name = f"{table_name}__{target_col}.pkl"
-    return MODEL_DIR / safe_name
+        parts.append(model_key)
+    return MODEL_DIR / ("__".join(parts) + ".pkl")
 
 
 def train_all(
@@ -42,6 +54,7 @@ def train_all(
     target_col: str | None = None,
     selection_metric: str | None = None,
     forecast_frequency: str = "months",
+    forecast_horizon: int = 12,
     problem_type_hint: str | None = None,
 ) -> TrainingExperimentResult:
     """
@@ -52,6 +65,9 @@ def train_all(
         table_name:       Table name (used for model persistence path).
         target_col:       Optional explicit target column. Auto-detected if None.
         selection_metric: Metric to use for best model selection (e.g., roc_auc, f1_score).
+        forecast_frequency: Bucket size for forecasting ("months", "days", ...).
+        forecast_horizon: Periods ahead the model will be asked for; sets the
+                          validation window used to select a forecasting model.
         problem_type_hint: Optional hint for problem type (e.g. "forecasting").
 
     Returns:
@@ -67,13 +83,42 @@ def train_all(
 
     # 2. Preprocess
     if detection.problem_type == "forecasting":
-        ts_data = preprocessing.prepare_forecasting_data(df, detection, frequency=forecast_frequency)
-        # For forecasting, we don't evaluate multiple models for now, just the default
-        experiment = TrainingExperimentResult(selection_metric="none")
-        
-        model = models.create_model(problem_type="forecasting")
-        model.fit(ts_data)
-        
+        from prediction import forecast_selection, series_validation
+
+        frequency = series_validation.normalize_frequency(forecast_frequency)
+        ts_data, agg_info = preprocessing.aggregate_time_series(
+            df, detection.date_column, detection.target_column, frequency=frequency,
+        )
+
+        # Validate the series and choose a model by chronological backtest,
+        # rather than assuming a single model fits every dataset.
+        diagnostics = series_validation.validate_series(
+            ts_data,
+            requested_frequency=frequency,
+            horizon=forecast_horizon,
+            inferred_frequency=agg_info.get("inferred_frequency"),
+            duplicate_timestamps=agg_info.get("duplicate_timestamps", 0),
+            n_trimmed_partial=agg_info.get("n_trimmed_partial", 0),
+        )
+        model, selection_meta = forecast_selection.select_and_fit(
+            ts_data, diagnostics, forecast_horizon,
+        )
+
+        experiment = TrainingExperimentResult(selection_metric=selection_meta.selection_metric)
+
+        if model is None:
+            logger.warning(
+                "[Trainer] No forecasting model could be validated for %s.%s: %s",
+                table_name, detection.target_column, diagnostics.reason,
+            )
+            experiment.training_results.append({
+                "model_key": None,
+                "training_status": "REFUSED",
+                "reason": diagnostics.reason,
+                "diagnostics": dataclasses.asdict(diagnostics),
+            })
+            return experiment
+
         artifact = TrainedModelArtifact(
             model=model,
             preprocessor=None,
@@ -82,18 +127,39 @@ def train_all(
             table_name=table_name,
             evaluation=EvaluationResult(),
             feature_importances=[],
-            model_type=model.model_name,
+            model_type=selection_meta.selected_model_label or model.model_name,
             problem_type="forecasting",
         )
-        
+        # Provenance travels with the artifact so a persisted forecast can
+        # always state which model was chosen and how it scored.
+        artifact.forecast_frequency = frequency
+        artifact.series_diagnostics = diagnostics
+        artifact.selection_metadata = selection_meta
+
         experiment.models.append(artifact)
-        experiment.best_model_key = models.DEFAULT_FORECASTING_KEY
-        
-        model_path = get_model_path(table_name, detection.target_column)
+        experiment.best_model_key = selection_meta.selected_model_key or models.DEFAULT_FORECASTING_KEY
+        experiment.training_results.append({
+            "model_key": selection_meta.selected_model_key,
+            "model_name": selection_meta.selected_model_label,
+            "training_status": "SUCCESS",
+            "selection_method": selection_meta.selection_method,
+            "selection_metric": selection_meta.selection_metric,
+            "score": selection_meta.selected_score,
+            "beats_naive": selection_meta.beats_naive,
+            "n_folds": selection_meta.n_folds,
+        })
+
+        model_path = get_model_path(table_name, detection.target_column, frequency=frequency)
         with open(model_path, "wb") as f:
             pickle.dump(artifact, f)
-            
-        logger.info("[Trainer] Trained and saved forecasting model to %s", model_path)
+
+        logger.info(
+            "[Trainer] Forecasting model for %s.%s (%s): %s via %s (%s=%s, beats_naive=%s) → %s",
+            table_name, detection.target_column, frequency,
+            selection_meta.selected_model_label, selection_meta.selection_method,
+            selection_meta.selection_metric, selection_meta.selected_score,
+            selection_meta.beats_naive, model_path,
+        )
         return experiment
 
     # Classification / Regression path
@@ -194,9 +260,14 @@ def train_all(
     return experiment
 
 
-def load_artifact(table_name: str, target_col: str, model_key: str | None = None) -> TrainedModelArtifact | None:
+def load_artifact(
+    table_name: str,
+    target_col: str,
+    model_key: str | None = None,
+    frequency: str | None = None,
+) -> TrainedModelArtifact | None:
     """Load a previously trained model artifact from disk."""
-    model_path = get_model_path(table_name, target_col, model_key)
+    model_path = get_model_path(table_name, target_col, model_key, frequency)
     if not model_path.exists():
         return None
     with open(model_path, "rb") as f:

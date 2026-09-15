@@ -291,95 +291,31 @@ def _find_target_column(df: pd.DataFrame, hint: str | None = None, problem_type_
     return None
 
 
-def detect_group_dimensions(group_hints: list[str], base_table: str) -> list[dict[str, str]]:
+def detect_group_dimensions(
+    group_hints: list[str],
+    base_table: str,
+    exclude_columns: set[str] | None = None,
+) -> list[dict[str, str]]:
     """
-    Find the tables, columns, and join keys for a list of grouped forecasting hints.
-    
-    Returns:
-        A list of dicts, each with:
-          - target_table: e.g. "geo"
-          - group_column: e.g. "geo"
-          - join_key_base: e.g. "geoid"
-          - join_key_target: e.g. "geoid"
-          - semantic_hint: e.g. "country"
+    Resolve grouping hints to concrete (table, column, join key) triples.
+
+    Delegates to :mod:`prediction.dimensions`, which resolves against the live
+    schema and its values rather than a hardcoded alias table. The old
+    implementation mapped "country" and "region" onto the same candidate list
+    and guessed join keys from table names, so "by region" silently returned
+    countries and "by team" joined on the product key.
+
+    Returns the dict shape the predictor consumes. Hints that cannot be
+    resolved are reported by raising, never by falling back to a default
+    dimension — answering a different question than the one asked is worse
+    than failing.
     """
-    from services.database import get_all_table_names, get_table_schema
+    from prediction.dimensions import resolve_dimensions
 
-    tables = get_all_table_names()
-    
-    # Semantic mapping for common dimension names
-    dim_aliases = {
-        "country": ["geo", "region", "country", "nation"],
-        "region": ["geo", "region"],
-        "product": ["product", "item"],
-        "category": ["category", "type", "class", "productcategory"],
-        "team": ["team", "salesteam", "group"],
-        "salesperson": ["salesperson", "rep", "agent"],
-    }
-    
-    base_schema = get_table_schema(base_table)
-    base_columns = [c["column_name"].lower() for c in base_schema]
-    
-    results = []
-    
-    for hint in group_hints:
-        hint_lower = hint.lower().replace(" ", "")
-        best_score = 0.0
-        best_match = None
-        
-        expanded_hint = set([hint_lower])
-        for key, aliases in dim_aliases.items():
-            if hint_lower in aliases or hint_lower == key:
-                expanded_hint.update(aliases)
+    resolution = resolve_dimensions(
+        group_hints, base_table, exclude_columns=exclude_columns,
+    )
+    if not resolution.ok:
+        raise ValueError(resolution.error_message())
 
-        for table in tables:
-            if table == base_table:
-                continue
-                
-            schema = get_table_schema(table)
-            target_columns = [c["column_name"].lower() for c in schema]
-            
-            for col in target_columns:
-                score = 0.0
-                
-                # Exact match
-                if col in expanded_hint:
-                    score += 100.0
-                    
-                # Substring match
-                for eh in expanded_hint:
-                    if len(eh) >= 3 and (eh in col or col in eh):
-                        score += 20.0
-                        
-                if score > best_score:
-                    # To be a valid dimension, we need a join key.
-                    possible_keys = [table + "id", table[0] + "id"]
-                    join_key = None
-                    
-                    # Check for direct ID match in base table
-                    for bc in base_columns:
-                        if bc in possible_keys or bc == table + "id":
-                            join_key = bc
-                            break
-                            
-                    # Check for identical column names ending in 'id'
-                    if not join_key:
-                        for tc in target_columns:
-                            if tc.endswith("id") and tc in base_columns:
-                                join_key = tc
-                                break
-                                
-                    if join_key:
-                        best_score = score
-                        best_match = {
-                            "target_table": table,
-                            "group_column": col,
-                            "join_key_base": join_key,
-                            "join_key_target": join_key,
-                            "semantic_hint": hint,
-                        }
-        
-        if best_match:
-            results.append(best_match)
-            
-    return results
+    return [d.to_dim_info() for d in resolution.resolved]

@@ -568,52 +568,105 @@ def _build_forecasting_charts(forecast_result, title: str | None = None) -> dict
         }
     }
 
+# Plotting every series of a high-cardinality combination (country x product
+# is 132 lines) is unreadable and slow. Cap the chart, never the forecast.
+MAX_PLOTTED_SERIES = 12
+MAX_RANKED_BARS = 20
+
+
+def _dimension_label(forecast_result) -> str:
+    """Human-readable name for the grouping, e.g. "country and product"."""
+    dims = getattr(forecast_result, "dimensions", None) or []
+    return " and ".join(dims) if dims else "Group"
+
+
+def _forecastable(entries: list[dict]) -> list[dict]:
+    """
+    Entries that actually produced a forecast.
+
+    A group refused for insufficient history has final_value None. Plotting it
+    as a zero-height bar makes "we could not forecast this" look identical to
+    "we forecast zero", so it is dropped from the chart and reported through
+    excluded_groups instead.
+    """
+    return [p for p in entries if p.get("final_value") is not None]
+
+
 def _build_grouped_forecasting_line_chart(forecast_result) -> dict:
-    """Build a multi-line chart for grouped forecasting."""
-    group_label = " and ".join(forecast_result.dimensions) if getattr(forecast_result, "dimensions", None) else "Group"
-    
+    """Build a multi-line chart for grouped forecasting, one line per group."""
+    group_label = _dimension_label(forecast_result)
+    preds = getattr(forecast_result, "raw_forecast_results", None) or []
+    plotted = _forecastable(preds)[:MAX_PLOTTED_SERIES]
+
     series_data = []
-    # fallback to predictions if raw_forecast_results isn't there
-    preds = getattr(forecast_result, "raw_forecast_results", getattr(forecast_result, "predictions", []))
-    for p in preds:
+    for p in plotted:
         series_data.append({
             "group": str(p["group"]),
+            "group_dict": p.get("group_dict", {}),
             "historical": p.get("historical", [])[-50:],
             "forecast": p.get("forecast", []),
         })
-        
+
+    total = len(_forecastable(preds))
     return {
         "type": "grouped_time_series_forecast",
         "title": f"Forecast {forecast_result.target_column} by {group_label}",
         "dimension": "group",
-        "data": series_data
+        "dimensions": list(getattr(forecast_result, "dimensions", None) or []),
+        "data": series_data,
+        "shown": len(series_data),
+        "total": total,
+        "truncated": total > len(series_data),
+        "note": (
+            f"Showing the top {len(series_data)} of {total} {group_label} combinations; "
+            "all of them were forecast and ranked."
+            if total > len(series_data) else ""
+        ),
     }
 
+
 def _build_grouped_forecasting_ranking_chart(forecast_result, task_type: str = "grouped_ranking") -> dict:
-    """Build a bar chart for grouped forecasting ranking."""
-    ranking_data = []
-    preds = getattr(forecast_result, "forecast_ranking", getattr(forecast_result, "predictions", []))
-    for p in preds:
-        ranking_data.append({
+    """Build a bar chart ranking groups by forecast value or growth."""
+    preds = getattr(forecast_result, "forecast_ranking", None) or []
+    ranked = _forecastable(preds)
+
+    ranking_data = [
+        {
             "group": str(p["group"]),
-            "value": round(float(p["final_value"]), 2) if p["final_value"] is not None else 0.0,
+            "group_dict": p.get("group_dict", {}),
+            "value": round(float(p["final_value"]), 2),
             "color": "#6366f1",
-        })
-        
-    group_label = " and ".join(forecast_result.dimensions) if getattr(forecast_result, "dimensions", None) else "Group"
-        
+        }
+        for p in ranked
+    ]
+
+    group_label = _dimension_label(forecast_result)
     if task_type == "growth_analysis":
         title = f"Expected Growth % by {group_label}"
     else:
         title = f"Predicted {forecast_result.target_column} by {group_label}"
-        
+
+    excluded = getattr(forecast_result, "excluded_groups", None) or []
+    shown = ranking_data[:MAX_RANKED_BARS]
+    notes = []
+    if len(ranking_data) > len(shown):
+        notes.append(f"Top {len(shown)} of {len(ranking_data)} ranked combinations.")
+    if excluded:
+        notes.append(f"{len(excluded)} group(s) had too little history to forecast.")
+
     return {
         "type": "value_ranking",
         "title": title,
         "dimension": "group",
+        "dimensions": list(getattr(forecast_result, "dimensions", None) or []),
         "metric": "value",
         "sort": "descending",
-        "data": ranking_data[:20],
+        "data": shown,
+        "shown": len(shown),
+        "total": len(ranking_data),
+        "excluded": len(excluded),
+        "truncated": len(ranking_data) > len(shown),
+        "note": " ".join(notes),
     }
 
 

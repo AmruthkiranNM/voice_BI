@@ -105,11 +105,16 @@ def predict_rows(
     group_hints: list[str] | None = None,
     forecast_steps: int = 12,
     forecast_frequency: str = "months",
+    group_filter: dict[str, list[str]] | None = None,
 ) -> Any:
     """
     Run inference on specific row(s) from a table.
-    
+
     If no model exists yet, trains one first (lazy training).
+
+    ``group_filter`` ({dimension: [allowed values]}) restricts which groups are
+    forecast. Pass it only when the user explicitly named the groups; by
+    default every eligible combination is forecast and ranked afterwards.
     """
     logger.info(
         "[Service] predict_rows called", 
@@ -145,9 +150,18 @@ def predict_rows(
     resolved_target_col = detection.target_column
     logger.info(f"[Service] Resolved target column: {resolved_target_col}")
 
-    # Load or train
-    artifact = trainer.load_artifact(table_name, resolved_target_col)
-    
+    # Load or train.
+    # Forecasting artifacts are keyed by frequency as well as table+target: a
+    # model fitted on monthly buckets cannot answer a question asked in days.
+    from prediction.series_validation import normalize_frequency
+
+    normalized_frequency = normalize_frequency(forecast_frequency)
+    artifact = trainer.load_artifact(
+        table_name,
+        resolved_target_col,
+        frequency=normalized_frequency if is_forecast else None,
+    )
+
     needs_retrain = False
     if artifact is None:
         needs_retrain = True
@@ -155,12 +169,31 @@ def predict_rows(
         needs_retrain = True
     elif not is_forecast and getattr(artifact, "problem_type", None) == "forecasting":
         needs_retrain = True
+    elif is_forecast and getattr(artifact, "forecast_frequency", None) != normalized_frequency:
+        needs_retrain = True
+
+    # A grouped forecast fits one model per group from the group's own series,
+    # so the table-level artifact would never be used. Skip that wasted fit.
+    if task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
+        needs_retrain = False
 
     if needs_retrain:
-        logger.info("[Service] No saved model or wrong type; training models now...")
-        experiment = trainer.train_all(df, table_name, target_col=resolved_target_col, forecast_frequency=forecast_frequency, problem_type_hint=problem_hint)
+        logger.info("[Service] No saved model or wrong type/frequency; training models now...")
+        experiment = trainer.train_all(
+            df, table_name,
+            target_col=resolved_target_col,
+            forecast_frequency=normalized_frequency,
+            forecast_horizon=forecast_steps,
+            problem_type_hint=problem_hint,
+        )
         if not experiment.models:
-            raise RuntimeError(f"Training failed to produce any models for {table_name}")
+            reason = ""
+            if experiment.training_results:
+                reason = experiment.training_results[0].get("reason", "")
+            raise RuntimeError(
+                f"No model could be trained for '{table_name}'."
+                + (f" {reason}" if reason else "")
+            )
         artifact = experiment.models[0]  # Just use the first one for lazy predict fallback
 
     if task_type == "trend_direction_forecast":
@@ -172,20 +205,41 @@ def predict_rows(
              raise ValueError(f"Task type '{task_type}' requires group_hints to be provided.")
              
         logger.info(f"[Service] Executing {task_type} with hints: {group_hints}")
-        dim_info_list = detector.detect_group_dimensions(group_hints, table_name)
+        # Keep the measure and the time axis out of the dimension catalog —
+        # they are what is being forecast and when, never how it is grouped.
+        exclude = {resolved_target_col}
+        if detection.date_column:
+            exclude.add(detection.date_column)
+
+        dim_info_list = detector.detect_group_dimensions(
+            group_hints, table_name, exclude_columns=exclude,
+        )
         if not dim_info_list:
-            raise ValueError(f"Could not find valid grouping dimensions for '{group_hints}' connected to {table_name}.")
-            
-        # Add the dataframe instances directly into the dim_info dictionaries
+            raise ValueError(
+                f"Could not find valid grouping dimensions for '{group_hints}' "
+                f"connected to {table_name}."
+            )
+
+        # Load each distinct dimension table once. Dimensions that live in the
+        # fact table itself need no join and therefore no extra load.
+        loaded: dict[str, pd.DataFrame] = {}
         for dim_info in dim_info_list:
-            if not dim_info.get("target_table"):
-                 raise ValueError(f"Missing target_table in dimension info for hint: {dim_info}")
-            dim_info["dim_df"] = _load_table(dim_info["target_table"])
-            if dim_info["dim_df"].empty:
-                 logger.warning(f"[Service] Dimension table {dim_info['target_table']} is empty.")
-        
+            if not dim_info.get("requires_join", True):
+                continue
+            target = dim_info.get("target_table")
+            if not target:
+                raise ValueError(f"Missing target_table in dimension info for hint: {dim_info}")
+            if target not in loaded:
+                loaded[target] = _load_table(target)
+                if loaded[target].empty:
+                    raise ValueError(
+                        f"Dimension table '{target}' is empty, so '{dim_info['semantic_hint']}' "
+                        "cannot be used to group this forecast."
+                    )
+            dim_info["dim_df"] = loaded[target]
+
         ranking_metric = "growth" if task_type == "growth_analysis" else "sum"
-        
+
         return predictor.predict_grouped_forecast(
             df=df,
             dimensions=dim_info_list,
@@ -194,6 +248,7 @@ def predict_rows(
             frequency=forecast_frequency,
             table_name=table_name,
             ranking_metric=ranking_metric,
+            group_filter=group_filter,
         )
 
     if task_type == "forecasting":

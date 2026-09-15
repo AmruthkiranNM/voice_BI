@@ -9,6 +9,7 @@ import logging
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import LogisticRegression, LinearRegression
 
+from prediction import forecasting_models
 from prediction.forecasting_models import ForecastingModelWrapper
 
 
@@ -76,7 +77,51 @@ MODEL_REGISTRY: dict[str, dict] = {
         ),
     },
 
-    # Forecasting Models
+    # ── Forecasting Models ──
+    # These are candidates, not defaults: forecast_selection.select_and_fit
+    # backtests them per series and picks a winner on validation evidence.
+    # The trivial baselines are deliberately included — a model that cannot
+    # beat "same as last period" has not earned the user's trust.
+    "naive": {
+        "label": "Naive (last value)",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.NaiveForecaster(),
+    },
+    "seasonal_naive": {
+        "label": "Seasonal Naive",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.SeasonalNaiveForecaster(),
+    },
+    "drift": {
+        "label": "Drift",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.DriftForecaster(),
+    },
+    "moving_average": {
+        "label": "Moving Average",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.MovingAverageForecaster(),
+    },
+    "simple_exp_smoothing": {
+        "label": "Simple Exponential Smoothing",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.SimpleExpSmoothingForecaster(),
+    },
+    "holt_linear": {
+        "label": "Holt Linear Trend",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.HoltLinearForecaster(),
+    },
+    "damped_holt": {
+        "label": "Damped Holt Trend",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.DampedHoltForecaster(),
+    },
+    "holt_winters_additive": {
+        "label": "Holt-Winters (additive seasonal)",
+        "problem_type": "forecasting",
+        "factory": lambda: forecasting_models.HoltWintersForecaster(),
+    },
     "exponential_smoothing": {
         "label": "Exponential Smoothing",
         "problem_type": "forecasting",

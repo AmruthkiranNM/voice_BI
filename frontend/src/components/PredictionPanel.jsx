@@ -11,14 +11,21 @@ export default function PredictionPanel({ result, insight }) {
   const prediction = result?.prediction;
   const visualization = result?.visualization;
   const mode = visualization?.mode || 'single';
-  const predictions = prediction?.predictions || [];
-  const isForecast = mode === 'forecast';
-  const firstPred = predictions[0] || (isForecast && prediction?.forecast?.[0]) || null;
+  const charts = visualization?.charts || [];
+
+  // Per-row predictions live under `row_predictions`; `predictions` is the
+  // legacy name kept for older payloads.
+  const rowPredictions = prediction?.row_predictions || prediction?.predictions || [];
+  const firstPred = rowPredictions[0] || null;
 
   const accuracy = prediction?.model_accuracy;
 
-
-  if (!firstPred) {
+  // Gate on whether there is anything to draw, not on one field's name. A
+  // grouped forecast has neither `row_predictions` nor a top-level `forecast`
+  // — its series live per group in `raw_forecast_results` and reach this
+  // component as `visualization.charts`, so keying the guard off row
+  // predictions hid every grouped and multidimensional forecast entirely.
+  if (!charts.length && !firstPred) {
     return (
       <div className="panel-card text-center py-10 text-zinc-400">
         <TbAlertTriangle className="w-8 h-8 mx-auto mb-3 text-amber-400" />
@@ -30,7 +37,7 @@ export default function PredictionPanel({ result, insight }) {
   const targetColumn = prediction?.target_column || 'Value';
 
   // Single mode (gauge & profile view)
-  if (mode === 'single') {
+  if (mode === 'single' && firstPred) {
     const probability = firstPred.probability;
     const riskLevel = firstPred.risk ?? 'Unknown';
     const featureImpacts = firstPred.feature_impacts || [];
@@ -140,14 +147,21 @@ export default function PredictionPanel({ result, insight }) {
     );
   }
 
-  // Batch mode (multi-chart dashboard)
-  const charts = visualization?.charts || [];
-  
+  // Batch / forecast mode (multi-chart dashboard)
   return (
     <div className="bi-dashboard animate-in space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {charts.map((chart, idx) => (
-          <div key={idx} className={`panel-card flex flex-col ${(chart.type === 'time_series_forecast' || chart.type === 'grouped_time_series_forecast') ? 'col-span-1 md:col-span-2 min-h-[550px]' : 'min-h-[350px]'}`}>
+        {charts.map((chart, idx) => {
+          const isTimeSeries = chart.type === 'time_series_forecast'
+            || chart.type === 'grouped_time_series_forecast';
+          // Multi-dimensional group labels ("Canada - Organic Choco Syrup")
+          // need the full row; in a half-width card they truncate to "Canada -
+          // After…", which makes the ranking unreadable.
+          const isWideRanking = chart.type === 'value_ranking'
+            && ((chart.dimensions?.length || 0) > 1 || (chart.data?.length || 0) > 10);
+          const fullWidth = isTimeSeries || isWideRanking;
+          return (
+          <div key={idx} className={`panel-card flex flex-col ${fullWidth ? 'col-span-1 md:col-span-2' : ''} ${isTimeSeries ? 'min-h-[550px]' : isWideRanking ? 'min-h-[520px]' : 'min-h-[350px]'}`}>
             {(chart.type !== 'time_series_forecast' && chart.type !== 'grouped_time_series_forecast') && (
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-4">
                 {chart.title}
@@ -156,8 +170,14 @@ export default function PredictionPanel({ result, insight }) {
             <div className="flex-1 w-full relative">
               <ChartRenderer chart={chart} targetColumn={targetColumn} />
             </div>
+            {/* A chart may show fewer groups than were forecast. Say so, so a
+                capped chart is never mistaken for the full result. */}
+            {chart.note && (
+              <p className="mt-3 text-[11px] text-zinc-500 leading-relaxed">{chart.note}</p>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -235,7 +255,13 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
         data: data.map(d => chart.dimension === 'group' ? d.group : d.customer_id),
         ...commonAxisProps,
         splitLine: { show: false },
-        axisLabel: { ...commonAxisProps.axisLabel, width: 100, overflow: 'truncate' }
+        axisLabel: {
+          ...commonAxisProps.axisLabel,
+          // One dimension is a short word; several are "Canada - Organic Choco
+          // Syrup". Size the gutter to the labels actually present.
+          width: (chart.dimensions?.length || 1) > 1 ? 210 : 120,
+          overflow: 'truncate',
+        }
       },
       series: [
         {
@@ -420,14 +446,14 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
         axisPointer: { type: 'line', lineStyle: { color: '#52525b', type: 'dashed' } },
         formatter: function(params) {
           const date = params[0].name;
-          let html = `<div class="text-xs mb-2 text-zinc-400">Month:<br/><span class="text-zinc-100 font-medium">${formatTooltipDate(date)}</span></div>`;
+          let html = `<div style="font-size:12px;margin-bottom:8px;color:#a1a1aa">Month:<br/><span style="color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</span></div>`;
           
           params.forEach(p => {
              if (p.seriesName === 'Actual' && p.value !== '-') {
-                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span class="text-zinc-300">Actual ${metricLabel.toLowerCase()}:</span></div><span class="font-mono text-zinc-100 font-bold ml-auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Actual ${metricLabel.toLowerCase()}:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
              }
              if (p.seriesName === 'Forecast' && p.value !== '-') {
-                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span class="text-zinc-300">Forecast:</span></div><span class="font-mono text-zinc-100 font-bold ml-auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Forecast:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
              }
           });
           
@@ -435,7 +461,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              const lower = fcMap.get(date).lower;
              const upper = fcMap.get(date).upper;
              if (lower !== upper) {
-               html += `<div class="flex items-center gap-4 mt-2 pt-2 border-t border-zinc-700/50"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span class="text-zinc-400">Confidence interval:</span></div><span class="font-mono text-zinc-300 text-xs ml-auto">${isCurrency?'$':''}${Number(lower).toLocaleString(undefined, {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`;
+               html += `<div style="display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(63,63,70,.6)"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span style="color:#a1a1aa">Confidence interval:</span></div><span style="font-family:ui-monospace,monospace;color:#d4d4d8;font-size:12px;margin-left:auto">${isCurrency?'$':''}${Number(lower).toLocaleString(undefined, {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`;
              }
           }
           
@@ -673,7 +699,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
         axisPointer: { type: 'line', lineStyle: { color: '#52525b', type: 'dashed' } },
         formatter: function(params) {
           const date = params[0].name;
-          let html = `<div class="text-xs mb-2 text-zinc-400">Month:<br/><span class="text-zinc-100 font-medium">${formatTooltipDate(date)}</span></div>`;
+          let html = `<div style="font-size:12px;margin-bottom:8px;color:#a1a1aa">Month:<br/><span style="color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</span></div>`;
           
           const validParams = params.filter(p => p.value !== '-');
           const paramGroups = {};
@@ -695,7 +721,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              const displayVal = fc !== null ? fc : hist;
              const typeLabel = fc !== null ? 'Forecast' : 'Actual';
              
-             html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span class="text-zinc-300 font-medium">${groupName} <span class="text-zinc-500 font-normal ml-1">(${typeLabel})</span>:</span></div><span class="font-mono text-zinc-100 font-bold ml-auto">${isCurrency?'$':''}${Number(displayVal).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+             html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span style="color:#d4d4d8;font-weight:500">${groupName} <span style="color:#a1a1aa;font-weight:400;margin-left:4px">(${typeLabel})</span>:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(displayVal).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
           });
           return html;
         }
