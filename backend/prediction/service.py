@@ -150,6 +150,64 @@ def predict_rows(
     resolved_target_col = detection.target_column
     logger.info(f"[Service] Resolved target column: {resolved_target_col}")
 
+    # ── Target-type gate ──────────────────────────────────────────────
+    # The column decides what can be predicted from it; the question decides
+    # what is wanted. Checking both here means no caller can route a target
+    # into a pipeline it does not support, however it derived its task_type.
+    # A continuous measure asked for as "classification" is corrected to a
+    # forecast rather than being handed to a classifier, which is what
+    # produced "the least populated class in y has only 1 member" for BOXES.
+    from prediction.target_resolution import resolve_prediction_type, resolve_target
+
+    target_spec = resolve_target(
+        resolved_target_col, df, has_time_axis=bool(detection.date_column),
+    )
+    if is_forecast:
+        requested_type = "forecasting"
+    elif task_type == "regression":
+        requested_type = "regression"
+    else:
+        # ml_agent labels every non-forecast question "classification", so this
+        # is the value that must actually be challenged against the column.
+        requested_type = "classification"
+    chosen_type, type_reason = resolve_prediction_type(
+        target_spec, wants_future=is_forecast, requested=requested_type,
+    )
+
+    if chosen_type is None:
+        raise ValueError(
+            f"'{resolved_target_col}' cannot be predicted. {target_spec.reason}"
+        )
+
+    if chosen_type != requested_type:
+        logger.warning(
+            "[Service] Prediction type corrected: %s -> %s. %s",
+            requested_type, chosen_type, type_reason,
+        )
+        if chosen_type == "forecasting" and not is_forecast:
+            # Re-run detection in forecasting mode so the date column and the
+            # forecasting-specific suitability checks are applied.
+            is_forecast = True
+            problem_hint = "forecasting"
+            detection = detector.detect(
+                df, table_name, target_hint=resolved_target_col,
+                problem_type_hint=problem_hint,
+            )
+            if not detection.is_suitable:
+                raise ValueError(
+                    f"'{resolved_target_col}' is a continuous measure but cannot be "
+                    f"forecast: {detection.reason}"
+                )
+            if task_type in ("classification", "regression"):
+                task_type = "grouped_forecasting" if group_hints else "forecasting"
+        elif chosen_type == "regression" and detection.problem_type == "classification":
+            detection.problem_type = "regression"
+
+    logger.info(
+        "[Service] Target '%s' -> %s (%s); prediction type: %s",
+        resolved_target_col, target_spec.semantic_role, target_spec.dtype, chosen_type,
+    )
+
     # Load or train.
     # Forecasting artifacts are keyed by frequency as well as table+target: a
     # model fitted on monthly buckets cannot answer a question asked in days.

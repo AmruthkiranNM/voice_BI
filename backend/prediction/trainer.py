@@ -191,7 +191,13 @@ def train_all(
         model = models.create_model(key)
         model.fit(prepared.X_train, prepared.y_train)
 
-        eval_result = evaluator.evaluate(model, prepared.X_test, prepared.y_test)
+        # Evaluate with the detected problem type. Defaulting to classification
+        # meant every regression model was scored with classification metrics,
+        # which raises "can't handle a mix of multiclass and continuous targets".
+        eval_result = evaluator.evaluate(
+            model, prepared.X_test, prepared.y_test,
+            problem_type=detection.problem_type,
+        )
         importances = _extract_importances(model, prepared.feature_names)
 
         artifact = TrainedModelArtifact(

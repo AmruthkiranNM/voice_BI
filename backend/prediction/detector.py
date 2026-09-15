@@ -13,6 +13,7 @@ Responsibilities:
 """
 
 import logging
+import warnings
 from typing import Any
 
 import pandas as pd
@@ -119,6 +120,12 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
         )
 
     # ── 2. Determine problem type ──
+    # The target resolver is the single authority on what a column *is*.
+    # Deciding it independently here is how the same column ended up being
+    # treated as a measure in one code path and a label in another.
+    from prediction.target_resolution import resolve_target
+
+    target_spec = resolve_target(target_col, df, has_time_axis=bool(date_col))
     unique_values = df[target_col].dropna().unique().tolist()
     problem_type = None
 
@@ -141,11 +148,13 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
             )
         problem_type = "forecasting"
         unique_values = []
-    elif len(unique_values) == 2:
+    elif target_spec.recommended_prediction_type == "classification":
         problem_type = "classification"
-    elif pd.api.types.is_numeric_dtype(df[target_col]) and len(unique_values) > 2:
+    elif target_spec.semantic_role == "measure":
+        # A continuous measure is a regression target here. Whether the caller
+        # actually wants it projected over time is decided by the question, via
+        # target_resolution.resolve_prediction_type — not by this function.
         problem_type = "regression"
-        # For regression, target classes don't make sense
         unique_values = []
     else:
         return DetectionResult(
@@ -153,7 +162,9 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
             is_suitable=False,
             target_column=target_col,
             row_count=len(df),
-            reason=f"Target column '{target_col}' is neither binary nor continuous numerical.",
+            reason=(
+                f"Target column '{target_col}' cannot be predicted. {target_spec.reason}"
+            ),
         )
 
     # ── 3. Classify all columns ──
@@ -215,25 +226,55 @@ def detect(df: pd.DataFrame, table_name: str, target_hint: str | None = None, pr
 
 
 def _find_date_column(df: pd.DataFrame) -> str | None:
-    """Find the first column that appears to be a date/datetime."""
-    # Check explicitly typed datetime columns first
+    """
+    Find the column that carries the time axis.
+
+    Three passes, most reliable first: a real datetime dtype, then a
+    name that advertises itself as a date and whose values parse, then —
+    only if neither found anything — any text column whose values actually
+    parse as dates.
+
+    The third pass matters for genericity: a timestamp column called
+    ``when_on`` or ``period`` carries no naming hint, and without it such a
+    dataset simply reports "no date column" and cannot be forecast at all.
+    """
+    # 1. Explicitly typed datetime columns
     for col in df.columns:
         if pd.api.types.is_datetime64_any_dtype(df[col]):
             return col
-            
-    # Heuristics for string columns that might be dates
+
+    def _parses_as_dates(col: str, threshold: float) -> bool:
+        sample = df[col].dropna().head(50)
+        if sample.empty:
+            return False
+        # Plain numbers parse as epochs; that is not evidence of a date column.
+        if pd.api.types.is_numeric_dtype(sample):
+            return False
+        try:
+            with warnings.catch_warnings():
+                # Mixed/unknown formats fall back to dateutil and warn; that is
+                # expected here, since probing is the whole point.
+                warnings.simplefilter("ignore")
+                parsed = pd.to_datetime(sample, errors="coerce")
+        except (ValueError, TypeError):
+            return False
+        return bool(parsed.notna().mean() >= threshold)
+
+    # 2. Name advertises a date, and the values agree
     date_hints = ["date", "time", "month", "year", "timestamp"]
     for col in df.columns:
-        col_lower = col.lower()
-        if any(h in col_lower for h in date_hints):
-            # Try parsing a sample
-            sample = df[col].dropna().head(10)
-            if not sample.empty:
-                try:
-                    pd.to_datetime(sample, errors="coerce")
-                    return col
-                except (ValueError, TypeError):
-                    pass
+        if any(h in col.lower() for h in date_hints) and _parses_as_dates(col, 0.5):
+            return col
+
+    # 3. No hint in any name — fall back to what the values actually are
+    for col in df.columns:
+        if _parses_as_dates(col, 0.9):
+            logger.info(
+                "[Detector] '%s' has no date-like name but its values parse as dates; "
+                "using it as the time axis.", col,
+            )
+            return col
+
     return None
 
 

@@ -30,27 +30,8 @@ Respond ONLY with a JSON object:
 }}
 """
 
-EXPLANATION_PROMPT = """You are a Business Advisor AI.
-
-The user asked: "{message}"
-
-We have calculated the explanation deterministically using actual historical data, and ran a forecast model to get the future ranking.
-
-CURRENT OBSERVED EXPLANATION (SECTION 1):
-{diagnostic_text}
-
-FUTURE FORECAST EXPLANATION (SECTION 2):
-{forecast_text}
-
-Write a seamless, 2-section response answering both parts of the user's question ("Why is it like this..." and "...will it be the same next year?").
-
-RULES:
-1. ONLY use the actual numerical values provided in the explanations above.
-2. DO NOT invent causal claims (e.g., "better marketing"). Distinguish between "observed data" and "causal reasons". Say something like "These figures show the observed revenue distribution, but revenue data alone does not establish why customers purchased these products."
-3. Make sure it reads smoothly but remains grounded entirely in the deterministic data provided.
-
-Write the final response now:
-"""
+# Explanation wording now goes through agents/explanation.py, which checks the
+# generated text against the deterministic evidence before returning it.
 
 def run(message: str, context: dict[str, Any], history: list[dict[str, str]] | None = None) -> dict[str, Any] | str:
     logger.info("[HistoricalToPredictive] Entering compound diagnostic+predictive routing")
@@ -138,18 +119,13 @@ def run(message: str, context: dict[str, Any], history: list[dict[str, str]] | N
     # 4. Compare Current vs Future
     forecast_text = _calculate_forecast_comparison(prediction_result, current_ranking, group_dims, target_col)
 
-    # 5. LLM Synthesis
-    synthesis_prompt = EXPLANATION_PROMPT.format(
-        message=message,
-        diagnostic_text=diagnostic_text,
-        forecast_text=forecast_text
-    )
-    
-    try:
-        final_answer = call_llm(synthesis_prompt, expect_json=False)
-    except Exception as e:
-        logger.error(f"[HistoricalToPredictive] Synthesis failed: {e}")
-        final_answer = f"{diagnostic_text}\n\n{forecast_text}"
+    # 5. Phrase the deterministic evidence, and verify the phrasing.
+    #    Every figure below was computed above; the model only writes it up,
+    #    and anything it adds that is not in the evidence is rejected.
+    from agents import explanation as explanation_layer
+
+    evidence = f"{diagnostic_text}\n\n{forecast_text}"
+    final_answer = explanation_layer.explain(message, evidence, fallback=evidence)
 
     # 6. Build new Response
     pred_dict = dataclasses.asdict(prediction_result)
@@ -215,29 +191,53 @@ def _calculate_diagnostics(rows: list[dict], target_col: str, group_dims: list[s
     return "\n".join(lines)
 
 
-def _calculate_forecast_comparison(prediction_result, current_ranking: list[tuple[str, float]], group_dims: list[str], target_col: str) -> str:
-    """Deterministically extract the forecast ranking and compare it."""
-    if not hasattr(prediction_result, "predictions"):
-        return "The forecast model did not return group-level predictions to compare."
+def _calculate_forecast_comparison(
+    prediction_result,
+    current_ranking: list[tuple[str, float]],
+    group_dims: list[str],
+    target_col: str,
+    top_n: int = 3,
+) -> str:
+    """
+    Compare the observed ranking against the forecast ranking, deterministically.
 
-    # Sort forecast predictions
-    preds = prediction_result.predictions
-    sorted_preds = sorted(preds, key=lambda p: float(p.get("final_value") or 0.0), reverse=True)
-    
-    lines = ["FUTURE FORECAST RANKING:"]
-    
-    if not sorted_preds:
-        return "No forecast results available."
-        
-    for i, p in enumerate(sorted_preds[:3], 1):
-        lines.append(f"{i}. {p['group']}: Predicted {target_col} = {float(p.get('final_value') or 0.0):,.2f}")
+    Reads ``raw_forecast_results`` — where grouped forecasts actually live. The
+    previous version guarded on ``hasattr(result, "predictions")``, an attribute
+    UniversalPredictionResult does not define, so the guard always fired and
+    every future-ranking question was answered "the forecast model did not
+    return group-level predictions" even though the forecast had just run.
+    """
+    from agents import forecast_comparison as fc
 
-    if current_ranking and sorted_preds:
-        curr_top = current_ranking[0][0]
-        fut_top = sorted_preds[0]['group']
-        if curr_top == fut_top:
-            lines.append(f"\nCOMPARISON: {curr_top} remains the #1 ranked group in the forecast.")
-        else:
-            lines.append(f"\nCOMPARISON: Ranking changes! {curr_top} falls from #1, and {fut_top} takes the lead.")
-            
-    return "\n".join(lines)
+    future = fc.extract_forecast_ranking(prediction_result)
+    if not future:
+        excluded = getattr(prediction_result, "excluded_groups", None) or []
+        if excluded:
+            reasons = "; ".join(
+                f"{e.get('group')}: {e.get('reason', 'insufficient history')}"
+                for e in excluded[:5]
+            )
+            return (
+                "No group could be forecast, so no future ranking is available. "
+                f"Reasons: {reasons}"
+            )
+        return "The forecast produced no ranked groups to compare."
+
+    current = [
+        fc.RankedEntry(rank=i, group=name, value=value,
+                       group_dict={group_dims[0]: name} if group_dims else {})
+        for i, (name, value) in enumerate(current_ranking, start=1)
+    ]
+
+    comparison = fc.compare_rankings(
+        current, future, top_n=top_n,
+        n_excluded=len(getattr(prediction_result, "excluded_groups", None) or []),
+    )
+    dimension_label = group_dims[0] if group_dims else "group"
+    horizon = getattr(prediction_result, "horizon", 0)
+    horizon_label = f"the next {horizon} periods" if horizon else "the forecast horizon"
+
+    return fc.format_comparison(
+        comparison, target=target_col,
+        dimension_label=dimension_label, horizon_label=horizon_label,
+    )

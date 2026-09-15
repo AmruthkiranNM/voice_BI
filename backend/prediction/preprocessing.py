@@ -92,14 +92,30 @@ def prepare_training_data(
         Fitted sklearn Pipeline object
     """
     target_col = detection.target_column
-    y = df[target_col].astype(int)
+    is_classification = (detection.problem_type or "classification") == "classification"
 
-    # 1. Train/Test split FIRST to prevent data leakage during imputation/scaling
+    if is_classification:
+        # Labels may be text ("Yes"/"No"), so encode rather than assume ints.
+        y = df[target_col]
+        if not pd.api.types.is_numeric_dtype(y):
+            y = y.astype("category").cat.codes
+        else:
+            y = y.astype(int)
+    else:
+        y = pd.to_numeric(df[target_col], errors="coerce")
+
+    # 1. Train/Test split FIRST to prevent data leakage during imputation/scaling.
+    #    Stratification only makes sense for classification: it asks for every
+    #    class to be represented in both splits. Applied to a continuous
+    #    measure, every distinct value becomes its own "class" and the split
+    #    fails with "the least populated class in y has only 1 member" — a
+    #    classification error raised on a regression target, which is what made
+    #    a numeric measure look like a routing problem.
     df_train, df_test, y_train, y_test = train_test_split(
         df, y,
         test_size=test_size,
         random_state=_RANDOM_STATE,
-        stratify=y,
+        stratify=y if is_classification else None,
     )
 
     # 2. Build and fit preprocessor on training data ONLY

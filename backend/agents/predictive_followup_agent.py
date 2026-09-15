@@ -47,12 +47,31 @@ For each intent object in the "intents" array, include these additional fields i
 Respond ONLY with the JSON object.
 """
 
-EXPLANATION_PROMPT = """You are a Business Advisor AI.
-The user asked: "{message}"
-We deterministically calculated the answer based on the prediction model results: {answer_data}
+def _forecast_evidence(prediction_result, target: str | None, horizon: int) -> str:
+    """Deterministic evidence lines describing a forecast result."""
+    from agents import forecast_comparison as fc
 
-Write a short (1-2 sentences), friendly response giving the user the exact answer. Do not hallucinate or guess.
-"""
+    ranked = fc.extract_forecast_ranking(prediction_result)
+    dims = getattr(prediction_result, "dimensions", None) or []
+    label = " and ".join(dims) if dims else "group"
+    lines = [
+        f"FORECAST: {target or getattr(prediction_result, 'target_column', 'the measure')} "
+        f"over the next {horizon} periods, by {label}.",
+    ]
+    meta = getattr(prediction_result, "model_metadata", None)
+    if meta is not None:
+        lines.append(
+            f"MODEL: {getattr(meta, 'selected_model_label', 'selected model')} "
+            f"({getattr(meta, 'selection_method', 'selected')})."
+        )
+    if ranked:
+        lines.append("RANKED FORECAST TOTALS:")
+        for e in ranked[:5]:
+            lines.append(f"  {e.rank}. {e.group}: {e.value:,.2f}")
+        lines.append(f"({len(ranked)} groups were forecast and ranked.)")
+    else:
+        lines.append("No group produced a forecast.")
+    return "\n".join(lines)
 
 def run(message: str, context: dict[str, Any], history: list[dict[str, Any]]) -> dict[str, Any]:
     original_query = context.get("query", "")
@@ -137,26 +156,48 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
     if not table_name:
         return {"reply": "I need a valid dataset to run this prediction.", "new_response": None}
 
-    # Recover previous parameters
+    # ── Inherit the previous prediction's configuration ──
+    # Every slot is carried forward from the result the user is looking at, and
+    # only the slots the follow-up actually names are overridden. Re-deriving
+    # the task type from the *original* question is what previously broke a
+    # target switch: "Which country generated the most revenue?" parses as a
+    # non-forecasting question, so "what about boxes sold?" inherited that and
+    # sent a continuous measure into a per-row pipeline.
     target = pred_data.get("target_column")
-    horizon = pred_data.get("horizon", 12)
-    task_type = ml_agent._extract_task_type(original_query) # fallback
-    if "group_dimensions" in pred_data:
-        task_type = "grouped_forecasting"
-        group_hints = pred_data["group_dimensions"]
-    else:
-        group_hints = []
+    horizon = pred_data.get("horizon") or 12
+    frequency = (pred_data.get("series_diagnostics") or {}).get("requested_frequency") or "months"
+    ranking_metric = pred_data.get("ranking_metric") or "sum"
 
-    # Override parameters
+    # The result records what kind of prediction it was; trust that over a
+    # re-parse of stale text. `dimensions` is the real field name — the old
+    # code looked for `group_dimensions`, which never exists, so grouped
+    # follow-ups silently lost their dimensions.
+    task_type = pred_data.get("task_type") or "forecasting"
+    group_hints = list(pred_data.get("dimensions") or [])
+    if group_hints and task_type in ("forecasting", "grouped_forecasting"):
+        task_type = "grouped_forecasting"
+
+    # ── Apply only what this follow-up changed ──
     if intent_data.get("new_target"):
         target = intent_data["new_target"]
     if intent_data.get("new_horizon"):
         horizon = intent_data["new_horizon"]
+    if intent_data.get("new_frequency"):
+        frequency = intent_data["new_frequency"]
     if intent_data.get("new_group"):
         group_hints = intent_data["new_group"]
         task_type = "grouped_forecasting"
 
-    frequency = intent_data.get("new_frequency") or "months"
+    # A question about the future stays about the future even when the measure
+    # changes. The service re-validates this against the column itself, so a
+    # measure can never end up in a classifier.
+    if intent_data.get("intent") == "future_comparison" and task_type == "classification":
+        task_type = "grouped_forecasting" if group_hints else "forecasting"
+
+    logger.info(
+        "Follow-up prediction config: target=%s task=%s dims=%s horizon=%s freq=%s",
+        target, task_type, group_hints, horizon, frequency,
+    )
 
     logger.info(f"Re-running prediction with: target={target}, horizon={horizon}, groups={group_hints}")
     
@@ -198,34 +239,40 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
         
         intent = intent_data.get("intent")
         if intent == "future_comparison":
-            # Compare current ranking (from pred_data) with new prediction_result
-            current_preds = pred_data.get("predictions", [])
-            if current_preds and hasattr(prediction_result, "predictions") and prediction_result.predictions:
-                curr_sorted = sorted(current_preds, key=lambda p: float(p.get("final_value") or 0.0), reverse=True)
-                new_sorted = sorted(prediction_result.predictions, key=lambda p: float(p.get("final_value") or 0.0), reverse=True)
-                
-                curr_top = curr_sorted[0]["group"] if curr_sorted else "Unknown"
-                new_top = new_sorted[0]["group"] if new_sorted else "Unknown"
-                
+            # Compare the ranking the user is looking at against the new
+            # forecast, deterministically and over ALL eligible groups.
+            from agents import forecast_comparison as fc
+
+            current = fc.extract_forecast_ranking(pred_data)
+            future = fc.extract_forecast_ranking(prediction_result)
+
+            if future:
+                top_n = max(1, min(3, len(future)))
+                comparison = fc.compare_rankings(
+                    current, future, top_n=top_n,
+                    n_excluded=len(getattr(prediction_result, "excluded_groups", None) or []),
+                )
+                dimension_label = (group_hints or ["group"])[0]
+                explanation = fc.format_comparison(
+                    comparison, target=target or "the measure",
+                    dimension_label=dimension_label,
+                    horizon_label=f"the next {horizon} periods",
+                )
                 entity = intent_data.get("entity")
-                
-                explanation = f"New forecast generated for {horizon} periods. "
-                if curr_top == new_top:
-                    explanation += f"{curr_top} is projected to remain the highest ranked group."
-                else:
-                    explanation += f"The ranking is expected to change. {curr_top} falls from the top spot, and {new_top} takes the lead."
-                    
                 if entity:
-                    # Find entity's new rank
-                    for i, p in enumerate(new_sorted, 1):
-                        if entity.lower() in str(p["group"]).lower():
-                            explanation += f" {p['group']} is predicted to rank #{i} with a value of {float(p.get('final_value') or 0.0):,.2f}."
-                            break
+                    match = next(
+                        (e for e in future if entity.lower() in e.group.lower()), None,
+                    )
+                    if match:
+                        explanation += (
+                            f"\n  {match.group} is forecast at {match.value:,.2f}, "
+                            f"ranked {match.rank} of {len(future)}."
+                        )
             else:
-                explanation = ml_agent._generate_forecasting_explanation(message, prediction_result, task_type)
+                explanation = _forecast_evidence(prediction_result, target, horizon)
         else:
-            explanation = ml_agent._generate_forecasting_explanation(message, prediction_result, task_type)
-        
+            explanation = _forecast_evidence(prediction_result, target, horizon)
+
         return {"_deterministic_text": explanation, "reply": explanation, "new_response": {"result": new_result, "insight": explanation}}
         
     except Exception as e:
@@ -362,11 +409,17 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
     return response_dict
 
 def _generate_explanation(message: str, answer_data: str) -> str:
-    prompt = EXPLANATION_PROMPT.format(message=message, answer_data=answer_data)
-    try:
-        return call_llm(prompt, expect_json=False).strip()
-    except Exception:
-        return answer_data
+    """
+    Phrase the deterministic answer, and verify the phrasing before returning.
+
+    The numbers were already computed; the model only writes them up. Anything
+    it adds that is not in the evidence — an invented figure or a reason for
+    the trend — invalidates the wording and the deterministic text is returned
+    instead.
+    """
+    from agents import explanation as explanation_layer
+
+    return explanation_layer.explain(message, answer_data, fallback=answer_data)
 
 
 def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict) -> dict:
