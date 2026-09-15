@@ -216,6 +216,9 @@ class UniversalPredictionResult:
     raw_forecast_results: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     available_granularities: list[list[str]] = dataclasses.field(default_factory=list)
     
+    # Store dynamic follow-up visualization data (e.g. deterministic rankings) without destroying raw data
+    derived_insights: dict[str, Any] | None = None
+    
     ranking_metric: str | None = None
     best_group: str | None = None
     

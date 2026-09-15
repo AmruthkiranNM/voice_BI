@@ -110,23 +110,27 @@ def predict_rows(
     Run inference on specific row(s) from a table.
     
     If no model exists yet, trains one first (lazy training).
-    
-    Args:
-        table_name:          SQLite table name.
-        target_col:          Optional explicit target column.
-        customer_id:         Shortcut to filter by ID column.
-        filters:             {column: value} filters.
-        risk_thresholds:     Optional configurable mapping for 'High' and 'Medium' risk boundaries.
-        rank_by_probability: Whether to sort the final result by probability descending.
-        task_type:           Type of task (e.g., forecasting, trend_direction_forecast, grouped_forecasting).
-        group_hints:         Optional hints for grouped tasks (e.g., ['country', 'product category']).
-        forecast_steps:      Number of periods to forecast.
-        forecast_frequency:  Temporal frequency for the forecast.
-        
-    Returns:
-        PredictionResult, ForecastingResult, TrendDirectionResult, or GroupedForecastingResult.
     """
+    logger.info(
+        "[Service] predict_rows called", 
+        extra={
+            "table_name": table_name,
+            "target_col": target_col,
+            "task_type": task_type,
+            "group_hints": group_hints,
+            "forecast_steps": forecast_steps
+        }
+    )
+
+    if not table_name:
+        raise ValueError("table_name must be provided and cannot be empty.")
+        
+    if forecast_steps <= 0:
+        raise ValueError(f"forecast_steps must be strictly positive, got {forecast_steps}")
+
     df = _load_table(table_name)
+    if df.empty:
+        raise ValueError(f"Table '{table_name}' is empty. Cannot perform predictions.")
     
     is_forecast = task_type in ("forecasting", "trend_direction_forecast", "grouped_forecasting", "grouped_ranking", "growth_analysis")
 
@@ -135,16 +139,15 @@ def predict_rows(
     detection = detector.detect(df, table_name, target_hint=target_col, problem_type_hint=problem_hint)
     
     if not detection.is_suitable:
+        logger.error(f"[Service] Table '{table_name}' failed detection: {detection.reason}")
         raise ValueError(f"Table '{table_name}' is not suitable for this task: {detection.reason}")
         
     resolved_target_col = detection.target_column
+    logger.info(f"[Service] Resolved target column: {resolved_target_col}")
 
     # Load or train
     artifact = trainer.load_artifact(table_name, resolved_target_col)
-    expected_problem_type = "forecasting" if is_forecast else "classification"
     
-    # If it's a regression task but expected was classification, allow it (legacy behavior).
-    # But if it's forecasting vs non-forecasting, we must retrain.
     needs_retrain = False
     if artifact is None:
         needs_retrain = True
@@ -156,19 +159,30 @@ def predict_rows(
     if needs_retrain:
         logger.info("[Service] No saved model or wrong type; training models now...")
         experiment = trainer.train_all(df, table_name, target_col=resolved_target_col, forecast_frequency=forecast_frequency, problem_type_hint=problem_hint)
+        if not experiment.models:
+            raise RuntimeError(f"Training failed to produce any models for {table_name}")
         artifact = experiment.models[0]  # Just use the first one for lazy predict fallback
 
     if task_type == "trend_direction_forecast":
+        logger.info(f"[Service] Executing trend_direction_forecast for {table_name}")
         return predictor.predict_trend_direction(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
         
-    if task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis") and group_hints:
+    if task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
+        if not group_hints:
+             raise ValueError(f"Task type '{task_type}' requires group_hints to be provided.")
+             
+        logger.info(f"[Service] Executing {task_type} with hints: {group_hints}")
         dim_info_list = detector.detect_group_dimensions(group_hints, table_name)
         if not dim_info_list:
             raise ValueError(f"Could not find valid grouping dimensions for '{group_hints}' connected to {table_name}.")
             
         # Add the dataframe instances directly into the dim_info dictionaries
         for dim_info in dim_info_list:
+            if not dim_info.get("target_table"):
+                 raise ValueError(f"Missing target_table in dimension info for hint: {dim_info}")
             dim_info["dim_df"] = _load_table(dim_info["target_table"])
+            if dim_info["dim_df"].empty:
+                 logger.warning(f"[Service] Dimension table {dim_info['target_table']} is empty.")
         
         ranking_metric = "growth" if task_type == "growth_analysis" else "sum"
         
@@ -183,6 +197,7 @@ def predict_rows(
         )
 
     if task_type == "forecasting":
+        logger.info(f"[Service] Executing forecasting for {table_name}")
         return predictor.forecast(df, artifact, steps=forecast_steps, frequency=forecast_frequency)
 
     # Locate target rows
@@ -192,6 +207,7 @@ def predict_rows(
             df, filters=filters, customer_id=customer_id,
         )
         if not row_indices:
+            logger.warning(f"[Service] No matching rows found in {table_name} for given filters/customer_id.")
             is_classification = getattr(artifact, 'problem_type', 'classification') == 'classification'
             accuracy_metric = artifact.evaluation.accuracy if is_classification else artifact.evaluation.r2
             return PredictionResult(
@@ -202,6 +218,7 @@ def predict_rows(
                 count=0,
             )
 
+    logger.info(f"[Service] Executing classification/regression prediction for {table_name}")
     return predictor.predict(
         df, 
         artifact, 

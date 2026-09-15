@@ -27,12 +27,13 @@ Output a JSON object with:
    - "growth_highest": User wants to know which group has the highest predicted growth.
    - "peak": User wants to know the highest point/date for a specific group.
    - "change_horizon": User wants to change the forecast horizon.
-   - "change_group": User wants to group by a different dimension.
+   - "change_group": User wants to group by a different dimension (e.g. from Country to Product).
    - "change_target": User wants to predict a different metric.
    - "explain": General question asking to explain the existing prediction further.
    - "entity_detail": User asks about a specific entity (e.g., "What about India?").
    - "comparison": User asks to compare two entities (e.g., "Compare India with Australia.").
    - "future_comparison": User asks if the current ranking/entity will remain the same in the future (e.g., "Will Australia remain the highest next year?").
+   - "hierarchical_forecast": User asks to drill down or forecast an inner dimension for the current entities (e.g., "What about their top products next year?" when currently grouped by country).
 
 For each intent object in the "intents" array, include these additional fields if applicable:
 - "new_horizon": (int or null) If intent is change_horizon or future_comparison.
@@ -41,6 +42,7 @@ For each intent object in the "intents" array, include these additional fields i
 - "new_target": (string or null) If intent is change_target.
 - "entity": (string or null) If intent is peak, entity_detail, or future_comparison.
 - "entities": (list of strings or null) If intent is comparison.
+- "new_child_dimension": (string or null) If intent is hierarchical_forecast (e.g., "product").
 
 Respond ONLY with the JSON object.
 """
@@ -95,6 +97,11 @@ def run(message: str, context: dict[str, Any], history: list[dict[str, Any]]) ->
                 final_new_result = res["new_response"]["result"]
         elif intent in ("rank_highest", "rank_lowest", "growth_highest", "peak", "entity_detail", "comparison", "explain"):
             res = _handle_deterministic_calculation(message, intent_obj, context)
+            answers.append(res.get("_deterministic_text", res.get("reply", "")))
+            if res.get("new_response") and not final_new_result:
+                final_new_result = res["new_response"]["result"]
+        elif intent == "hierarchical_forecast":
+            res = _handle_hierarchical_forecast(message, intent_obj, context)
             answers.append(res.get("_deterministic_text", res.get("reply", "")))
             if res.get("new_response") and not final_new_result:
                 final_new_result = res["new_response"]["result"]
@@ -272,24 +279,31 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
             answer_data = f"Group {group_val} has the value {top_val:,.2f}."
             
         # Update visualization to be a bar chart ranking!
-        # Create a dummy GroupedForecastingResult to pass to ml_agent formatter
-        dummy_result = GroupedForecastingResult(
-            target_column=pred_data.get("target_column", ""),
-            date_column=pred_data.get("date_column", ""),
-            group_dimensions=pred_data.get("group_dimensions", []),
-            horizon=pred_data.get("horizon", 12),
-            table_name=pred_data.get("table_name", ""),
-            predictions=sorted_preds,
-            best_group=top_pred["group"]
-        )
+        # Do not destroy the raw forecast results. Instead, pass insights through derived_insights.
         task_type = "growth_analysis" if is_growth else "grouped_ranking"
+        
+        # We need a dummy structure that ml_agent's chart builder accepts, or we update the builder
+        # But we must NOT mutate new_result["prediction"]["predictions"].
+        class DummyResult:
+            pass
+        dummy = DummyResult()
+        dummy.forecast_ranking = sorted_preds
+        dummy.dimensions = pred_data.get("dimensions", [])
+        dummy.target_column = pred_data.get("target_column", "")
+        
         viz_metadata = {
             "mode": "forecast",
             "problem_type": "forecasting",
-            "charts": [ml_agent._build_grouped_forecasting_ranking_chart(dummy_result, task_type)]
+            "charts": [ml_agent._build_grouped_forecasting_ranking_chart(dummy, task_type)]
         }
+        
         new_result = context.get("result").copy()
-        new_result["prediction"]["predictions"] = sorted_preds
+        # Create a deep-ish copy of prediction to avoid mutating the original
+        new_result["prediction"] = {**pred_data}
+        new_result["prediction"]["derived_insights"] = {
+            "task_type": task_type,
+            "sorted_preds": sorted_preds
+        }
         new_result["visualization"] = viz_metadata
         
     elif intent == "peak":
@@ -353,3 +367,114 @@ def _generate_explanation(message: str, answer_data: str) -> str:
         return call_llm(prompt, expect_json=False).strip()
     except Exception:
         return answer_data
+
+
+def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict) -> dict:
+    original_query = context.get("query", "")
+    result = context.get("result", {})
+    pred_data = result.get("prediction", {})
+    table_name = pred_data.get("table_name") or context.get("table_name")
+    
+    if not table_name:
+        return {"reply": "I need a valid dataset to run this prediction.", "new_response": None}
+
+    parent_dims = pred_data.get("dimensions", [])
+    if not parent_dims:
+        parent_dims = ["country"] # fallback
+        
+    child_dim = intent_data.get("new_child_dimension") or "product"
+    
+    # Avoid duplicate dims
+    target_dims = parent_dims.copy()
+    if child_dim not in target_dims:
+        target_dims.append(child_dim)
+        
+    target = pred_data.get("target_column")
+    horizon = pred_data.get("horizon", 12)
+    frequency = "months"
+    
+    logger.info(f"Hierarchical Forecast: parents={parent_dims}, child={child_dim}, new_dims={target_dims}")
+    
+    try:
+        prediction_result = prediction_service.predict_rows(
+            table_name=table_name,
+            target_col=target,
+            task_type="grouped_forecasting",
+            group_hints=target_dims,
+            forecast_steps=horizon,
+            forecast_frequency=frequency
+        )
+        
+        # Build hierarchy
+        preds = getattr(prediction_result, "raw_forecast_results", [])
+        
+        # Group by parent dimensions
+        hierarchy = {}
+        for p in preds:
+            group_dict = p.get("group_dict", {})
+            # Parent key
+            parent_key_parts = [str(group_dict.get(d, "Unknown")) for d in parent_dims]
+            parent_key = " - ".join(parent_key_parts)
+            
+            child_val = str(group_dict.get(child_dim, "Unknown"))
+            
+            if parent_key not in hierarchy:
+                hierarchy[parent_key] = []
+                
+            hierarchy[parent_key].append({
+                "child": child_val,
+                "final_value": float(p.get("final_value") or 0.0),
+                "forecast": p.get("forecast", [])
+            })
+            
+        # Sort children
+        explanation_parts = []
+        top_hierarchical_preds = []
+        for parent_key, children in hierarchy.items():
+            children.sort(key=lambda x: x["final_value"], reverse=True)
+            top_children = children[:3]
+            
+            part = f"**{parent_key}**:\n"
+            for i, c in enumerate(top_children, 1):
+                part += f"{i}. {c['child']} — {c['final_value']:,.2f}\n"
+                
+                # Add to a flat list for visualization
+                top_hierarchical_preds.append({
+                    "group": f"{parent_key} - {c['child']}",
+                    "final_value": c['final_value'],
+                    "historical": [],
+                    "forecast": c['forecast']
+                })
+            explanation_parts.append(part)
+            
+        explanation = "Here are the top products forecasted for each group next year:\n\n" + "\n".join(explanation_parts)
+        
+        # Update visualization to use the derived_insights
+        pred_dict = dataclasses.asdict(prediction_result)
+        
+        class DummyResult:
+            pass
+        dummy = DummyResult()
+        dummy.forecast_ranking = top_hierarchical_preds
+        dummy.dimensions = target_dims
+        dummy.target_column = target
+        
+        viz_metadata = {
+            "mode": "forecast",
+            "problem_type": "forecasting",
+            "charts": [ml_agent._build_grouped_forecasting_ranking_chart(dummy, "grouped_ranking")]
+        }
+        
+        new_result = context.get("result").copy()
+        new_result["prediction"] = pred_dict
+        new_result["prediction"]["derived_insights"] = {
+            "task_type": "hierarchical_ranking",
+            "hierarchy": hierarchy
+        }
+        new_result["visualization"] = viz_metadata
+        
+        return {"_deterministic_text": explanation, "reply": explanation, "new_response": {"result": new_result, "insight": explanation}}
+        
+    except Exception as e:
+        logger.exception("Failed to run hierarchical forecast")
+        return {"reply": f"I couldn't generate the hierarchical prediction: {str(e)}", "new_response": None}

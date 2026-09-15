@@ -283,7 +283,25 @@ def predict_grouped_forecast(
     predictions = []
     
     for group_name, ts_data in grouped_series.items():
+        if isinstance(group_name, tuple):
+            group_dict = {dim: str(val) for dim, val in zip(semantic_dimensions, group_name)}
+            group_str = " - ".join(str(v) for v in group_name)
+        else:
+            group_dict = {semantic_dimensions[0]: str(group_name)}
+            group_str = str(group_name)
+
         try:
+            if len(ts_data.dropna()) < 3:
+                predictions.append({
+                    "group": group_str,
+                    "group_dict": group_dict,
+                    "historical": [{"date": str(d), "value": float(v) if pd.notna(v) else None} for d, v in ts_data.items()],
+                    "forecast": [],
+                    "final_value": None,
+                    "status": "insufficient_history"
+                })
+                continue
+
             model = create_model(problem_type="forecasting")
             model.fit(ts_data)
             forecast_mean, _ = model.predict(steps=steps)
@@ -300,22 +318,15 @@ def predict_grouped_forecast(
             # Ranking Calculation
             if ranking_metric == "growth":
                 baseline_len = min(len(hist_rows), steps)
-                baseline_total = sum(r["value"] for r in hist_rows[-baseline_len:] if r["value"])
-                forecast_total = sum(r["value"] for r in fc_rows if r["value"])
+                baseline_total = sum(r["value"] for r in hist_rows[-baseline_len:] if r.get("value"))
+                forecast_total = sum(r["value"] for r in fc_rows if r.get("value"))
                 
                 if baseline_total and baseline_total > 0:
                     final_val = ((forecast_total - baseline_total) / baseline_total) * 100
                 else:
-                    final_val = 0.0
+                    final_val = None # Baseline is zero or missing, do not fabricate percentage
             else:
-                final_val = sum(r["value"] for r in fc_rows if r["value"])
-            
-            if isinstance(group_name, tuple):
-                group_dict = {dim: str(val) for dim, val in zip(semantic_dimensions, group_name)}
-                group_str = " - ".join(str(v) for v in group_name)
-            else:
-                group_dict = {semantic_dimensions[0]: str(group_name)}
-                group_str = str(group_name)
+                final_val = sum(r["value"] for r in fc_rows if r.get("value"))
             
             predictions.append({
                 "group": group_str,
@@ -325,7 +336,7 @@ def predict_grouped_forecast(
                 "final_value": final_val,
             })
         except Exception as e:
-            logger.warning(f"Failed to forecast group {group_name}: {e}")
+            logger.warning(f"Failed to forecast group {group_str}: {e}")
             
     # Rank them
     predictions.sort(key=lambda x: x.get("final_value", 0) or 0, reverse=True)

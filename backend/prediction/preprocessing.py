@@ -229,9 +229,8 @@ def prepare_grouped_forecasting_data(
         g_df = g_df.set_index(date_col)
         s = g_df[target_col].resample(rule).sum()
         
-        # Keep only groups with at least a few points
-        if len(s) >= 3:
-            grouped_series[group_name] = s
+        # Always add to grouped series so predictor can flag insufficient history
+        grouped_series[group_name] = s
             
     return grouped_series
 
