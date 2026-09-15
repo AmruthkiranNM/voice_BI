@@ -287,6 +287,7 @@ def resolve_config(
     scope_tables: list[str] | None = None,
     inherited: PredictionConfig | dict | None = None,
     allow_clarification: bool = True,
+    force_prediction_type: str | None = None,
 ) -> PredictionConfig:
     """
     Build an executable PredictionConfig for a question.
@@ -299,6 +300,9 @@ def resolve_config(
             and overridden only where this question changes them.
         allow_clarification: when the target is genuinely ambiguous, return a
             clarification request instead of guessing.
+        force_prediction_type: set by the task router. The router has already
+            decided what kind of analysis this is, using signals and dataset
+            capabilities; re-deciding here could contradict it.
 
     Returns:
         A PredictionConfig. Check ``status`` and ``is_executable`` before use.
@@ -399,7 +403,15 @@ def resolve_config(
 
     # ── 4. Prediction type ──
     wants_future = bool(interpretation.get("asks_about_future", _asks_about_future(question)))
-    prediction_type, type_reason = resolve_prediction_type(target_spec, wants_future=wants_future)
+    prediction_type, type_reason = resolve_prediction_type(
+        target_spec, wants_future=wants_future, requested=force_prediction_type,
+    )
+    if force_prediction_type and prediction_type != force_prediction_type:
+        config.warnings.append(
+            f"The task router asked for {force_prediction_type}, but "
+            f"'{target}' supports {', '.join(target_spec.supported_prediction_types) or 'nothing'}; "
+            f"using {prediction_type}."
+        )
     if prediction_type is None:
         config.status = cfg.STATUS_INVALID_CONFIG
         config.errors.append(f"'{target}' cannot be predicted. {target_spec.reason}")
@@ -494,8 +506,13 @@ def resolve_config(
         from prediction.dimensions import infer_dimensions
 
         # The words that named the measure are not candidates for grouping.
+        # Only the words that actually *named* the measure — the column and any
+        # phrase the interpreter identified. `target_request` falls back to the
+        # whole question when interpretation returns nothing, and excluding
+        # every word of the question left no candidates at all, which is how
+        # "Which country ... ?" lost its grouping and fell back to a single
+        # ungrouped series.
         target_words = set(re.findall(r"[a-z0-9]+", (config.target or "").lower()))
-        target_words |= set(re.findall(r"[a-z0-9]+", (config.target_request or "").lower()))
         target_words |= set(re.findall(
             r"[a-z0-9]+", (interpretation.get("target_phrase") or "").lower()))
 

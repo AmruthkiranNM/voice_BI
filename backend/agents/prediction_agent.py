@@ -33,6 +33,7 @@ def run(
     *,
     table_names: list[str] | None = None,
     inherited_config: dict | None = None,
+    task_decision: Any = None,
 ) -> dict[str, Any]:
     """
     Answer a prediction question.
@@ -42,6 +43,9 @@ def run(
         table_names: the active data source's tables, so the prediction stays
             inside the dataset the user is looking at.
         inherited_config: the previous turn's config, for follow-ups.
+        task_decision: the task router's verdict. When supplied, its engine
+            constrains the prediction type, so routing and execution cannot
+            disagree about what kind of prediction this is.
 
     Returns:
         ``{"result": ..., "insight": ...}`` in the shape the orchestrator and
@@ -49,12 +53,24 @@ def run(
     """
     logger.info("[PredictionAgent] %s", query[:120])
 
+    forced_type = None
+    if task_decision is not None:
+        from agents import task_router
+        forced_type = {
+            task_router.ENGINE_FORECAST: cfg.FORECASTING,
+            task_router.ENGINE_CLASSIFICATION: cfg.CLASSIFICATION,
+            task_router.ENGINE_REGRESSION: cfg.REGRESSION,
+        }.get(task_decision.engine)
+
     config = resolve_config(
         query,
         table=(table_names[0] if table_names and len(table_names) == 1 else None),
         scope_tables=table_names,
         inherited=inherited_config,
+        force_prediction_type=forced_type,
     )
+    if task_decision is not None:
+        config.resolved_by["task"] = task_decision.task
 
     if config.status == cfg.STATUS_NEEDS_CLARIFICATION:
         return _clarification_response(config)

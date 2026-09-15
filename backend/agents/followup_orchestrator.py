@@ -78,24 +78,46 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     #    separate agent that reconstructed the target from the SQL result's
     #    column aliases ("total_revenue", "GEO") — names no table has — and so
     #    failed with "no viable target column found".
-    from prediction.intent_markers import is_predictive_question
+    from agents import task_router
 
-    predictive, why = is_predictive_question(message)
-    if predictive or result.get("pipeline_type") == "PREDICTIVE":
+    # The question decides the engine. The previous turn is context for a
+    # follow-up that carries no signal of its own — never a reason to keep
+    # using the prediction engine for an ordinary analytical question.
+    scope_tables = context.get("table_names") or (
+        [context["table_name"]] if context.get("table_name") else None
+    )
+    previous_engine = (
+        task_router.ENGINE_FORECAST
+        if result.get("pipeline_type") == "PREDICTIVE" else task_router.ENGINE_BI
+    )
+    decision = task_router.route(
+        message,
+        table=result.get("table_name") or context.get("table_name"),
+        scope_tables=scope_tables,
+        previous_task=result.get("task") or (context.get("metadata") or {}).get("task"),
+        previous_engine=previous_engine,
+    )
+    logger.info("[FOLLOWUP:%s] %s", req_id, decision.describe())
+
+    if decision.blocked:
+        message_text = " ".join(decision.blocked)
+        if decision.alternatives:
+            message_text += " " + " ".join(decision.alternatives)
+        return {"reply": message_text, "new_response": None}
+
+    if decision.is_predictive:
         from agents import conversation_state, prediction_agent
 
         seed = conversation_state.build_seed(context)
         logger.info(
-            "[FOLLOWUP:%s] predictive follow-up (%s); inherited target=%s dims=%s",
-            req_id, why,
+            "[FOLLOWUP:%s] predictive follow-up; inherited target=%s dims=%s",
+            req_id,
             getattr(seed, "target", None), getattr(seed, "group_dimensions", None),
         )
-        scope = context.get("table_names") or (
-            [context["table_name"]] if context.get("table_name") else None
-        )
         outcome = prediction_agent.run(
-            message, table_names=scope,
+            message, table_names=scope_tables,
             inherited_config=seed.to_dict() if seed else None,
+            task_decision=decision,
         )
         return {
             "reply": outcome.get("insight", ""),

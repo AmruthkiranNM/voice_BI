@@ -14,7 +14,7 @@ import re
 import time
 from typing import Any
 
-from agents import planner, rag_agent, sql_agent, validator, execution, insight, router, ml_agent
+from agents import planner, rag_agent, sql_agent, validator, execution, insight, ml_agent
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +89,25 @@ def process_query(
         # ════════════════════════════════════════════
         # STEP 0: Router Agent
         # ════════════════════════════════════════════
-        pipeline_type = router.run(query)
-        log_step("Router Agent", "completed", {"pipeline_type": pipeline_type})
-        
+        from agents import task_router
+
+        decision = task_router.route(query, scope_tables=table_names)
+        pipeline_type = "ANALYTICAL" if decision.engine == task_router.ENGINE_BI else "PREDICTIVE"
+        log_step("Task Router", "completed", {
+            "task": decision.task,
+            "engine": decision.engine,
+            "confidence": decision.confidence,
+            "blocked": decision.blocked,
+            "reasons": decision.reasons,
+        })
+
+        # A predictive request the dataset cannot support is explained, never
+        # converted into a computation of a different shape.
+        if decision.blocked:
+            return _capability_response(
+                query, decision, agent_logs, time.time() - pipeline_start,
+            )
+
         if pipeline_type == "PREDICTIVE":
             logger.info("[Orchestrator] Routing query to PREDICTIVE pipeline.")
             from agents import prediction_agent
@@ -99,7 +115,9 @@ def process_query(
             # The active data source is passed through, so a prediction is
             # always scoped to the dataset the user is looking at rather than
             # to whichever table in the database happens to match a keyword.
-            ml_result = prediction_agent.run(query, table_names=table_names)
+            ml_result = prediction_agent.run(
+                query, table_names=table_names, task_decision=decision,
+            )
             log_step("Prediction Agent", "completed", {
                 "status": ml_result.get("result", {}).get("status"),
                 "config": ml_result.get("config", {}).get("prediction_type"),
@@ -114,6 +132,8 @@ def process_query(
                 "llm_mode": "local (ML)",
                 "metadata": {
                     "pipeline_type": "PREDICTIVE",
+                    "task": decision.task,
+                    "engine": decision.engine,
                     "prediction_config": ml_result.get("config", {}),
                     "execution_time_ms": round((time.time() - pipeline_start) * 1000, 2),
                 },
@@ -476,6 +496,46 @@ def _diagnose_zero_rows(sql: str, query: str) -> str | None:
         )
 
     return None
+
+
+def _capability_response(
+    query: str,
+    decision,
+    agent_logs: list,
+    pipeline_time: float,
+) -> dict[str, Any]:
+    """
+    Answer a request the dataset cannot support, honestly.
+
+    Names what is missing and what the data *can* do instead, rather than
+    running a different computation and presenting it as the answer.
+    """
+    message = " ".join(decision.blocked)
+    if decision.alternatives:
+        message += " " + " ".join(decision.alternatives)
+
+    return {
+        "success": True,
+        "query": query,
+        "sql": None,
+        "result": {
+            "columns": [], "rows": [], "row_count": 0,
+            "status": "unsupported_task",
+            "task": decision.task,
+            "engine": decision.engine,
+            "blocked": decision.blocked,
+            "alternatives": decision.alternatives,
+        },
+        "insight": message,
+        "llm_mode": "none",
+        "metadata": {
+            "pipeline_type": "CAPABILITY_LIMIT",
+            "task": decision.task,
+            "engine": decision.engine,
+            "pipeline_time_seconds": round(pipeline_time, 3),
+        },
+        "agent_logs": agent_logs,
+    }
 
 
 def _error_response(
