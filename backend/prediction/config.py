@@ -95,6 +95,11 @@ class PredictionConfig:
     # ── Grouping ──
     group_dimensions: list[str] = dataclasses.field(default_factory=list)
     dimension_specs: list[dict[str, Any]] = dataclasses.field(default_factory=list)
+    #: How the dimensions were arrived at: "inherited" when carried from the
+    #: previous turn untouched, "replaced"/"drilldown" when the question asked
+    #: to change them, "new" on a first turn. A follow-up that changes
+    #: granularity without asking is a bug, and this records which happened.
+    dimension_origin: str = "new"
 
     # ── Restrictions ──
     filters: list[Filter] = dataclasses.field(default_factory=list)
@@ -131,6 +136,16 @@ class PredictionConfig:
         return bool(self.group_dimensions)
 
     @property
+    def result_granularity(self) -> str:
+        """
+        The level a result is reported at, e.g. "country" or "country_product".
+
+        Follow-ups inherit this unless the question asks to change it. Naming
+        it explicitly makes an accidental change detectable instead of silent.
+        """
+        return "_".join(self.group_dimensions) if self.group_dimensions else "total"
+
+    @property
     def is_executable(self) -> bool:
         return self.status == STATUS_OK and not self.errors
 
@@ -155,6 +170,7 @@ class PredictionConfig:
             "time_frequency": self.time_frequency,
             "horizon": self.horizon,
             "group_dimensions": list(self.group_dimensions),
+            "result_granularity": self.result_granularity,
             "dimension_columns": sorted(
                 f"{s.get('target_table')}.{s.get('group_column')}"
                 for s in self.dimension_specs
@@ -191,7 +207,7 @@ class PredictionConfig:
                 f"horizon={self.horizon}",
             ]
         if self.group_dimensions:
-            parts.append(f"dims={self.group_dimensions}")
+            parts.append(f"dims={self.group_dimensions}({self.dimension_origin})")
         if self.filters:
             parts.append(f"filters={[f.column for f in self.filters]}")
         if self.operations:
@@ -200,7 +216,11 @@ class PredictionConfig:
         return " ".join(parts)
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        payload = dataclasses.asdict(self)
+        # Derived, but carried explicitly so a consumer never has to re-derive
+        # it — and so a follow-up can compare against it.
+        payload["result_granularity"] = self.result_granularity
+        return payload
 
 
 def validate_config(config: PredictionConfig) -> list[str]:

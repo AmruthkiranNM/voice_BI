@@ -9,6 +9,8 @@ from prediction.schemas import GroupedForecastingResult, ForecastingResult
 
 logger = logging.getLogger(__name__)
 
+from prediction import config_resolver
+
 FOLLOWUP_INTENT_PROMPT = """You are a predictive analytics intent resolver.
 The user is looking at a machine learning prediction or forecast, and just asked a follow up question.
 
@@ -42,7 +44,7 @@ For each intent object in the "intents" array, include these additional fields i
 - "new_target": (string or null) If intent is change_target.
 - "entity": (string or null) If intent is peak, entity_detail, or future_comparison.
 - "entities": (list of strings or null) If intent is comparison.
-- "new_child_dimension": (string or null) If intent is hierarchical_forecast (e.g., "product").
+- "new_child_dimension": (string or null) If intent is hierarchical_forecast, the column the user named to break down by. Null unless the question names one.
 
 Respond ONLY with the JSON object.
 """
@@ -212,9 +214,24 @@ def _handle_parameter_change(message: str, intent_data: dict, context: dict) -> 
         horizon = intent_data["new_horizon"]
     if intent_data.get("new_frequency"):
         frequency = intent_data["new_frequency"]
-    if intent_data.get("new_group"):
-        group_hints = intent_data["new_group"]
-        task_type = "grouped_forecasting"
+    requested_group = intent_data.get("new_group")
+    if requested_group:
+        requested_group = ([requested_group] if isinstance(requested_group, str)
+                           else list(requested_group))
+        # Re-grouping only happens when the question asked for it. The
+        # interpreter sees the previous result's rows and will otherwise
+        # propose whatever columns appeared in them, which answers at a
+        # granularity the user never requested.
+        named = [d for d in requested_group
+                 if config_resolver._mentions_dimension(message, d)]
+        if named or config_resolver._REGROUP_SIGNAL.search(message):
+            group_hints = named or requested_group
+            task_type = "grouped_forecasting"
+        else:
+            logger.info(
+                "Ignoring proposed grouping %s: not named in '%s'; keeping %s.",
+                requested_group, message, group_hints,
+            )
 
     # A question about the future stays about the future even when the measure
     # changes. The service re-validates this against the column itself, so a
@@ -460,11 +477,31 @@ def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict
         return {"reply": "I need a valid dataset to run this prediction.", "new_response": None}
 
     parent_dims = pred_data.get("dimensions", [])
-    if not parent_dims:
-        parent_dims = ["country"] # fallback
-        
-    child_dim = intent_data.get("new_child_dimension") or "product"
-    
+
+    # A drill-down needs both levels to be real. Defaulting them to a guessed
+    # pair answers at a granularity nobody asked for, so an unnamed level is a
+    # reason to stop rather than something to invent.
+    child_dim = intent_data.get("new_child_dimension")
+    if not parent_dims or not child_dim:
+        return {
+            "reply": "I need to know which grouping to break the forecast down by. "
+                     "Say for example \"break it down by category\".",
+            "new_response": None,
+        }
+
+    # The breakdown level has to be one the question actually named; otherwise
+    # it is the interpreter reading it off the previous result's rows.
+    if not config_resolver._mentions_dimension(message, child_dim):
+        logger.info(
+            "Hierarchical forecast declined: '%s' was not named in the question.",
+            child_dim,
+        )
+        return {
+            "reply": "I kept the previous breakdown. Tell me which level to "
+                     "break it down by and I'll re-run it.",
+            "new_response": None,
+        }
+
     # Avoid duplicate dims
     target_dims = parent_dims.copy()
     if child_dim not in target_dims:

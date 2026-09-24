@@ -486,14 +486,13 @@ def resolve_config(
 
     # ── 6. Dimensions ──
     requested_dims = [d for d in (interpretation.get("group_dimensions") or []) if d]
-    if not requested_dims and inherited_cfg and _keeps_dimensions(question, interpretation):
-        requested_dims = list(inherited_cfg.group_dimensions)
-    elif requested_dims and inherited_cfg and interpretation.get("keeps_previous_dimensions"):
-        # A drill-down keeps the outer grouping and adds the inner one, so
-        # "their top products" stays country x product rather than collapsing
-        # to products alone.
-        requested_dims = [d for d in inherited_cfg.group_dimensions
-                          if d not in requested_dims] + requested_dims
+    if inherited_cfg:
+        requested_dims, config.dimension_origin, dim_note = _resolve_dimension_change(
+            question, requested_dims, inherited_cfg, interpretation,
+        )
+        if dim_note:
+            config.warnings.append(dim_note)
+        config.resolved_by["dimensions"] = config.dimension_origin
 
     exclude = {config.target}
     if config.time_column:
@@ -614,15 +613,116 @@ def resolve_config(
     return config
 
 
-def _keeps_dimensions(question: str, interpretation: dict) -> bool:
-    """
-    Whether a follow-up should inherit the previous grouping.
+#: Wording that asks for a *different* grouping: "by region", "per team",
+#: "instead", "split/broken down by". These replace the previous grouping.
+_REGROUP_SIGNAL = re.compile(
+    r"\b(?:by|per|across|for\s+each|for\s+every|group(?:ed)?\s+by|split\s+by|"
+    r"broken\s+down\s+by|break\s+(?:it\s+)?down\s+by|instead|rather\s+than|"
+    r"switch\s+to|change\s+to)\b",
+    re.I,
+)
 
-    It should, unless the question explicitly re-groups — which is signalled by
-    the interpreter returning dimensions of its own, handled by the caller.
-    A question that names no grouping is continuing the current one.
+#: Wording that asks to expand *within* the current grouping: "their products",
+#: "each of them", "within those". These add a level, keeping the outer one.
+_DRILLDOWN_SIGNAL = re.compile(
+    r"\b(?:their|its|each\s+of\s+(?:them|those|these)|within|inside|"
+    r"drill\s*(?:down)?|broken\s+down|breakdown)\b",
+    re.I,
+)
+
+
+def _mentions_dimension(question: str, dimension: str) -> bool:
     """
-    return not interpretation.get("group_dimensions")
+    Whether the question actually names ``dimension``.
+
+    Matching is on word stems so "products" satisfies a "product" hint and a
+    qualified hint like "geo.country" is matched on its parts. This is the
+    check that stops a grouping the user never uttered from being added.
+    """
+    stems: set[str] = set()
+    for word in re.findall(r"[a-z0-9]+", question.lower()):
+        if len(word) > 2:
+            stems |= _stems(word)
+    for part in re.split(r"[^a-z0-9]+", dimension.lower()):
+        if len(part) > 2 and _stems(part) & stems:
+            return True
+    return False
+
+
+def _stems(word: str) -> set[str]:
+    """
+    Plural/singular variants of a word, so "categories" meets "category".
+
+    Only the English noun endings that appear in column names are handled;
+    anything subtler belongs to the embedding-based resolver, not here.
+    """
+    forms = {word}
+    if word.endswith("ies") and len(word) > 4:
+        forms.add(word[:-3] + "y")
+    if word.endswith("es") and len(word) > 3:
+        forms.add(word[:-2])
+    if word.endswith("s") and len(word) > 2:
+        forms.add(word[:-1])
+    if word.endswith("y") and len(word) > 2:
+        forms.add(word[:-1] + "ies")
+    return forms
+
+
+def _resolve_dimension_change(
+    question: str,
+    requested_dims: list[str],
+    inherited_cfg: PredictionConfig,
+    interpretation: dict,
+) -> tuple[list[str], str, str]:
+    """
+    Decide the grouping of a follow-up, and say how it was decided.
+
+    A follow-up inherits the previous granularity unless the *question* asks to
+    change it. The interpreter's opinion alone is not enough: an LLM reading a
+    country-level result will readily propose grouping by product because
+    products appeared in the source rows, which silently answers a different
+    question than the one asked. So a proposed dimension is honoured only when
+    the question names it, or when the question carries wording that asks for a
+    re-grouping at all.
+
+    Returns ``(dimensions, origin, note)`` where origin is one of
+    ``inherited`` / ``replaced`` / ``drilldown``.
+    """
+    previous = list(inherited_cfg.group_dimensions)
+
+    if not requested_dims:
+        # Nothing proposed: the question is continuing at the current level.
+        return previous, "inherited", ""
+
+    regroup = bool(_REGROUP_SIGNAL.search(question))
+    drilldown = bool(_DRILLDOWN_SIGNAL.search(question))
+
+    # Keep only what the user can be shown to have asked for. When the question
+    # carries an explicit grouping phrase we trust the interpreter's naming
+    # (it may have mapped "nation" onto a `country` column); without one, the
+    # dimension has to appear in the question itself.
+    if regroup or drilldown:
+        asked = list(requested_dims)
+    else:
+        asked = [d for d in requested_dims if _mentions_dimension(question, d)]
+
+    unasked = [d for d in requested_dims if d not in asked]
+    note = ""
+    if unasked:
+        note = (
+            f"Ignored grouping the question did not ask for ({', '.join(unasked)}); "
+            f"kept the previous granularity ({inherited_cfg.result_granularity})."
+        )
+
+    if not asked:
+        return previous, "inherited", note
+
+    if drilldown and previous:
+        # Expansion under the existing grouping: the outer level stays.
+        merged = previous + [d for d in asked if d not in previous]
+        return merged, "drilldown", note
+
+    return asked, "replaced", note
 
 
 def _inherit(config: PredictionConfig, previous: PredictionConfig) -> PredictionConfig:

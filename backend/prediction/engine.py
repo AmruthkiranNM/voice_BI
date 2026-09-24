@@ -69,6 +69,11 @@ class PredictionResult:
     series_diagnostics: dict[str, Any] = dataclasses.field(default_factory=dict)
     excluded_groups: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
+    #: The level these rows are reported at, e.g. "country". Carried on the
+    #: result so a caller can assert it matches what was asked rather than
+    #: inferring it from whatever columns happen to be in the rows.
+    result_granularity: str = "total"
+
     visualization: dict[str, Any] = dataclasses.field(default_factory=dict)
     warnings: list[str] = dataclasses.field(default_factory=list)
     errors: list[str] = dataclasses.field(default_factory=list)
@@ -148,6 +153,7 @@ def execute(config: PredictionConfig, use_cache: bool = True) -> PredictionResul
 
     result.elapsed_ms = round((time.time() - started) * 1000, 1)
     result.warnings = list(config.warnings) + result.warnings
+    _enforce_granularity(config, result)
 
     if use_cache and result.ok:
         if len(_CACHE) >= _CACHE_MAX:
@@ -160,6 +166,90 @@ def execute(config: PredictionConfig, use_cache: bool = True) -> PredictionResul
         len(result.ranking_rows), len(result.excluded_groups), result.elapsed_ms,
     )
     return result
+
+
+def _enforce_granularity(config: PredictionConfig, result: PredictionResult) -> None:
+    """
+    Check the rows are reported at the level the config asked for.
+
+    Every derived view is built from rows keyed by ``group_values``, so the
+    level actually answered is observable. If it carries dimensions the config
+    does not, the rows are rolled back up to the requested level; answering a
+    country question with country-and-product rows is wrong even when each
+    individual number is right. A level that is *missing* cannot be recovered
+    by aggregation, so that is reported as an error instead of being papered
+    over.
+    """
+    result.result_granularity = config.result_granularity
+    expected = list(config.group_dimensions)
+
+    observed: set[str] = set()
+    for row in result.forecast_rows + result.ranking_rows:
+        observed |= set((row.get("group_values") or {}).keys())
+    if not observed:
+        return
+
+    extra = [d for d in observed if d not in expected]
+    missing = [d for d in expected if d not in observed]
+
+    if missing:
+        result.status = cfg.STATUS_INVALID_CONFIG
+        result.errors.append(
+            f"Result is missing the requested grouping ({', '.join(missing)}); "
+            f"it cannot be reported at '{config.result_granularity}'."
+        )
+        return
+
+    if extra:
+        logger.warning(
+            "[Engine] Rolling result back up from %s to %s",
+            "_".join(sorted(observed)), config.result_granularity,
+        )
+        result.warnings.append(
+            f"Rolled the result back up to {config.result_granularity}; the "
+            f"question did not ask to break it down by {', '.join(extra)}."
+        )
+        _rollup(result, expected)
+
+
+def _rollup(result: PredictionResult, dimensions: list[str]) -> None:
+    """Sum rows that differ only by dimensions outside ``dimensions``."""
+    def collapse(rows: list[dict[str, Any]], keep_period: bool) -> list[dict[str, Any]]:
+        merged: dict[tuple, dict[str, Any]] = {}
+        for row in rows:
+            values = {d: (row.get("group_values") or {}).get(d) for d in dimensions}
+            period = row.get("period") if keep_period else None
+            key = (tuple(values.items()), period)
+            entry = merged.get(key)
+            if entry is None:
+                entry = {k: v for k, v in row.items()
+                         if k not in ("value", "group", "group_values",
+                                      "lower", "upper", "rank")}
+                entry["group_values"] = values
+                entry["group"] = " - ".join(str(v) for v in values.values()) or None
+                entry["value"] = 0.0
+                merged[key] = entry
+            # Bounds are summed alongside the value so an interval stays an
+            # interval; a rolled-up point estimate with the original group's
+            # bounds would understate the spread.
+            for field in ("value", "lower", "upper"):
+                if row.get(field) is not None:
+                    entry[field] = (entry.get(field) or 0.0) + float(row[field])
+        return list(merged.values())
+
+    result.forecast_rows = collapse(result.forecast_rows, keep_period=True)
+    result.historical_rows = collapse(result.historical_rows, keep_period=True)
+    result.aggregated_rows = collapse(result.aggregated_rows, keep_period=False)
+
+    ranked = sorted(collapse(result.ranking_rows, keep_period=False),
+                    key=lambda r: r.get("value") or 0.0, reverse=True)
+    for i, row in enumerate(ranked, start=1):
+        row["rank"] = i
+    result.ranking_rows = ranked
+    result.top_rows = ranked[:len(result.top_rows)] if result.top_rows else []
+    # Growth and comparison were derived from the finer rows and no longer
+    # describe these; recomputing them belongs to the operations layer.
+    result.growth_rows = []
 
 
 # ──────────────────────────────────────────────────────────

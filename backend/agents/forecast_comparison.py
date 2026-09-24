@@ -172,6 +172,24 @@ def format_comparison(
     """
     lines: list[str] = []
 
+    # "Will it stay on top?" is answerable from the two rankings alone, so the
+    # answer is stated first and derived here rather than left for the wording
+    # layer to infer from the lists below.
+    current_leader = comparison.current_top[0] if comparison.current_top else None
+    future_leader = comparison.future_top[0] if comparison.future_top else None
+    if current_leader and future_leader:
+        retained = current_leader.group == future_leader.group
+        lines.append(
+            f"ANSWER: {'Yes' if retained else 'No'} — the leading {dimension_label} "
+            f"by {target} is forecast to "
+            + (f"remain {current_leader.group}." if retained
+               else f"change from {current_leader.group} to {future_leader.group}.")
+        )
+        lines.append(f"CURRENT LEADER: {current_leader.group} ({current_leader.value:,.2f}, observed)")
+        lines.append(f"FORECAST LEADER: {future_leader.group} ({future_leader.value:,.2f}, {horizon_label})")
+        lines.append(f"REPORTED AT: {dimension_label} level")
+        lines.append("")
+
     lines.append(f"CURRENT TOP {comparison.top_n} {dimension_label.upper()} BY {target.upper()} (observed):")
     for e in comparison.current_top:
         lines.append(f"  {e.rank}. {e.group}: {e.value:,.2f}")
