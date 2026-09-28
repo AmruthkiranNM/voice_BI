@@ -50,12 +50,23 @@ const fmtValueFull = (v, colName) => {
 /* ═══════════════════════════════════════════════════════════
    TOOLTIPS
 ═══════════════════════════════════════════════════════════ */
-const richTooltip = (labels, datasets) => ({
+const richTooltip = (labels, datasets, tooltipContext) => ({
   trigger: 'axis',
   ...ECHARTS_TOOLTIP_STYLE(),
   formatter: (params) => {
     if (!params?.length) return '';
     const name = params[0].name;
+    const index = params[0].dataIndex;
+    const contextObj = tooltipContext ? tooltipContext[index] : null;
+
+    let contextHtml = '';
+    if (contextObj) {
+      contextHtml = Object.entries(contextObj)
+        .map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;text-transform:capitalize;">${k.replace(/_/g, ' ')}</span><span style="font-weight:600;color:${themeInk()};">${v}</span></div>`)
+        .join('');
+      contextHtml += `<div style="height:1px;background:${themeLineRgba(0.08)};margin:6px 0;"></div>`;
+    }
+
     const total = params.reduce((s, p) => s + (Number(p.value) || 0), 0);
     const rows = params.map(p => {
       const val = Number(p.value) || 0;
@@ -74,15 +85,28 @@ const richTooltip = (labels, datasets) => ({
           <span style="color:${diff >= 0 ? '#9C4A2A' : '#f87171'};font-size:10px;">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toFixed(1)}% avg</span>
         </div>`;
     }).join('');
-    return `<div style="min-width:220px;"><div style="font-size:12px;font-weight:600;color:${themeInk()};margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid ${themeLineRgba(0.08)};">${name}</div>${rows}</div>`;
+    
+    const titleHtml = `<div style="font-size:12px;font-weight:600;color:${themeInk()};margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid ${themeLineRgba(0.08)};">${name}</div>`;
+    return `<div style="min-width:220px;">${contextHtml || titleHtml}${rows}</div>`;
   },
 });
 
-const itemTooltip = (datasets) => ({
+const itemTooltip = (datasets, tooltipContext) => ({
   trigger: 'item',
   ...ECHARTS_TOOLTIP_STYLE(),
   formatter: (p) => {
     const ds = datasets[0];
+    const index = p.dataIndex;
+    const contextObj = tooltipContext ? tooltipContext[index] : null;
+
+    let contextHtml = '';
+    if (contextObj) {
+      contextHtml = Object.entries(contextObj)
+        .map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;text-transform:capitalize;">${k.replace(/_/g, ' ')}</span><span style="font-weight:600;color:${themeInk()};">${v}</span></div>`)
+        .join('');
+      contextHtml += `<div style="height:1px;background:${themeLineRgba(0.08)};margin:6px 0;"></div>`;
+    }
+
     const colName = ds?.originalColumn || '';
     const allVals = (ds?.data || []).map(Number).filter(x => !Number.isNaN(x));
     const total = allVals.reduce((a, b) => a + b, 0);
@@ -90,8 +114,10 @@ const itemTooltip = (datasets) => ({
     const pct = total ? ((val / total) * 100).toFixed(1) : null;
     const sortedVals = [...allVals].sort((a, b) => b - a);
     const rank = sortedVals.indexOf(val) + 1;
+    
+    const titleHtml = `<div style="font-weight:600;color:${themeInk()};margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${themeLineRgba(0.08)};">${p.name}</div>`;
     return `<div style="min-width:200px;">
-      <div style="font-weight:600;color:${themeInk()};margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid ${themeLineRgba(0.08)};">${p.name}</div>
+      ${contextHtml || titleHtml}
       <div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Value</span><span style="font-weight:600;color:${themeInk()};">${fmtValueFull(val, colName)}</span></div>
       ${pct != null ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Share</span><span style="color:#9C4A2A;">${pct}%</span></div>` : ''}
       ${rank ? `<div style="display:flex;justify-content:space-between;gap:12px;margin:3px 0;"><span style="color:#9C7A3E;">Rank</span><span style="color:#B5613C;">#${rank} of ${allVals.length}</span></div>` : ''}
@@ -175,7 +201,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle('Vertical Bar', `${primaryMetric} by ${labelColName}`),
-        tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
+        tooltip: richTooltip(labels, datasets, extra.tooltipContext), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
         xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
@@ -193,7 +219,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle('Horizontal Bar', `${primaryMetric} by ${labelColName}`),
-        tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
+        tooltip: richTooltip(labels, datasets, extra.tooltipContext), legend: showLegend ? legend : { show: false },
         toolbox, grid: { left: 16, right: 16, top: 56, bottom: 16, containLabel: true },
         xAxis: { type: 'value', ...ECHARTS_AXIS_STYLE(), axisLabel: { ...ECHARTS_AXIS_STYLE().axisLabel, formatter: v => fmt(v) }, name: primaryMetric, nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: { type: 'category', data: [...labels].reverse(), ...ECHARTS_AXIS_STYLE(), axisLabel: { ...ECHARTS_AXIS_STYLE().axisLabel, width: 120, overflow: 'truncate' }, name: labelColName, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
@@ -211,7 +237,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle('Grouped Bar', `Comparing metrics by ${labelColName}`),
-        tooltip: richTooltip(labels, datasets), legend,
+        tooltip: richTooltip(labels, datasets, extra.tooltipContext), legend,
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
         xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: yAxis(),
@@ -228,7 +254,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle('Stacked Bar', `Composition of metrics by ${labelColName}`),
-        tooltip: { ...richTooltip(labels, datasets), trigger: 'axis', axisPointer: { type: 'shadow' } },
+        tooltip: { ...richTooltip(labels, datasets, extra.tooltipContext), trigger: 'axis', axisPointer: { type: 'shadow' } },
         legend, toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
         xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: yAxis(),
@@ -246,7 +272,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle(type === 'multiLine' ? 'Multi-Line Comparison' : 'Line Chart', `${primaryMetric} across ${labelColName}`),
-        tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
+        tooltip: richTooltip(labels, datasets, extra.tooltipContext), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
         xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
@@ -267,7 +293,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle(type === 'stackedArea' ? 'Stacked Area' : 'Area Chart', `${primaryMetric} trend across ${labelColName}`),
-        tooltip: richTooltip(labels, datasets), legend: showLegend ? legend : { show: false },
+        tooltip: richTooltip(labels, datasets, extra.tooltipContext), legend: showLegend ? legend : { show: false },
         toolbox, grid: baseGrid(labels.length > 8 ? 80 : 60),
         xAxis: { ...xAxis(labels), name: labelColName, nameLocation: 'middle', nameGap: labels.length > 8 ? 55 : 35, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
         yAxis: { ...yAxis(), name: primaryMetric, nameLocation: 'middle', nameGap: 50, nameTextStyle: { color: themeMuted(), fontSize: 11 } },
@@ -337,7 +363,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
       return {
         color: colors,
         title: chartTitle(isDonut ? 'Donut Chart' : 'Pie Chart', `${primaryMetric} distribution`),
-        tooltip: itemTooltip(datasets),
+        tooltip: itemTooltip(datasets, extra.tooltipContext),
         legend: {
           ...ECHARTS_LEGEND_STYLE(),
           orient: 'vertical',
@@ -595,11 +621,13 @@ export function prepareChartData(result, spec = null) {
     rows.some(r => TIME_PATTERN.test(String(r[labelCol] ?? ''))) ||
     DATE_COL_NAMES.test(labelCol);
 
+  const isDetail = spec?.intent === 'detail';
+
   // ── Hierarchical grouping path ──
   // When the spec says "isHierarchical", do NOT pivot into multi-series.
   // Instead: create compound labels "Group — Item", use only actual result rows
   // (no fake zero filling), and sort by group then by metric within group.
-  if (spec?.isHierarchical && spec.groupDimension && spec.itemDimension) {
+  if (!isDetail && spec?.isHierarchical && spec.groupDimension && spec.itemDimension) {
     const groupCol = spec.groupDimension;
     const itemCol = spec.itemDimension;
     const measureCol = numericCols[0];
@@ -658,7 +686,7 @@ export function prepareChartData(result, spec = null) {
   // e.g. rows grouped by month AND country: pivot the secondary category into
   // its own series instead of showing one bar per row with a repeated x-axis label.
   const secondaryCol = spec?.secondaryDimension;
-  if (secondaryCol && columns.includes(secondaryCol)) {
+  if (!isDetail && secondaryCol && columns.includes(secondaryCol)) {
     const measureCol = numericCols[0];
     const labels = [...new Set(rows.map(r => String(r[labelCol] ?? '')))].sort((a, b) =>
       isTime ? a.localeCompare(b) : 0,
@@ -676,17 +704,70 @@ export function prepareChartData(result, spec = null) {
   }
 
   // ── Standard single-dimension path ──
+  let finalLabelCols = [labelCol];
+  let labelColTitle = labelCol.replace(/_/g, ' ');
+
+  // Disambiguate duplicate categories to preserve granularity (especially for detail intents)
+  if (spec && spec.columnsProfile && rows.length > 1) {
+    const primaryUniques = new Set(rows.map(r => String(r[labelCol] ?? ''))).size;
+    if (primaryUniques < rows.length) {
+      // Find other string/date dimensions, prioritizing explicitly mentioned ones
+      const otherDims = spec.columnsProfile
+        .filter(c => c.column !== labelCol && (c.type === 'string' || c.type === 'date'))
+        .sort((a, b) => b.dimensionScore - a.dimensionScore);
+
+      let currentUniques = primaryUniques;
+
+      for (const dim of otherDims) {
+        if (currentUniques >= rows.length * 0.95) break; // Close enough to unique
+        if (dim.identifierScore > 0.5) continue; // Avoid ugly IDs
+
+        finalLabelCols.push(dim.column);
+        
+        const combined = rows.map(r => finalLabelCols.map(c => String(r[c] ?? '')).join(' — '));
+        const newUniques = new Set(combined).size;
+        
+        if (newUniques <= currentUniques) {
+          // Did not help disambiguate at all
+          finalLabelCols.pop();
+        } else {
+          currentUniques = newUniques;
+        }
+
+        if (finalLabelCols.length >= 3) break; // Keep labels readable
+      }
+      
+      if (finalLabelCols.length > 1) {
+        labelColTitle = finalLabelCols.map(c => c.replace(/_/g, ' ')).join(' and ');
+      }
+    }
+  }
+
   let displayRows = isTime
     ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol])))
     : [...rows].sort((a, b) => Number(b[numericCols[0]]) - Number(a[numericCols[0]]));
 
-  const labels = displayRows.map(r => String(r[labelCol] ?? ''));
+  const labels = displayRows.map(r => finalLabelCols.map(c => String(r[c] ?? '')).join(' — '));
   const datasets = numericCols.map(col => ({
     label: col.replace(/_/g, ' '),
     originalColumn: col,
     data: displayRows.map(r => Number(r[col]) || 0),
   }));
 
-  return { labels, datasets, isTime, labelCol: labelCol.replace(/_/g, ' '), numericCols };
+  // Store the raw row data in tooltip payload so we can display individual components
+  const fullTooltipData = displayRows.map(r => {
+    const dataObj = {};
+    finalLabelCols.forEach(c => dataObj[c] = r[c]);
+    return dataObj;
+  });
+
+  return { 
+    labels, 
+    datasets, 
+    isTime, 
+    labelCol: labelColTitle, 
+    numericCols,
+    tooltipContext: fullTooltipData 
+  };
 }
 

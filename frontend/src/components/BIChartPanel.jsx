@@ -55,11 +55,13 @@ const TOP_N_OPTIONS = [
   { value: 20, label: 'Top 20' },
 ];
 
-export default function BIChartPanel({ result, intent, query = '' }) {
+export default function BIChartPanel({ result, intent, query = '', plan }) {
   const spec = useMemo(
-    () => resolveVisualizationSpec(result, intent, query),
-    [result, intent, query]
+    () => resolveVisualizationSpec(result, intent, query, plan),
+    [result, intent, query, plan]
   );
+
+  if (!spec && intent === 'detail') return null;
 
   const semanticResult = useMemo(() => {
     if (!spec || !result) return result;

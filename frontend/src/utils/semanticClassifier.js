@@ -125,8 +125,8 @@ export function classifyColumns(result, intent = '', query = '') {
 /**
  * Resolves the primary visualization specification.
  */
-export function resolveVisualizationSpec(result, intent = '', query = '') {
-  if (!result || !result.columns || !result.rows || result.rows.length === 0 || intent === 'detail') {
+export function resolveVisualizationSpec(result, intent = '', query = '', plan = null) {
+  if (!result || !result.columns || !result.rows || result.rows.length === 0) {
     return null;
   }
 
@@ -158,8 +158,24 @@ export function resolveVisualizationSpec(result, intent = '', query = '') {
   let secondaryMeasures = [];
   let excludedFields = [];
   
+  // If we have an explicit plan with metrics, heavily filter potential measures to match plan metrics
+  let explicitMetrics = [];
+  if (plan && plan.metrics && Array.isArray(plan.metrics) && plan.metrics.length > 0) {
+    // Exact or loose match to plan metrics
+    explicitMetrics = plan.metrics
+      .filter(m => typeof m === 'string')
+      .map(m => m.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  }
+
   const potentialMeasures = columnsProfile
-    .filter(c => c.measureScore > 0)
+    .filter(c => {
+      if (explicitMetrics.length > 0) {
+        const cNorm = c.column.toLowerCase().replace(/[^a-z0-9]/g, '');
+        // If explicit metrics provided, it MUST be one of them or close to it
+        return explicitMetrics.some(m => cNorm.includes(m) || m.includes(cNorm));
+      }
+      return c.measureScore > 0;
+    })
     .sort((a, b) => b.measureScore - a.measureScore);
 
   if (potentialMeasures.length > 0) {

@@ -212,7 +212,7 @@ export default function ResultsDashboard({
 
       {/* ── Primary Chart (full width) ─────────────────────── */}
       {hasChart && (
-        <BIChartPanel result={result} intent={intent} query={query || ''} />
+        <BIChartPanel result={result} intent={intent} query={query || ''} plan={plan} />
       )}
 
       {/* ── Secondary row: Dataset Summary + Stats ─────────── */}
@@ -220,9 +220,9 @@ export default function ResultsDashboard({
         <div className="bi-dataset-col" style={{ minWidth: 0 }}>
           <DatasetSummary datasetInfo={datasetInfo} />
         </div>
-        {result?.rows?.length > 0 && (
+        {result?.rows?.length > 0 && intent !== 'detail' && (
           <div className="bi-stats-col" style={{ minWidth: 0 }}>
-            <SecondaryChartOrStats result={result} intent={intent} query={query} />
+            <SecondaryChartOrStats result={result} intent={intent} query={query} plan={plan} />
           </div>
         )}
       </div>
@@ -269,9 +269,9 @@ function FooterTrace({ agentLogs, pipelineTime }) {
 }
 
 /** Secondary mini-chart showing distribution stats */
-function SecondaryChartOrStats({ result, intent, query }) {
+function SecondaryChartOrStats({ result, intent, query, plan }) {
   const { columns = [], rows = [] } = result || {};
-  const spec = resolveVisualizationSpec(result, intent, query);
+  const spec = resolveVisualizationSpec(result, intent, query, plan);
   let numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c]))));
 
   if (spec && spec.excludedFields) {
