@@ -172,17 +172,25 @@ def _summary_rows(config: PredictionConfig, result) -> list[dict[str, str]]:
         if rows:
             rows.insert(0, {"metric": "Ranked by", "value": metric})
     elif result.forecast_rows:
-        for row in result.forecast_rows[:10]:
+        # Grouped rows need the group in the label, or "2022-04-30: 600,084"
+        # appears once per country with no way to tell which is which.
+        limit = 60 if config.is_grouped else 10
+        for row in result.forecast_rows[:limit]:
             if row.get("value") is not None:
-                rows.append({"metric": str(row.get("period"))[:10],
-                             "value": f"{row['value']:,.2f}"})
+                period = str(row.get("period"))[:10]
+                label = f"{row.get('group')} · {period}" if config.is_grouped and row.get("group") else period
+                rows.append({"metric": label, "value": f"{row['value']:,.2f}"})
     elif result.row_predictions:
         for row in result.row_predictions[:10]:
             value = row.get("probability")
-            rows.append({
-                "metric": str(row.get("customer_id")),
-                "value": f"{value:.1%}" if value is not None else f"{row.get('prediction')}",
-            })
+            prediction = row.get("prediction")
+            if value is not None:
+                shown = f"{value:.1%}"
+            elif isinstance(prediction, (int, float)):
+                shown = f"{prediction:,.2f}"
+            else:
+                shown = f"{prediction}"
+            rows.append({"metric": str(row.get("customer_id")), "value": shown})
     return rows
 
 
@@ -330,6 +338,18 @@ def build_evidence(config: PredictionConfig, result) -> str:
         if first and last:
             lines.append(f"FIRST PERIOD {str(first['period'])[:10]}: {first['value']:,.2f}")
             lines.append(f"LAST PERIOD {str(last['period'])[:10]}: {last['value']:,.2f}")
+    elif result.forecast_rows:
+        # Grouped forecast with no ranking requested: without per-group totals
+        # the explanation has no figures and can only say it has none.
+        totals: dict[str, float] = {}
+        for r in result.forecast_rows:
+            if r.get("value") is not None:
+                totals[r["group"]] = totals.get(r["group"], 0.0) + r["value"]
+        lines.append(f"FORECAST TOTAL PER {(label or 'GROUP').upper()} over the horizon (highest first):")
+        for group, total in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:10]:
+            lines.append(f"  {group}: {total:,.2f}")
+        if len(totals) > 10:
+            lines.append(f"({len(totals)} groups were forecast; the 10 largest are listed.)")
 
     if result.growth_rows:
         top = next((g for g in result.growth_rows if g["growth_pct"] is not None), None)
@@ -363,9 +383,24 @@ def build_evidence(config: PredictionConfig, result) -> str:
 
     if result.row_predictions:
         lines.append(f"PREDICTED ROWS: {len(result.row_predictions)}.")
+        for row in result.row_predictions[:10]:
+            score = row.get("probability")
+            pred = row.get("prediction")
+            if score is not None:
+                shown = f"{score * 100:.1f}% probability"
+            elif isinstance(pred, (int, float)):
+                shown = f"predicted {pred:,.2f}"
+            else:
+                shown = f"predicted {pred}"
+            lines.append(f"  {row.get('customer_id')}: {shown}")
         accuracy = result.model_metadata.get("accuracy")
         if accuracy is not None:
-            lines.append(f"MODEL ACCURACY on held-out data: {accuracy}.")
+            # For regression this value is R², not accuracy — label it as such
+            # so the explanation doesn't call a goodness-of-fit score "accuracy".
+            if result.model_metadata.get("problem_type") == "regression":
+                lines.append(f"MODEL R² (share of variance explained) on held-out data: {accuracy}.")
+            else:
+                lines.append(f"MODEL ACCURACY on held-out data: {accuracy}.")
 
     model = result.model_metadata or {}
     if model.get("selected_model_label"):

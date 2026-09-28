@@ -252,7 +252,7 @@ def predict_rows(
                 f"No model could be trained for '{table_name}'."
                 + (f" {reason}" if reason else "")
             )
-        artifact = experiment.models[0]  # Just use the first one for lazy predict fallback
+        artifact = experiment.best_artifact
 
     if task_type == "trend_direction_forecast":
         logger.info(f"[Service] Executing trend_direction_forecast for {table_name}")

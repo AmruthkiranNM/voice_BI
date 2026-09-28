@@ -71,13 +71,16 @@ def _check_security(sql: str, result: dict[str, Any]) -> None:
     Check for dangerous SQL keywords that could indicate injection
     or destructive operations.
     """
-    sql_upper = sql.upper()
-
     for keyword in BLOCKED_SQL_KEYWORDS:
-        # Use word boundary matching to avoid false positives
-        # e.g., "UPDATED_AT" should not trigger "UPDATE"
-        pattern = r'\b' + re.escape(keyword) + r'\b'
-        if re.search(pattern, sql_upper):
+        # Word boundaries stop "UPDATED_AT" matching "UPDATE", but \b can't
+        # sit next to punctuation ('--', '/*') or after '_' ('xp_cmdshell'),
+        # so only add a boundary on a side that ends in a letter or digit.
+        pattern = re.escape(keyword)
+        if keyword[0].isalnum():
+            pattern = r'\b' + pattern
+        if keyword[-1].isalnum():
+            pattern += r'\b'
+        if re.search(pattern, sql, re.IGNORECASE):
             result["security_valid"] = False
             result["errors"].append(f"Blocked SQL keyword detected: '{keyword}'. Only SELECT queries are allowed.")
 

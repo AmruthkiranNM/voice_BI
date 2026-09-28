@@ -286,6 +286,16 @@ class TrainingExperimentResult:
     best_model_key: str = ""
     selection_metric: str = ""
 
+    @property
+    def best_artifact(self) -> "TrainedModelArtifact | None":
+        """The selected model. `models` and `training_results` are appended in
+        lockstep, so match on the result's model_key rather than taking models[0]
+        (which is simply the first model trained)."""
+        for artifact, res in zip(self.models, self.training_results):
+            if res.get("model_key") == self.best_model_key:
+                return artifact
+        return self.models[0] if self.models else None
+
 
 @dataclasses.dataclass
 class UniversalPredictionResult:

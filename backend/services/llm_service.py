@@ -57,8 +57,12 @@ def _call_groq(prompt: str) -> str:
     }
     
     import time
-    max_retries = 3
-    base_delay = 5
+    # Groq's free tier limits tokens per *minute*, so retries need to be able
+    # to wait out most of a minute, not give up after ~15s.
+    max_retries = 6
+    base_delay = 4
+    max_total_wait = 60.0
+    waited = 0.0
 
     for attempt in range(max_retries):
         req = urllib.request.Request(
@@ -83,21 +87,37 @@ def _call_groq(prompt: str) -> str:
                 raise RuntimeError(f"Groq did not respond within {config.GROQ_TIMEOUT_SECONDS}s.") from e
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
-            if e.code == 429 and attempt < max_retries - 1:
-                delay = base_delay * (2 ** attempt)
+            if e.code == 429:
+                delay = min(base_delay * (2 ** attempt), 20.0)
                 try:
-                    error_data = json.loads(body)
-                    error_msg = error_data.get("error", {}).get("message", "")
-                    match = re.search(r"in (\d+(?:\.\d+)?)s", error_msg)
+                    error_msg = json.loads(body).get("error", {}).get("message", "")
+                    # Groq says e.g. "try again in 757.5ms", "in 5.5575s", or — for
+                    # the daily token cap — "in 7m5.952s".
+                    match = re.search(r"try again in (?:(\d+)m)?(\d+(?:\.\d+)?)(ms|s)\b", error_msg)
                     if match:
-                        delay = float(match.group(1)) + 1.0 # Add 1s buffer
+                        value = float(match.group(2))
+                        seconds = value / 1000.0 if match.group(3) == "ms" else value
+                        delay = int(match.group(1) or 0) * 60 + seconds + 1.0
                 except Exception:
                     pass
-                logger.warning("Groq rate limit hit. Retrying in %.2fs...", delay)
-                time.sleep(delay)
-                continue
+                if attempt < max_retries - 1 and waited + delay <= max_total_wait:
+                    logger.warning("Groq rate limit hit. Retrying in %.2fs (attempt %d)...", delay, attempt + 1)
+                    time.sleep(delay)
+                    waited += delay
+                    continue
+                logger.error("Groq rate limit persisted after %.0fs of retries: %s", waited, body)
+                if "tokens per day" in body:
+                    raise RuntimeError(
+                        "The AI service's daily usage limit has been reached. It resets "
+                        "gradually over the next few minutes to hours; please try again later."
+                    ) from e
+                raise RuntimeError(
+                    "The AI service is busy right now (rate limit). Please wait a minute and ask again."
+                ) from e
+            # Log the provider's full response, but don't surface it to users —
+            # it can contain account identifiers.
             logger.error("Groq API call failed: %s %s", e.code, body)
-            raise RuntimeError(f"Groq call failed ({e.code}): {body}") from e
+            raise RuntimeError(f"The AI service returned an error (HTTP {e.code}). Please try again.") from e
         except urllib.error.URLError as e:
             if attempt == max_retries - 1:
                 logger.error("Groq API call failed: %s", str(e))

@@ -104,6 +104,7 @@ def profile_time_columns(df: pd.DataFrame, max_sample: int = 500) -> list[TimeCo
     import warnings as _warnings
 
     profiles: list[TimeColumnProfile] = []
+    position = {column: i for i, column in enumerate(df.columns)}
 
     for column in df.columns:
         series = df[column].dropna()
@@ -160,7 +161,12 @@ def profile_time_columns(df: pd.DataFrame, max_sample: int = 500) -> list[TimeCo
         profile.score = round(score, 3)
         profiles.append(profile)
 
-    profiles.sort(key=lambda p: (-p.score, -p.span_days, p.column))
+    # A wider span wins, but spans within ~10% of the widest are a tie: e.g.
+    # order_date vs ship_date, where ship_date runs a few days past the last
+    # order. Ties go to the column listed first, which is normally the
+    # primary date (order before ship, sale before delivery).
+    widest = max((p.span_days for p in profiles), default=0.0) or 1.0
+    profiles.sort(key=lambda p: (-p.score, -round(p.span_days / widest, 1), position[p.column]))
     return profiles
 
 

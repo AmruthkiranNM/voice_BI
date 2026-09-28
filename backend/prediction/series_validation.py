@@ -115,7 +115,7 @@ def median_step_days(timestamps: pd.Series | pd.DatetimeIndex) -> float:
     idx = pd.DatetimeIndex(pd.Series(timestamps).dropna().unique()).sort_values()
     if len(idx) < 2:
         return 0.0
-    gaps = np.diff(idx.view("int64")) / 8.64e13
+    gaps = np.diff(idx.as_unit("ns").asi8) / 8.64e13  # force ns: pandas 3 defaults to us
     gaps = gaps[gaps > 0]
     return float(np.median(gaps)) if gaps.size else 0.0
 
@@ -133,7 +133,7 @@ def infer_frequency(timestamps: pd.Series | pd.DatetimeIndex) -> str:
     if len(idx) < 2:
         return "months"
 
-    gaps_days = np.diff(idx.view("int64")) / 8.64e13  # ns → days
+    gaps_days = np.diff(idx.as_unit("ns").asi8) / 8.64e13  # ns → days (force ns: pandas 3 defaults to us)
     gaps_days = gaps_days[gaps_days > 0]
     if gaps_days.size == 0:
         return "months"

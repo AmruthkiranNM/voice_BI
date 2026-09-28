@@ -52,7 +52,8 @@ def future_index(index: pd.Index, steps: int) -> pd.Index:
         if freq is not None:
             return pd.date_range(start=index[-1], periods=steps + 1, freq=freq)[1:]
         if len(index) >= 2:
-            deltas = np.diff(index.view("int64"))
+            # pandas 3 may store datetimes in us/s; Timestamp.value below is ns.
+            deltas = np.diff(index.as_unit("ns").asi8)
             step_ns = int(np.median(deltas))
             if step_ns > 0:
                 start = index[-1].value + step_ns

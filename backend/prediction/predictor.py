@@ -29,12 +29,26 @@ from prediction import dimensions as dimension_validation
 logger = logging.getLogger(__name__)
 
 
+def _top_positions(df: pd.DataFrame, artifact: TrainedModelArtifact, k: int) -> list[int]:
+    """Positions of the k rows with the highest positive-class probability
+    (classification) or predicted value (regression), scored in one batch."""
+    X = preprocessing.prepare_inference_data(df, artifact.preprocessor)
+    model = artifact.model
+    if getattr(artifact, "problem_type", "classification") == "classification":
+        proba = model.predict_proba(X)
+        scores = proba[:, 1] if proba.shape[1] > 1 else proba[:, 0]
+    else:
+        scores = model.predict(X)
+    return np.argsort(-np.asarray(scores, dtype=float), kind="stable")[:k].tolist()
+
+
 def predict(
     df: pd.DataFrame,
     artifact: TrainedModelArtifact,
     row_indices: list[int] | None = None,
     risk_thresholds: dict[str, float] | None = None,
     rank_by_probability: bool = False,
+    top_k: int = 5,
 ) -> PredictionResult:
     """
     Run inference on specific rows of a DataFrame.
@@ -45,6 +59,9 @@ def predict(
         row_indices:         Which rows to predict. None = first 5 rows.
         risk_thresholds:     Dict defining 'High' and 'Medium' thresholds (e.g., {"High": 0.7, "Medium": 0.4}).
         rank_by_probability: If True, sorts the resulting predictions by probability descending.
+                             With no row_indices, every row is scored and the top_k
+                             highest are returned (not just the first rows).
+        top_k:               How many rows to return when ranking the whole table.
 
     Returns:
         UniversalPredictionResult with per-row predictions and metadata.
@@ -55,6 +72,8 @@ def predict(
     # Select subset
     if row_indices is not None:
         subset = df.iloc[row_indices]
+    elif rank_by_probability and not df.empty:
+        subset = df.iloc[_top_positions(df, artifact, top_k)]
     else:
         subset = df.head(5)
 

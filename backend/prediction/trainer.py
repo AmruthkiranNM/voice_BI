@@ -14,6 +14,7 @@ import pickle
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from config import DATA_DIR
@@ -276,8 +277,14 @@ def load_artifact(
     model_path = get_model_path(table_name, target_col, model_key, frequency)
     if not model_path.exists():
         return None
-    with open(model_path, "rb") as f:
-        artifact = pickle.load(f)
+    try:
+        with open(model_path, "rb") as f:
+            artifact = pickle.load(f)
+    except (ModuleNotFoundError, AttributeError, ImportError, pickle.UnpicklingError, EOFError) as e:
+        # Saved with an incompatible library version (e.g. a different
+        # scikit-learn); treat as missing so the caller retrains.
+        logger.warning("[Trainer] Could not load %s (%s); re-training required.", model_path.name, e)
+        return None
     # Handle legacy format: old ml_engine.py saved a plain dict
     if isinstance(artifact, dict):
         logger.warning("[Trainer] Found legacy model format; re-training required.")
@@ -287,9 +294,18 @@ def load_artifact(
 
 def _extract_importances(model, feature_names: list[str]) -> list[tuple[str, float]]:
     """Extract and sort feature importances from a fitted model."""
-    try:
-        raw = model.feature_importances_
-        pairs = list(zip(feature_names, [round(float(v), 4) for v in raw]))
-        return sorted(pairs, key=lambda x: x[1], reverse=True)
-    except AttributeError:
+    if hasattr(model, "feature_importances_"):
+        raw = np.asarray(model.feature_importances_, dtype=float)
+    elif hasattr(model, "coef_"):
+        # Linear models: magnitude of the coefficient (averaged over classes
+        # for multiclass), normalised to sum to 1 like tree importances.
+        # Features are scaled by the preprocessor, so magnitudes are comparable.
+        coef = np.abs(np.asarray(model.coef_, dtype=float))
+        raw = coef.mean(axis=0) if coef.ndim > 1 else coef
+        total = raw.sum()
+        if total > 0:
+            raw = raw / total
+    else:
         return [(f, 0.0) for f in feature_names]
+    pairs = list(zip(feature_names, [round(float(v), 4) for v in raw]))
+    return sorted(pairs, key=lambda x: x[1], reverse=True)

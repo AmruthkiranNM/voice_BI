@@ -467,6 +467,26 @@ def route(
         previous_task=previous_task, previous_engine=previous_engine,
     )
 
+    # With several tables in scope, the table picked above is the largest fact
+    # table, which may have no dates (e.g. order_details vs orders). A forecast
+    # blocked only for lack of a time axis should look for a table that has one
+    # before telling the user forecasting is impossible.
+    if (not table and scope_tables and len(scope_tables) > 1
+            and decision.engine == ENGINE_FORECAST and decision.blocked
+            and capabilities is not None and not capabilities.has_temporal_column):
+        from prediction.profiler import choose_dataset_table
+        try:
+            timed_table, _ = choose_dataset_table(scope_tables, require_time_axis=True)
+        except Exception:
+            timed_table = None
+        if timed_table and timed_table != resolved_table:
+            resolved_table = timed_table
+            capabilities = inspect_capabilities(resolved_table)
+            decision = classify_task(
+                question, table=resolved_table, capabilities=capabilities,
+                previous_task=previous_task, previous_engine=previous_engine,
+            )
+
     logger.info(
         "[TaskRouter] %r -> %s | signals=%s | %s",
         (question or "")[:80], decision.describe(),

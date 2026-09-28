@@ -442,6 +442,20 @@ def resolve_config(
             )
 
         requested_unit = interpretation.get("horizon_unit")
+        parsed_count = None
+        if requested_unit not in ("days", "weeks", "months", "quarters", "years"):
+            # The LLM interpreter sometimes omits the unit; "next 12 months" in
+            # the question itself is unambiguous, so read it deterministically
+            # rather than letting the bucket default to something coarser.
+            from prediction.time_resolution import parse_horizon_phrase as _parse
+            from prediction.series_validation import normalize_frequency
+            count, parsed_unit = _parse(question)
+            parsed_unit = normalize_frequency(parsed_unit) if parsed_unit else None
+            # Only fine-grained units name a bucket size; "next year" states a
+            # span and keeps the existing default-bucket behaviour.
+            requested_unit = parsed_unit if parsed_unit in ("days", "weeks", "months") else None
+            # The count goes with the unit: "next 3 months" is 3, not 1.
+            parsed_count = count if requested_unit else None
         frequency, freq_notes = resolve_frequency(
             requested_unit if requested_unit in (
                 "days", "weeks", "months", "quarters", "years") else None,
@@ -456,6 +470,8 @@ def resolve_config(
         config.warnings.extend(freq_notes)
 
         stated_count = interpretation.get("horizon_count")
+        if stated_count is None:
+            stated_count = parsed_count
         stated_phrase = None
         from prediction.time_resolution import parse_horizon_phrase
         if stated_count is None and not requested_unit:

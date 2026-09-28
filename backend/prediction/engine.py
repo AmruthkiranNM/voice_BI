@@ -475,14 +475,14 @@ def _run_supervised(config: PredictionConfig, kind: str) -> PredictionResult:
             result.status = cfg.STATUS_INSUFFICIENT_DATA
             result.errors.append(f"No {kind} model could be trained for '{config.target}'.")
             return result
-        artifact = experiment.models[0]
+        artifact = experiment.best_artifact
         result.validation_metrics = {
             "selection_metric": experiment.selection_metric,
             "best_model": experiment.best_model_key,
             "candidates": experiment.training_results,
         }
 
-    predictions = predictor.predict(df, artifact, rank_by_probability=True)
+    predictions = predictor.predict(df, artifact, rank_by_probability=True, top_k=config.top_n or 5)
     result.row_predictions = [dataclasses.asdict(r) for r in predictions.row_predictions]
     result.model_metadata = {
         "selected_model_label": artifact.model_type,
