@@ -184,9 +184,11 @@ export default function ResultsDashboard({
         </div>
 
         {/* Insights panel (right, 40%) */}
-        <div className="bi-insights-col">
-          <BIInsightsPanel result={result} intent={intent} query={query} />
-        </div>
+        {intent !== 'detail' && (
+          <div className="bi-insights-col">
+            <BIInsightsPanel result={result} intent={intent} query={query} />
+          </div>
+        )}
       </div>
 
       {/* ── Follow-Up Chat ────────────────────────────────── */}
@@ -229,6 +231,7 @@ export default function ResultsDashboard({
       <ResultTable
         result={result}
         fullWidth
+        intent={intent}
         onRowDrill={(row, cols) => {
           handleRowDrill(row, cols);
           document.getElementById('followup-chat')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -269,7 +272,7 @@ function SecondaryChartOrStats({ result, intent, query }) {
   const { columns = [], rows = [] } = result || {};
   const spec = resolveVisualizationSpec(result, intent, query);
   let numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c]))));
-  
+
   if (spec && spec.excludedFields) {
     numericCols = numericCols.filter(c => !spec.excludedFields.includes(c));
   }

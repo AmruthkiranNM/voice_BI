@@ -44,6 +44,7 @@ def run(sql: str) -> dict[str, Any]:
             "columns": result["columns"],
             "rows": result["rows"],
             "row_count": result["row_count"],
+            "is_truncated": result.get("is_truncated", False),
             "execution_time_ms": elapsed_ms,
             "error": None,
         }

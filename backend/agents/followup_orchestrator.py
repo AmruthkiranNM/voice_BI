@@ -49,6 +49,8 @@ RULES:
 1. If there are no rows, respond EXACTLY: "I couldn't determine that reliably from the available data."
 2. State the final answer clearly based on the rows.
 3. Do not mention that you ran a query. Just answer the question.
+4. Do NOT rank, identify "top"/"best"/"worst" items, or generate recommendations unless the question explicitly asks for them.
+5. Do NOT invent numbers that aren't in the result rows.
 
 Write your final answer now:"""
 

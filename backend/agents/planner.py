@@ -131,7 +131,7 @@ def run(query: str) -> dict:
         return {
             "original_query": query,
             "steps": ["Retrieve relevant data based on the query"],
-            "intent": "aggregation",
+            "intent": "detail",
             "metrics": [],
             "filters": {
                 "time_range": None,
@@ -140,7 +140,7 @@ def run(query: str) -> dict:
                 "other": None,
             },
             "grouping": None,
-            "requires_aggregation": True,
+            "requires_aggregation": False,
             "requires_comparison": False,
             "parse_error": str(e),
         }

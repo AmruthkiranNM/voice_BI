@@ -266,13 +266,19 @@ def execute_query(sql: str) -> dict[str, Any]:
     try:
         cursor = conn.execute(sql)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
-        rows = cursor.fetchmany(MAX_RESULT_ROWS)
+        # Fetch one extra row to detect whether the safety limit truncated the
+        # result.  The extra row is never returned to the caller.
+        rows = cursor.fetchmany(MAX_RESULT_ROWS + 1)
+        is_truncated = len(rows) > MAX_RESULT_ROWS
+        if is_truncated:
+            rows = rows[:MAX_RESULT_ROWS]
         result_rows = [dict(zip(columns, row)) for row in rows]
 
         return {
             "columns": columns,
             "rows": result_rows,
             "row_count": len(result_rows),
+            "is_truncated": is_truncated,
         }
     except Exception as e:
         logger.error("Query execution failed: %s | SQL: %s", str(e), sql)

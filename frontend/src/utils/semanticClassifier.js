@@ -126,7 +126,7 @@ export function classifyColumns(result, intent = '', query = '') {
  * Resolves the primary visualization specification.
  */
 export function resolveVisualizationSpec(result, intent = '', query = '') {
-  if (!result || !result.columns || !result.rows || result.rows.length === 0) {
+  if (!result || !result.columns || !result.rows || result.rows.length === 0 || intent === 'detail') {
     return null;
   }
 

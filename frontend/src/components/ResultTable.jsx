@@ -4,7 +4,7 @@ import { showToast } from '../utils/toast';
 
 const PAGE_SIZE = 25;
 
-export default function ResultTable({ result, fullWidth = false, onRowDrill }) {
+export default function ResultTable({ result, fullWidth = false, intent, onRowDrill }) {
   const [sort, setSort] = useState({ column: null, dir: 'asc' });
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -278,7 +278,7 @@ export default function ResultTable({ result, fullWidth = false, onRowDrill }) {
                 })}
               </tbody>
               {/* Totals row */}
-              {filteredRows.length > 1 && (
+              {filteredRows.length > 1 && intent !== 'detail' && (
                 <tfoot className="bi-tfoot">
                   <tr>
                     <td className="bi-td bi-td-rank bi-total-label">Σ</td>

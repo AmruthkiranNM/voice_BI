@@ -297,7 +297,7 @@ def process_query(
                 "reason": "fast_mode" if fast_mode else "disabled",
             })
         else:
-            insight_text = insight.run(query, sql, exec_result)
+            insight_text = insight.run(query, sql, exec_result, plan=plan)
             log_step("Insight Agent", "completed", {
                 "insight_length": len(insight_text),
             })
@@ -335,6 +335,7 @@ def process_query(
                 "columns": exec_result["columns"],
                 "rows": exec_result["rows"],
                 "row_count": exec_result["row_count"],
+                "is_truncated": exec_result.get("is_truncated", False),
             },
             "insight": insight_text,
             "llm_mode": "ollama",
