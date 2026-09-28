@@ -105,6 +105,42 @@ export async function submitQuery(query, options = {}) {
   }
 }
 
+/**
+ * Fetch a specific page of an existing SQL query
+ */
+export async function fetchSqlPage({ sql, page, pageSize, sortCol, sortDir, search }) {
+  try {
+    const { data } = await api.post('/query/paginate', {
+      sql,
+      page,
+      page_size: pageSize,
+      sort_column: sortCol || null,
+      sort_dir: sortDir || 'asc',
+      search_term: search || null
+    });
+    return data;
+  } catch (error) {
+    throw new Error('Failed to fetch page data', { cause: error });
+  }
+}
+
+/**
+ * Export complete result set for a query
+ */
+export async function fetchSqlExport({ sql, sortCol, sortDir, search }) {
+  try {
+    const { data } = await api.post('/query/export', {
+      sql,
+      sort_column: sortCol || null,
+      sort_dir: sortDir || 'asc',
+      search_term: search || null
+    });
+    return data;
+  } catch (error) {
+    throw new Error('Failed to fetch export data', { cause: error });
+  }
+}
+
 /** Upload a business CSV dataset */
 export async function uploadDataset(file) {
   const formData = new FormData();

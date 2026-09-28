@@ -264,24 +264,77 @@ def execute_query(sql: str) -> dict[str, Any]:
     """
     conn = get_connection()
     try:
-        cursor = conn.execute(sql)
-        columns = [desc[0] for desc in cursor.description] if cursor.description else []
-        # Fetch one extra row to detect whether the safety limit truncated the
-        # result.  The extra row is never returned to the caller.
-        rows = cursor.fetchmany(MAX_RESULT_ROWS + 1)
-        is_truncated = len(rows) > MAX_RESULT_ROWS
-        if is_truncated:
-            rows = rows[:MAX_RESULT_ROWS]
-        result_rows = [dict(zip(columns, row)) for row in rows]
-
+        paginated = execute_paginated_query(sql, page=1, page_size=MAX_RESULT_ROWS)
         return {
-            "columns": columns,
-            "rows": result_rows,
-            "row_count": len(result_rows),
-            "is_truncated": is_truncated,
+            "columns": paginated["columns"],
+            "rows": paginated["rows"],
+            "row_count": paginated["total_rows"],
+            "is_truncated": paginated["total_rows"] > MAX_RESULT_ROWS,
         }
     except Exception as e:
         logger.error("Query execution failed: %s | SQL: %s", str(e), sql)
         raise
     finally:
         conn.close()
+
+def execute_paginated_query(sql: str, page: int = 1, page_size: int = 50, sort_col: str | None = None, sort_dir: str = "asc", search: str | None = None) -> dict[str, Any]:
+    """Execute a query with proper server-side pagination, search, and sorting."""
+    conn = get_connection()
+    try:
+        base_sql = sql.strip().rstrip(";")
+        
+        # Get columns
+        cursor = conn.execute(f"{base_sql} LIMIT 0")
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        
+        wrapped_sql = f"SELECT * FROM ({base_sql}) AS __vbi_base"
+        params = []
+        
+        if search and columns:
+            # Simple text search across all columns
+            search_clauses = [f"CAST([{col}] AS TEXT) LIKE ?" for col in columns]
+            wrapped_sql += " WHERE (" + " OR ".join(search_clauses) + ")"
+            search_term = f"%{search}%"
+            params.extend([search_term] * len(columns))
+            
+        # Get total count
+        count_sql = f"SELECT COUNT(*) as cnt FROM ({wrapped_sql})"
+        cursor = conn.execute(count_sql, params)
+        total_rows = int(cursor.fetchone()["cnt"])
+        
+        # Add sorting
+        order_clauses = []
+        if sort_col and sort_col in columns:
+            order_clauses.append(f"[{sort_col}] {sort_dir.upper()}")
+            
+        # Fallback deterministic sort to ensure stable pagination
+        if columns:
+            fallback = columns[0]
+            if fallback != sort_col:
+                order_clauses.append(f"[{fallback}] ASC")
+                
+        if order_clauses:
+            wrapped_sql += " ORDER BY " + ", ".join(order_clauses)
+            
+        # Add limit/offset
+        wrapped_sql += " LIMIT ? OFFSET ?"
+        params.extend([page_size, (page - 1) * page_size])
+        
+        cursor = conn.execute(wrapped_sql, params)
+        rows = cursor.fetchall()
+        result_rows = [dict(zip(columns, row)) for row in rows]
+        
+        return {
+            "columns": columns,
+            "rows": result_rows,
+            "total_rows": total_rows,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": max(1, (total_rows + page_size - 1) // page_size) if page_size > 0 else 1
+        }
+    except Exception as e:
+        logger.error("Paginated query failed: %s | SQL: %s", str(e), sql)
+        raise
+    finally:
+        conn.close()
+

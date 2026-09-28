@@ -68,6 +68,16 @@ class QueryResponse(BaseModel):
     agent_logs: list = []
 
 
+class PaginateRequest(BaseModel):
+    sql: str
+    page: int = 1
+    page_size: int = 25
+    sort_column: str | None = None
+    sort_dir: str = "asc"
+    search_term: str | None = None
+
+
+
 # ── Endpoints ──
 
 @router.post(
@@ -124,6 +134,59 @@ def handle_query(request: QueryRequest):
             status_code=500,
             detail=f"Internal server error: {str(e)}",
         )
+
+@router.post(
+    "/query/paginate",
+    summary="Paginate an existing SQL query",
+)
+def paginate_query(request: PaginateRequest):
+    """Execute a query with pagination, search, and sorting."""
+    from services.database import execute_paginated_query
+    
+    try:
+        result = execute_paginated_query(
+            sql=request.sql,
+            page=request.page,
+            page_size=request.page_size,
+            sort_col=request.sort_column,
+            sort_dir=request.sort_dir,
+            search=request.search_term
+        )
+        return {"success": True, "result": result}
+    except Exception as e:
+        logger.exception("Pagination failed")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/query/export",
+    summary="Export complete results of a query",
+)
+def export_query(request: PaginateRequest):
+    """Execute query and stream all matching rows for export."""
+    from services.database import execute_paginated_query
+    from fastapi.responses import StreamingResponse
+    import io
+    import csv
+    import json
+    
+    try:
+        # Fetch all by passing page_size=0 or very large
+        result = execute_paginated_query(
+            sql=request.sql,
+            page=1,
+            page_size=1000000, # Large enough for export, or we could stream properly
+            sort_col=request.sort_column,
+            sort_dir=request.sort_dir,
+            search=request.search_term
+        )
+        
+        # Determine format (default CSV)
+        # We can implement simple JSON or CSV based on a format param if needed, 
+        # but returning JSON array directly is fine for the frontend to handle.
+        return {"success": True, "result": result}
+    except Exception as e:
+        logger.exception("Export failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete(

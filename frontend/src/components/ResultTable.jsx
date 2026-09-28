@@ -1,10 +1,11 @@
-import { useMemo, useState, useRef, useCallback } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload, TbCalendar, TbInbox } from 'react-icons/tb';
 import { showToast } from '../utils/toast';
+import { fetchSqlPage, fetchSqlExport } from '../services/api';
 
 const PAGE_SIZE = 25;
 
-export default function ResultTable({ result, fullWidth = false, intent, onRowDrill }) {
+export default function ResultTable({ result, sql, fullWidth = false, intent, onRowDrill }) {
   const [sort, setSort] = useState({ column: null, dir: 'asc' });
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -18,16 +19,56 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
   const resizeStartW = useRef(0);
 
   const columns = result?.columns ?? [];
-  const rows = result?.rows ?? [];
+  const initialRows = result?.rows ?? [];
+  
+  const [serverRows, setServerRows] = useState(initialRows);
+  const [totalRows, setTotalRows] = useState(result?.row_count ?? initialRows.length);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    setServerRows(result?.rows ?? []);
+    setTotalRows(result?.row_count ?? (result?.rows?.length || 0));
+    setPage(1);
+  }, [result]);
+
+  const isServerSide = !!sql && totalRows > PAGE_SIZE;
+
+  useEffect(() => {
+    if (!isServerSide) return;
+    let active = true;
+    const fetch = async () => {
+      setIsLoading(true);
+      try {
+        const data = await fetchSqlPage({
+          sql,
+          page,
+          pageSize: PAGE_SIZE,
+          sortCol: sort.column,
+          sortDir: sort.dir,
+          search: filter
+        });
+        if (active) {
+          setServerRows(data.result.rows);
+          setTotalRows(data.result.total_rows);
+        }
+      } catch (err) {
+        showToast('Failed to fetch data: ' + err.message);
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+    const timer = setTimeout(fetch, 300);
+    return () => { active = false; clearTimeout(timer); };
+  }, [page, sort.column, sort.dir, filter, sql, isServerSide]);
 
   const numericCols = useMemo(() =>
-    columns.filter(c => rows.some(r => r[c] != null && !Number.isNaN(Number(r[c])))),
-    [columns, rows],
+    columns.filter(c => initialRows.some(r => r[c] != null && !Number.isNaN(Number(r[c])))),
+    [columns, initialRows],
   );
 
   const colType = (c) => {
     if (numericCols.includes(c)) return 'numeric';
-    if (rows.some(r => /^\d{4}[-/]/.test(String(r[c] ?? '')))) return 'date';
+    if (initialRows.some(r => /^\d{4}[-/]/.test(String(r[c] ?? '')))) return 'date';
     return 'text';
   };
 
@@ -48,7 +89,8 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
   }, [columns, hiddenCols, pinnedCol]);
 
   const filteredRows = useMemo(() => {
-    let out = rows;
+    if (isServerSide) return serverRows;
+    let out = serverRows;
     if (filter.trim()) {
       const needle = filter.trim().toLowerCase();
       out = out.filter(row => columns.some(c => String(row[c] ?? '').toLowerCase().includes(needle)));
@@ -63,10 +105,11 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
       });
     }
     return out;
-  }, [rows, columns, filter, sort]);
+  }, [serverRows, columns, filter, sort, isServerSide]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const pagedRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = isServerSide ? Math.max(1, Math.ceil(totalRows / PAGE_SIZE)) : Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const pagedRows = isServerSide ? filteredRows : filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const displayCount = isServerSide ? totalRows : filteredRows.length;
 
   // Column totals
   const totals = useMemo(() => {
@@ -114,24 +157,50 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
     setPage(1);
   };
 
-  const exportCsv = () => {
-    const header = visibleCols.join(',');
-    const body = filteredRows.map(row => visibleCols.map(c => {
-      const val = row[c]; const str = val == null ? '' : String(val);
-      return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
-    }).join(',')).join('\n');
-    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'data-export.csv'; a.click(); URL.revokeObjectURL(a.href);
-    showToast(`Exported ${filteredRows.length.toLocaleString()} rows as CSV`);
+  const exportCsv = async () => {
+    const doExport = (dataRows) => {
+      const header = visibleCols.join(',');
+      const body = dataRows.map(row => visibleCols.map(c => {
+        const val = row[c]; const str = val == null ? '' : String(val);
+        return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      }).join(',')).join('\n');
+      const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'data-export.csv'; a.click(); URL.revokeObjectURL(a.href);
+      showToast(`Exported ${dataRows.length.toLocaleString()} rows as CSV`);
+    };
+
+    if (isServerSide) {
+      try {
+        const data = await fetchSqlExport({ sql, sortCol: sort.column, sortDir: sort.dir, search: filter });
+        doExport(data.result.rows);
+      } catch (err) {
+        showToast('Export failed: ' + err.message);
+      }
+    } else {
+      doExport(filteredRows);
+    }
   };
 
-  const exportJson = () => {
-    const data = filteredRows.map(row => Object.fromEntries(visibleCols.map(c => [c, row[c]])));
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = 'data-export.json'; a.click(); URL.revokeObjectURL(a.href);
-    showToast(`Exported ${filteredRows.length.toLocaleString()} rows as JSON`);
+  const exportJson = async () => {
+    const doExport = (dataRows) => {
+      const exportData = dataRows.map(row => Object.fromEntries(visibleCols.map(c => [c, row[c]])));
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'data-export.json'; a.click(); URL.revokeObjectURL(a.href);
+      showToast(`Exported ${dataRows.length.toLocaleString()} rows as JSON`);
+    };
+
+    if (isServerSide) {
+      try {
+        const data = await fetchSqlExport({ sql, sortCol: sort.column, sortDir: sort.dir, search: filter });
+        doExport(data.result.rows);
+      } catch (err) {
+        showToast('Export failed: ' + err.message);
+      }
+    } else {
+      doExport(filteredRows);
+    }
   };
 
   // Column resize handlers
@@ -148,7 +217,7 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
     document.addEventListener('mouseup', onUp);
   }, [colWidths]);
 
-  if (!columns.length || !rows.length) {
+  if (!columns.length || !initialRows.length) {
     return (
       <div className="bi-table-panel">
         <div className="bi-empty-state">
@@ -169,7 +238,7 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
             {isExpanded ? <TbChevronDown className="w-4 h-4" /> : <TbChevronRight className="w-4 h-4" />}
           </button>
           <h3 className="bi-table-title">Results</h3>
-          <span className="bi-table-count">{filteredRows.length.toLocaleString()} rows · {visibleCols.length} cols</span>
+          <span className="bi-table-count">{displayCount.toLocaleString()} rows · {visibleCols.length} cols</span>
         </div>
 
         <div className="bi-table-controls">
@@ -298,7 +367,7 @@ export default function ResultTable({ result, fullWidth = false, intent, onRowDr
             <div className="bi-pagination">
               <button className="bi-page-btn" onClick={() => setPage(1)} disabled={page === 1}>«</button>
               <button className="bi-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>‹</button>
-              <span className="bi-page-info">Page {page} of {totalPages} · {filteredRows.length.toLocaleString()} rows</span>
+              <span className="bi-page-info">Page {page} of {totalPages} · {displayCount.toLocaleString()} rows {isLoading && ' (loading...)'}</span>
               <button className="bi-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>›</button>
               <button className="bi-page-btn" onClick={() => setPage(totalPages)} disabled={page === totalPages}>»</button>
             </div>

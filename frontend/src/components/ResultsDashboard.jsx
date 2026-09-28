@@ -230,6 +230,7 @@ export default function ResultsDashboard({
       {/* ── Data Table (full width) ────────────────────────── */}
       <ResultTable
         result={result}
+        sql={sql}
         fullWidth
         intent={intent}
         onRowDrill={(row, cols) => {
