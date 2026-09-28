@@ -149,7 +149,7 @@ export default function BIChartPanel({ result, intent, query = '', plan }) {
 
   const processedData = useMemo(() => {
     if (!chartData) return null;
-    let { labels, datasets } = chartData;
+    let { labels, datasets, tooltipContext } = chartData;
 
     // Normalize
     if (normalize) {
@@ -159,22 +159,28 @@ export default function BIChartPanel({ result, intent, query = '', plan }) {
 
     // Sort
     if (sortMode !== 'default' && datasets[0]) {
-      const paired = labels.map((l, i) => ({ l, vals: datasets.map(d => d.data[i]) }));
+      const paired = labels.map((l, i) => ({ 
+        l, 
+        vals: datasets.map(d => d.data[i]),
+        ctx: tooltipContext ? tooltipContext[i] : null
+      }));
       if (sortMode === 'asc') paired.sort((a, b) => a.vals[0] - b.vals[0]);
       if (sortMode === 'desc') paired.sort((a, b) => b.vals[0] - a.vals[0]);
       if (sortMode === 'top10') paired.sort((a, b) => b.vals[0] - a.vals[0]).splice(10);
       if (sortMode === 'bottom10') paired.sort((a, b) => a.vals[0] - b.vals[0]).splice(10);
       labels = paired.map(p => p.l);
       datasets = datasets.map((ds, di) => ({ ...ds, data: paired.map(p => p.vals[di]) }));
+      if (tooltipContext) tooltipContext = paired.map(p => p.ctx);
     }
 
     // Top N filter
     if (topN > 0 && labels.length > topN) {
       labels = labels.slice(0, topN);
       datasets = datasets.map(ds => ({ ...ds, data: ds.data.slice(0, topN) }));
+      if (tooltipContext) tooltipContext = tooltipContext.slice(0, topN);
     }
 
-    return { labels, datasets };
+    return { labels, datasets, tooltipContext };
   }, [chartData, sortMode, normalize, topN]);
 
   const themeTick = useThemeTick();
@@ -186,6 +192,7 @@ export default function BIChartPanel({ result, intent, query = '', plan }) {
     return buildEChartsOption(effectiveType, processedData.labels, processedData.datasets, {
       showLabels,
       labelCol: chartData?.labelCol,
+      tooltipContext: processedData.tooltipContext,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processedData, effectiveType, showLabels, compatibility, chartData?.labelCol, themeTick]);

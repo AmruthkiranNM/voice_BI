@@ -747,7 +747,7 @@ export function prepareChartData(result, spec = null) {
     ? [...rows].sort((a, b) => String(a[labelCol]).localeCompare(String(b[labelCol])))
     : [...rows].sort((a, b) => Number(b[numericCols[0]]) - Number(a[numericCols[0]]));
 
-  const labels = displayRows.map(r => finalLabelCols.map(c => String(r[c] ?? '')).join(' — '));
+  const labels = displayRows.map(r => String(r[labelCol] ?? ''));
   const datasets = numericCols.map(col => ({
     label: col.replace(/_/g, ' '),
     originalColumn: col,
