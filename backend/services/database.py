@@ -279,15 +279,51 @@ def execute_query(sql: str) -> dict[str, Any]:
 
 def execute_paginated_query(sql: str, page: int = 1, page_size: int = 50, sort_col: str | None = None, sort_dir: str = "asc", search: str | None = None) -> dict[str, Any]:
     """Execute a query with proper server-side pagination, search, and sorting."""
+    import re
     conn = get_connection()
     try:
-        base_sql = sql.strip().rstrip(";")
+        base_sql = sql.strip().rstrip(";").strip()
         
-        # Get columns
-        cursor = conn.execute(f"{base_sql} LIMIT 0")
+        # 1. Detect if the logical query already has a semantic LIMIT
+        # (e.g. from a top-N user request).
+        has_explicit_limit = bool(re.search(r'\bLIMIT\s+\d+(?:\s+OFFSET\s+\d+)?\s*$', base_sql, flags=re.IGNORECASE))
+        
+        if has_explicit_limit:
+            # Execute the logical SQL exactly as-is without appending any SQL pagination wrappers
+            cursor = conn.execute(base_sql)
+            columns = [desc[0] for desc in cursor.description] if cursor.description else []
+            rows = cursor.fetchall()
+            result_rows = [dict(zip(columns, row)) for row in rows]
+            
+            # Apply UI sorting in Python (since we skipped the SQL wrapper)
+            if sort_col and sort_col in columns:
+                reverse = sort_dir.lower() == "desc"
+                result_rows.sort(key=lambda r: (r[sort_col] is None, r[sort_col]), reverse=reverse)
+                
+            # Apply UI search in Python
+            if search:
+                search_term = search.lower()
+                result_rows = [
+                    r for r in result_rows
+                    if any(search_term in str(v).lower() for v in r.values() if v is not None)
+                ]
+                
+            return {
+                "columns": columns,
+                "rows": result_rows,
+                "total_rows": len(result_rows),
+                "page": 1,
+                "page_size": max(len(result_rows), 1),
+                "total_pages": 1
+            }
+            
+        # 2. For queries without an explicit limit (e.g. "show all products"), safely wrap and paginate
+        # Wrap safely so we can get columns without syntax errors
+        wrapped_sql = f"SELECT * FROM ({base_sql}) AS __vbi_base"
+        
+        cursor = conn.execute(f"{wrapped_sql} LIMIT 0")
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         
-        wrapped_sql = f"SELECT * FROM ({base_sql}) AS __vbi_base"
         params = []
         
         if search and columns:
