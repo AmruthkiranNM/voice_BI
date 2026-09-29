@@ -178,7 +178,7 @@ def _extract_group_hints(query: str) -> list[str]:
     Handles multiple dimensions e.g. "by country and product category" -> ["country", "product category"]
     """
     patterns = [
-        r"(?:for each|for every|within each|in each|across|by|per)\s+([a-zA-Z_\s]+?(?:\s+and\s+[a-zA-Z_\s]+?)?)(?=\s+(?:for|in|is|will|likely|has|over|next|month|year|highest|lowest|$))",
+        r"(?:for each|for every|within each|in each|across|by|per)\s+([a-zA-Z_\s]+?(?:\s+and\s+[a-zA-Z_\s]+?)?)(?=\s+(?:for|in|is|will|likely|has|over|next|month|year|highest|lowest)|$)",
         r"which\s+([a-zA-Z_\s]+?(?:\s+and\s+[a-zA-Z_\s]+?)?)\s+(?:is|will|likely|has)",
     ]
     

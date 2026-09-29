@@ -55,8 +55,11 @@ def run(
     # ── Step 2: Ensure it's a SELECT statement ──
     _check_select_only(sql, result)
 
+    # ── Step 2.5: Ensure it's exactly one statement ──
+    _check_single_statement(sql, result)
+
     # ── Step 3: Schema Validation ──
-    if result["security_valid"]:
+    if result["security_valid"] and result["syntax_valid"]:
         _check_schema(sql, retrieved_tables, allowed_tables, result)
 
     if result["errors"]:
@@ -84,12 +87,30 @@ def _check_security(sql: str, result: dict[str, Any]) -> None:
             result["security_valid"] = False
             result["errors"].append(f"Blocked SQL keyword detected: '{keyword}'. Only SELECT queries are allowed.")
 
-    # Check for multiple statements (semicolon injection)
-    # Remove trailing semicolon first, then check for others
+    # The multiple statement check was moved to _check_single_statement
+    pass
+
+def _check_single_statement(sql: str, result: dict[str, Any]) -> None:
+    """
+    Ensure the SQL contains exactly one statement.
+    Multiple statements are a generation error, not a security failure,
+    so they can be retried.
+    """
     cleaned = sql.strip().rstrip(";").strip()
-    if ";" in cleaned:
-        result["security_valid"] = False
-        result["errors"].append("Multiple SQL statements detected. Only single SELECT queries are allowed.")
+    
+    # Strip string literals and comments to safely check for inner semicolons
+    no_comments = re.sub(r'--.*$', '', cleaned, flags=re.MULTILINE)
+    no_comments = re.sub(r'/\*.*?\*/', '', no_comments, flags=re.DOTALL)
+    no_strings = re.sub(r"'[^']*'", "''", no_comments)
+    no_strings = re.sub(r'"[^"]*"', '""', no_strings)
+    
+    if ";" in no_strings:
+        result["syntax_valid"] = False
+        result["errors"].append(
+            "Multiple SQL statements detected. Rewrite the entire request as exactly "
+            "ONE SELECT/WITH statement. Use CTEs and UNION ALL where appropriate. "
+            "Do not use semicolons between queries."
+        )
 
 
 def _check_select_only(sql: str, result: dict[str, Any]) -> None:

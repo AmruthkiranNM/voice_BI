@@ -111,12 +111,11 @@ def handle_query(request: QueryRequest):
     table_names = request.table_names
     if not table_names and request.table_name:
         table_names = [request.table_name]
-    if not table_names:
-        from services.database import get_all_table_names
-        tables = get_all_table_names()
-        if len(tables) == 1:
-            table_names = tables
-
+    
+    # Do NOT fall back to get_all_table_names() if the request provided no tables.
+    # If the user is on a source with no tables (or the frontend didn't send them),
+    # we should let process_query/task_router fail explicitly instead of silently
+    # querying unrelated datasets like Churn_Modelling.
     try:
         result = process_query(
             request.query,

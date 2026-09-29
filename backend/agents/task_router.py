@@ -474,18 +474,27 @@ def route(
     if (not table and scope_tables and len(scope_tables) > 1
             and decision.engine == ENGINE_FORECAST and decision.blocked
             and capabilities is not None and not capabilities.has_temporal_column):
+        
+        print(f"DEBUG fallback triggered! scope_tables={scope_tables}")
         from prediction.profiler import choose_dataset_table
         try:
             timed_table, _ = choose_dataset_table(scope_tables, require_time_axis=True)
-        except Exception:
+            print(f"DEBUG timed_table={timed_table}")
+        except Exception as e:
+            print(f"DEBUG Exception in choose_dataset_table: {e}")
             timed_table = None
         if timed_table and timed_table != resolved_table:
+            print(f"DEBUG Switching resolved_table to {timed_table}")
             resolved_table = timed_table
             capabilities = inspect_capabilities(resolved_table)
             decision = classify_task(
                 question, table=resolved_table, capabilities=capabilities,
                 previous_task=previous_task, previous_engine=previous_engine,
             )
+        else:
+            print(f"DEBUG timed_table {timed_table} was not used or same as {resolved_table}")
+    else:
+        print(f"DEBUG fallback skipped. not table={not table}, scope_tables={bool(scope_tables)}, len={len(scope_tables) if scope_tables else 0}, engine={decision.engine}, blocked={bool(decision.blocked)}, cap={capabilities is not None}")
 
     logger.info(
         "[TaskRouter] %r -> %s | signals=%s | %s",

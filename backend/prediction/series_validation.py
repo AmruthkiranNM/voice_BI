@@ -62,10 +62,10 @@ _FREQ_BY_DAYS = [
 FREQ_TO_RULE = {
     "days": "D", "day": "D",
     "weeks": "W", "week": "W",
-    "months": "ME", "month": "ME",
-    "quarters": "QE", "quarter": "QE",
-    "years": "YE", "year": "YE",
-    "periods": "ME", "period": "ME",
+    "months": "M", "month": "M",
+    "quarters": "Q", "quarter": "Q",
+    "years": "Y", "year": "Y",
+    "periods": "M", "period": "M",
 }
 
 # Number of buckets in one seasonal cycle, per frequency.
@@ -100,7 +100,7 @@ def normalize_frequency(frequency: str | None) -> str:
 
 def frequency_rule(frequency: str | None) -> str:
     """Return the pandas resample rule for a frequency name."""
-    return FREQ_TO_RULE.get(normalize_frequency(frequency), "ME")
+    return FREQ_TO_RULE.get(normalize_frequency(frequency), "M")
 
 
 def median_step_days(timestamps: pd.Series | pd.DatetimeIndex) -> float:
@@ -115,7 +115,8 @@ def median_step_days(timestamps: pd.Series | pd.DatetimeIndex) -> float:
     idx = pd.DatetimeIndex(pd.Series(timestamps).dropna().unique()).sort_values()
     if len(idx) < 2:
         return 0.0
-    gaps = np.diff(idx.as_unit("ns").asi8) / 8.64e13  # force ns: pandas 3 defaults to us
+    deltas = pd.Series(idx).diff().dropna()
+    gaps = deltas.dt.total_seconds().values / 86400.0
     gaps = gaps[gaps > 0]
     return float(np.median(gaps)) if gaps.size else 0.0
 
@@ -133,7 +134,8 @@ def infer_frequency(timestamps: pd.Series | pd.DatetimeIndex) -> str:
     if len(idx) < 2:
         return "months"
 
-    gaps_days = np.diff(idx.as_unit("ns").asi8) / 8.64e13  # ns → days (force ns: pandas 3 defaults to us)
+    deltas = pd.Series(idx).diff().dropna()
+    gaps_days = deltas.dt.total_seconds().values / 86400.0
     gaps_days = gaps_days[gaps_days > 0]
     if gaps_days.size == 0:
         return "months"
@@ -238,7 +240,10 @@ def validate_series(
 
     seasonal_m = SEASONAL_PERIODS.get(requested, 0)
     diag.seasonal_periods = seasonal_m or None
-    diag.seasonality_supported = bool(seasonal_m) and diag.n_observed >= 2 * seasonal_m
+    # Allow seasonal models to be evaluated if we have at least 1 full cycle,
+    # rather than strictly requiring 2. The cross-validation backtest will
+    # penalize overfitting if the seasonal model fails to generalize.
+    diag.seasonality_supported = bool(seasonal_m) and diag.n_observed >= seasonal_m
 
     diag.history_to_horizon_ratio = (
         round(diag.n_observed / horizon, 3) if horizon > 0 else 0.0

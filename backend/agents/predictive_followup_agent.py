@@ -374,14 +374,17 @@ def _handle_deterministic_calculation(message: str, intent_data: dict, context: 
         # Do not destroy the raw forecast results. Instead, pass insights through derived_insights.
         task_type = "growth_analysis" if is_growth else "grouped_ranking"
         
-        # We need a dummy structure that ml_agent's chart builder accepts, or we update the builder
-        # But we must NOT mutate new_result["prediction"]["predictions"].
-        class DummyResult:
-            pass
-        dummy = DummyResult()
-        dummy.forecast_ranking = sorted_preds
-        dummy.dimensions = pred_data.get("dimensions", [])
-        dummy.target_column = pred_data.get("target_column", "")
+        from prediction.schemas import UniversalPredictionResult
+        dummy = UniversalPredictionResult(
+            table_name=pred_data.get("table_name", ""),
+            task_type=task_type,
+            target_column=pred_data.get("target_column", ""),
+            date_column=pred_data.get("date_column", ""),
+            forecast_ranking=sorted_preds,
+            dimensions=pred_data.get("dimensions", []),
+            raw_forecast_results=pred_data.get("raw_forecast_results", []),
+            count=len(sorted_preds)
+        )
         
         viz_metadata = {
             "mode": "forecast",
@@ -550,7 +553,7 @@ def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict
         top_hierarchical_preds = []
         for parent_key, children in hierarchy.items():
             children.sort(key=lambda x: x["final_value"], reverse=True)
-            top_children = children[:3]
+            top_children = children[:5]  # Show up to 5 instead of 3
             
             part = f"**{parent_key}**:\n"
             for i, c in enumerate(top_children, 1):
@@ -559,6 +562,7 @@ def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict
                 # Add to a flat list for visualization
                 top_hierarchical_preds.append({
                     "group": f"{parent_key} - {c['child']}",
+                    "group_dict": {**{d: parent_key.split(" - ")[j] for j, d in enumerate(parent_dims)}, child_dim: c['child']},
                     "final_value": c['final_value'],
                     "historical": [],
                     "forecast": c['forecast']
@@ -570,12 +574,17 @@ def _handle_hierarchical_forecast(message: str, intent_data: dict, context: dict
         # Update visualization to use the derived_insights
         pred_dict = dataclasses.asdict(prediction_result)
         
-        class DummyResult:
-            pass
-        dummy = DummyResult()
-        dummy.forecast_ranking = top_hierarchical_preds
-        dummy.dimensions = target_dims
-        dummy.target_column = target
+        from prediction.schemas import UniversalPredictionResult
+        dummy = UniversalPredictionResult(
+            table_name=pred_data.get("table_name", ""),
+            task_type="hierarchical_ranking",
+            target_column=target,
+            date_column=pred_data.get("date_column", ""),
+            forecast_ranking=top_hierarchical_preds,
+            dimensions=target_dims,
+            raw_forecast_results=top_hierarchical_preds,
+            count=len(top_hierarchical_preds)
+        )
         
         viz_metadata = {
             "mode": "forecast",

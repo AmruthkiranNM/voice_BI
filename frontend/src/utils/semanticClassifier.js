@@ -167,16 +167,23 @@ export function resolveVisualizationSpec(result, intent = '', query = '', plan =
       .map(m => m.toLowerCase().replace(/[^a-z0-9]/g, ''));
   }
 
-  const potentialMeasures = columnsProfile
-    .filter(c => {
-      if (explicitMetrics.length > 0) {
-        const cNorm = c.column.toLowerCase().replace(/[^a-z0-9]/g, '');
-        // If explicit metrics provided, it MUST be one of them or close to it
-        return explicitMetrics.some(m => cNorm.includes(m) || m.includes(cNorm));
-      }
-      return c.measureScore > 0;
-    })
+  let potentialMeasures = columnsProfile
+    .filter(c => c.measureScore > 0)
     .sort((a, b) => b.measureScore - a.measureScore);
+
+  if (explicitMetrics.length > 0 && potentialMeasures.length > 0) {
+    const filteredMeasures = potentialMeasures.filter(c => {
+      const cNorm = c.column.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return explicitMetrics.some(m => cNorm.includes(m) || m.includes(cNorm));
+    });
+    
+    // Only apply the strict filtering if it actually matched something.
+    // If the LLM used a different alias (e.g. "sales" instead of "revenue"),
+    // fallback to the highest scored measure so the chart doesn't disappear.
+    if (filteredMeasures.length > 0) {
+      potentialMeasures = filteredMeasures;
+    }
+  }
 
   if (potentialMeasures.length > 0) {
     primaryMeasure = potentialMeasures[0];

@@ -99,14 +99,23 @@ def build_folds(series: pd.Series, horizon: int) -> list[tuple[int, int]]:
     ``series[train_end:val_end]`` — strictly later periods, never overlapping.
     Folds step backwards from the end of the series so the most recent data is
     always used for scoring at least once.
+
+    Validation horizon is set to match the actual forecast horizon as closely
+    as possible, subject to not starving the training slice. For a 12-month
+    forecast, scoring models only 1-step ahead selects level-only models that
+    look good short-term but produce uninformative flat forecasts.
     """
     n = len(series)
     if n < MIN_TRAIN_OBSERVATIONS + 1:
         return []
 
-    # Validation window: as long as the requested horizon, but never so long
-    # that it starves the training slice.
-    h_val = max(1, min(int(horizon), n // 4 if n >= 8 else 1))
+    # Validation window: aim for horizon // 2 steps so the model is tested
+    # over a horizon representative of the actual task, while still leaving
+    # enough training history for the earliest fold.
+    #   - Never more than n // 3 so the training slice stays meaningful.
+    #   - At least 1 so we always have some validation.
+    target_val = max(1, horizon // 2)
+    h_val = max(1, min(target_val, n // 3))
 
     folds: list[tuple[int, int]] = []
     for i in range(MAX_FOLDS):
@@ -240,6 +249,38 @@ def _score_candidate(
 # Public entry point
 # ──────────────────────────────────────────────────────────
 
+# Models that produce inherently flat (level-only) forecasts. When a trending
+# series can be better described by a trend model at nearly equal validation
+# cost, prefer the trend model even if the level model scored marginally better.
+_FLAT_MODEL_KEYS = frozenset({"naive", "moving_average", "simple_exp_smoothing"})
+
+
+def _series_has_significant_trend(series: pd.Series) -> bool:
+    """
+    Return True when the observed series carries a detectable linear trend
+    relative to its own noise level.
+
+    Uses the ratio of the OLS slope (extrapolated one standard deviation of
+    index units) to the residual standard deviation. A value above 0.3 means
+    the trend explains more than 30 % of one period's worth of variation —
+    strong enough to justify preferring a trend model over a flat one.
+
+    This is purely data-driven: no hard-coded threshold for any domain.
+    """
+    observed = series.dropna()
+    if len(observed) < 4:
+        return False
+    x = np.arange(len(observed), dtype=float)
+    slope, intercept = np.polyfit(x, observed.values.astype(float), 1)
+    fitted = slope * x + intercept
+    residuals = observed.values.astype(float) - fitted
+    std_resid = float(np.std(residuals))
+    if std_resid <= 0:
+        return abs(slope) > 0
+    # |slope| / std_resid > 0.3 means one extra period shifts the fit by >30%
+    # of one residual standard deviation — a meaningful trend.
+    return abs(slope) / std_resid > 0.30
+
 def select_and_fit(
     series: pd.Series,
     diagnostics: SeriesDiagnostics,
@@ -357,6 +398,40 @@ def select_and_fit(
 
     eligible.sort(key=sort_key)
     winner = eligible[0]
+
+    # ── Trend-aware tie-breaking ──────────────────────────────────────────
+    # Level-only models (Naive, MA, SES) produce flat forecasts by design.
+    # When the series carries a statistically significant trend, a flat
+    # forecast is misleading even if it scored marginally better on the
+    # short validation windows (because short validation disproportionately
+    # rewards level accuracy over long-horizon shape accuracy).
+    #
+    # If the winning model is flat-producing AND the series has a significant
+    # trend AND a trend-aware model (Drift, Holt, Damped Holt) is within
+    # 10 % of the winner's primary score, promote that trend model instead.
+    # The tolerance (10 %) is generous: validation uncertainty on short series
+    # easily swamps differences smaller than that, so both models are
+    # effectively tied in evidence.
+    if winner.model_key in _FLAT_MODEL_KEYS and _series_has_significant_trend(series):
+        trend_keys = {"drift", "holt_linear", "damped_holt"}
+        trend_eligible = [s for s in eligible if s.model_key in trend_keys]
+        if trend_eligible:
+            best_trend = trend_eligible[0]           # already sorted by score
+            w_score = winner.mase if use_mase else winner.mae
+            t_score = best_trend.mase if use_mase else best_trend.mae
+            if (w_score is not None and t_score is not None
+                    and t_score <= w_score * 1.10):
+                logger.info(
+                    "[Selection] Trend detected; promoting '%s' (score=%.4f) "
+                    "over flat model '%s' (score=%.4f) within 10%% tolerance.",
+                    best_trend.model_key, t_score, winner.model_key, w_score,
+                )
+                meta.notes.append(
+                    f"Series shows a significant trend; '{best_trend.model_label}' "
+                    f"(score={t_score:.4f}) preferred over flat model "
+                    f"'{winner.model_label}' (score={w_score:.4f}) within 10% tolerance."
+                )
+                winner = best_trend
 
     naive_score = next((s for s in eligible if s.model_key == "naive"), None)
     if naive_score is not None:

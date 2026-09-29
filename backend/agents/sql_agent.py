@@ -43,7 +43,17 @@ CRITICAL RULES:
   * For growth %, compute: ROUND(100.0 * (new - old) / NULLIF(old, 0), 2) AS growth_pct.
   * For ranking, use ORDER BY ... DESC LIMIT N.
 - Today's date is {today}.
-- Use proper JOINs when data spans multiple tables.
+- MULTIPLE ANALYTICAL QUESTIONS (COMPOUND QUERIES):
+  * You may use multiple CTEs inside one WITH statement to solve multi-step analytical requests.
+  * You MUST return exactly one PostgreSQL SELECT/WITH statement.
+  * Never return multiple SELECT statements.
+  * Never separate statements using semicolons.
+  * If the user asks multiple analytical subquestions that can be represented in one relational result, combine them using CTEs and UNION ALL. (e.g. Add a 'result_type' column to distinguish rows from different parts of the question).
+  * If they cannot be represented in one result, do your best to combine them, but never output two independent SELECT statements.
+- LIMIT RULES:
+  * Do not automatically assume plural nouns (like "bars") mean exactly one result with LIMIT 1.
+  * If the question asks for "highest selling bar" (singular), LIMIT 1 is appropriate.
+  * If the question asks for "highest selling bars" (plural), return the ranked set without a LIMIT, unless an explicit number is given (e.g. "top 3").
 - Output ONLY the raw SQL query — no markdown, no explanation, no code fences.
 {retry_section}
 ═══════════════════════════════════════

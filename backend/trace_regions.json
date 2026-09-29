@@ -1,0 +1,2394 @@
+{
+  "result": {
+    "pipeline_type": "PREDICTIVE",
+    "prediction": {
+      "config": {
+        "prediction_type": "forecasting",
+        "table": "sales",
+        "dataset_tables": [
+          "sales"
+        ],
+        "target": "amount",
+        "target_request": "revenue",
+        "target_semantics": {
+          "dtype": "numeric",
+          "semantic_role": "measure",
+          "n_distinct": 2138,
+          "is_binary": false,
+          "is_continuous": true,
+          "supported": [
+            "regression",
+            "forecasting"
+          ],
+          "reason": "'amount' is a continuous numeric measure (2138 distinct values). It supports regression and time-series forecasting."
+        },
+        "aggregation": "sum",
+        "time_column": "saledate",
+        "time_frequency": "months",
+        "horizon": 12,
+        "forecast_start": "2022-04-30 00:00:00",
+        "forecast_end": "2023-03-31 00:00:00",
+        "history_start": "2021-01-01 00:00:00",
+        "history_end": "2022-03-31 00:00:00",
+        "group_dimensions": [
+          "region"
+        ],
+        "dimension_specs": [
+          {
+            "target_table": "geo",
+            "group_column": "region",
+            "join_key_base": "geoid",
+            "join_key_target": "geoid",
+            "requires_join": true,
+            "semantic_hint": "region",
+            "resolution_method": "exact_name",
+            "resolution_confidence": 1.0,
+            "n_distinct": 3,
+            "ambiguous": false,
+            "runner_up": null
+          }
+        ],
+        "dimension_origin": "new",
+        "filters": [],
+        "operations": [],
+        "top_n": null,
+        "ranking_metric": "sum",
+        "growth_baseline_periods": 12,
+        "compare_against": null,
+        "model_strategy": "auto",
+        "confidence_level": 0.95,
+        "feature_columns": [],
+        "question": "Forecast revenue by region for the next 12 months.",
+        "source_entities": [],
+        "source_leader": null,
+        "resolved_by": {
+          "target": "interpreter",
+          "prediction_type": "The question asks about future periods and 'amount' is a continuous measure with a time axis.",
+          "time_column": "saledate (span 454 days, ~days)",
+          "horizon": "explicit"
+        },
+        "warnings": [],
+        "clarification": null,
+        "status": "ok",
+        "errors": [],
+        "result_granularity": "region"
+      },
+      "status": "ok",
+      "dataset_context": {
+        "table": "sales",
+        "rows": 7617,
+        "time_column": "saledate",
+        "history_start": "2021-01-01 00:00:00",
+        "history_end": "2022-03-31 00:00:00",
+        "frequency": "months"
+      },
+      "historical_rows": [
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-01-31 00:00:00",
+          "value": 1396661.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-02-28 00:00:00",
+          "value": 1525965.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-03-31 00:00:00",
+          "value": 1598667.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-04-30 00:00:00",
+          "value": 1404466.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-05-31 00:00:00",
+          "value": 1354717.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-06-30 00:00:00",
+          "value": 1242486.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-07-31 00:00:00",
+          "value": 1112622.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-08-31 00:00:00",
+          "value": 1586060.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-09-30 00:00:00",
+          "value": 1288322.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-10-31 00:00:00",
+          "value": 1404095.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-11-30 00:00:00",
+          "value": 1650047.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2021-12-31 00:00:00",
+          "value": 1637713.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-01-31 00:00:00",
+          "value": 2697065.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-02-28 00:00:00",
+          "value": 938028.0
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-03-31 00:00:00",
+          "value": 1172409.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-01-31 00:00:00",
+          "value": 1020201.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-02-28 00:00:00",
+          "value": 996219.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-03-31 00:00:00",
+          "value": 1106224.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-04-30 00:00:00",
+          "value": 980392.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-05-31 00:00:00",
+          "value": 920101.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-06-30 00:00:00",
+          "value": 918918.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-07-31 00:00:00",
+          "value": 926198.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-08-31 00:00:00",
+          "value": 935697.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-09-30 00:00:00",
+          "value": 666148.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-10-31 00:00:00",
+          "value": 950453.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-11-30 00:00:00",
+          "value": 858746.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2021-12-31 00:00:00",
+          "value": 819826.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-01-31 00:00:00",
+          "value": 1770440.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-02-28 00:00:00",
+          "value": 717332.0
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-03-31 00:00:00",
+          "value": 775719.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-01-31 00:00:00",
+          "value": 540330.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-02-28 00:00:00",
+          "value": 514542.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-03-31 00:00:00",
+          "value": 485884.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-04-30 00:00:00",
+          "value": 500395.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-05-31 00:00:00",
+          "value": 519673.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-06-30 00:00:00",
+          "value": 464758.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-07-31 00:00:00",
+          "value": 414015.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-08-31 00:00:00",
+          "value": 463519.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-09-30 00:00:00",
+          "value": 407463.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-10-31 00:00:00",
+          "value": 419559.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-11-30 00:00:00",
+          "value": 454762.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2021-12-31 00:00:00",
+          "value": 482510.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-01-31 00:00:00",
+          "value": 813414.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-02-28 00:00:00",
+          "value": 346283.0
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-03-31 00:00:00",
+          "value": 362502.0
+        }
+      ],
+      "forecast_rows": [
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-04-30 00:00:00",
+          "value": 1172409.0,
+          "lower": 273812.11814510636,
+          "upper": 2071005.8818548936
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-05-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 2443216.8974253647
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-06-30 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 2728824.4548956435
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-07-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 2969602.7637097873
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-08-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 3181732.7121968893
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-09-30 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 3373512.845000509
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-10-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 3549872.878286138
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-11-30 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 3714024.794850729
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2022-12-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 3868199.645564681
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2023-01-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 4014021.844986695
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2023-02-28 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 4152717.6948960028
+        },
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "period": "2023-03-31 00:00:00",
+          "value": 1172409.0,
+          "lower": 0.0,
+          "upper": 4285239.909791287
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-04-30 00:00:00",
+          "value": 726242.1270059008,
+          "lower": 128787.7657332517,
+          "upper": 1323696.48827855
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-05-31 00:00:00",
+          "value": 706039.3935870036,
+          "lower": 0.0,
+          "upper": 1550967.4541977388
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-06-30 00:00:00",
+          "value": 686038.6875022954,
+          "lower": 0.0,
+          "upper": 1720859.9964301349
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-07-31 00:00:00",
+          "value": 666237.9884784343,
+          "lower": 0.0,
+          "upper": 1861146.7110237326
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-08-31 00:00:00",
+          "value": 646635.2964448116,
+          "lower": 0.0,
+          "upper": 1982583.861704173
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-09-30 00:00:00",
+          "value": 627228.6313315254,
+          "lower": 0.0,
+          "upper": 2090686.9610499544
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-10-31 00:00:00",
+          "value": 608016.0328693719,
+          "lower": 0.0,
+          "upper": 2188731.692507741
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-11-30 00:00:00",
+          "value": 588995.56039184,
+          "lower": 0.0,
+          "upper": 2278851.6816133107
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2022-12-31 00:00:00",
+          "value": 570165.2926390833,
+          "lower": 0.0,
+          "upper": 2362528.376457031
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2023-01-31 00:00:00",
+          "value": 551523.3275638544,
+          "lower": 0.0,
+          "upper": 2440839.907186521
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2023-02-28 00:00:00",
+          "value": 533067.7821393777,
+          "lower": 0.0,
+          "upper": 2514599.727842197
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "period": "2023-03-31 00:00:00",
+          "value": 514796.79216914566,
+          "lower": 0.0,
+          "upper": 2584439.410024825
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-04-30 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 238615.7282405909,
+          "upper": 776183.6050927425
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-05-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 127281.77559645538,
+          "upper": 887517.557736878
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-06-30 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 41852.22905423876,
+          "upper": 972947.1042790946
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-07-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1044967.5435188182
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-08-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1108418.82424749
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-09-30 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1165783.1668662047
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-10-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1218535.124150561
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-11-30 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1267635.4488070894
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2022-12-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1313751.4819448942
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2023-01-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1357369.1105635194
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2023-02-28 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1398855.140099949
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "period": "2023-03-31 00:00:00",
+          "value": 507399.6666666667,
+          "lower": 0.0,
+          "upper": 1438494.5418915225
+        }
+      ],
+      "aggregated_rows": [
+        {
+          "group": "APAC",
+          "group_values": {
+            "region": "APAC"
+          },
+          "value": 14068908.0,
+          "status": "ok",
+          "reason": "",
+          "is_fallback": false
+        },
+        {
+          "group": "Americas",
+          "group_values": {
+            "region": "Americas"
+          },
+          "value": 7424986.912122644,
+          "status": "ok",
+          "reason": "",
+          "is_fallback": false
+        },
+        {
+          "group": "Europe",
+          "group_values": {
+            "region": "Europe"
+          },
+          "value": 6088796.000000001,
+          "status": "ok",
+          "reason": "",
+          "is_fallback": false
+        }
+      ],
+      "ranking_rows": [],
+      "top_rows": [],
+      "growth_rows": [],
+      "comparison": null,
+      "row_predictions": [],
+      "model_metadata": {
+        "per_group": {
+          "APAC": {
+            "selected_model_key": "naive",
+            "selected_model_label": "Naive (last value)",
+            "selection_method": "rolling_origin_backtest",
+            "selection_metric": "mase",
+            "selected_score": 2.040754,
+            "beats_naive": false,
+            "n_folds": 2,
+            "validation_horizon": 12,
+            "candidates": [
+              {
+                "model_key": "naive",
+                "model_label": "Naive (last value)",
+                "eligible": true,
+                "reason": "",
+                "mae": 317173.5,
+                "rmse": 401868.405124,
+                "mase": 2.040754,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 140288.4,
+                    "rmse": 162217.047775,
+                    "mase": 1.258316
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 494058.6,
+                    "rmse": 641519.762472,
+                    "mase": 2.823192
+                  }
+                ]
+              },
+              {
+                "model_key": "drift",
+                "model_label": "Drift",
+                "eligible": true,
+                "reason": "",
+                "mae": 318469.9,
+                "rmse": 404009.613326,
+                "mase": 2.051575,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 142385.6,
+                    "rmse": 166897.880166,
+                    "mase": 1.277127
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 494554.2,
+                    "rmse": 641121.346485,
+                    "mase": 2.826024
+                  }
+                ]
+              },
+              {
+                "model_key": "moving_average",
+                "model_label": "Moving Average",
+                "eligible": true,
+                "reason": "",
+                "mae": 334461.4,
+                "rmse": 418945.383023,
+                "mase": 2.203,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 179277.0,
+                    "rmse": 203423.441755,
+                    "mase": 1.608024
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 489645.8,
+                    "rmse": 634467.32429,
+                    "mase": 2.797976
+                  }
+                ]
+              },
+              {
+                "model_key": "simple_exp_smoothing",
+                "model_label": "Simple Exponential Smoothing",
+                "eligible": true,
+                "reason": "",
+                "mae": 328347.429075,
+                "rmse": 416225.808194,
+                "mase": 2.13475,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 158809.161772,
+                    "rmse": 184269.23528,
+                    "mase": 1.424438
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 497885.696378,
+                    "rmse": 648182.381109,
+                    "mase": 2.845061
+                  }
+                ]
+              },
+              {
+                "model_key": "holt_linear",
+                "model_label": "Holt Linear Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 396106.479338,
+                "rmse": 527551.865491,
+                "mase": 2.736778,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 290803.167886,
+                    "rmse": 364939.991837,
+                    "mase": 2.608357
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 501409.790789,
+                    "rmse": 690163.739146,
+                    "mase": 2.865199
+                  }
+                ]
+              },
+              {
+                "model_key": "damped_holt",
+                "model_label": "Damped Holt Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 336346.3591,
+                "rmse": 439173.676279,
+                "mase": 2.201298,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 171613.202773,
+                    "rmse": 194193.007096,
+                    "mase": 1.539284
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 501079.515427,
+                    "rmse": 684154.345461,
+                    "mase": 2.863312
+                  }
+                ]
+              },
+              {
+                "model_key": "seasonal_naive",
+                "model_label": "Seasonal Naive",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              },
+              {
+                "model_key": "holt_winters_additive",
+                "model_label": "Holt-Winters (additive seasonal)",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              }
+            ],
+            "n_imputed_for_fit": 0,
+            "floor_applied": true,
+            "interval_source": "validation_residuals",
+            "notes": [
+              "No candidate beat the naive baseline on validation; the forecast carries little information beyond the last observed value.",
+              "Best-available model, but MASE is 2.04 (>= 1): the series is noisy relative to its own period-to-period movement, so treat the point forecast as indicative rather than precise."
+            ]
+          },
+          "Americas": {
+            "selected_model_key": "damped_holt",
+            "selected_model_label": "Damped Holt Trend",
+            "selection_method": "rolling_origin_backtest",
+            "selection_metric": "mase",
+            "selected_score": 1.6141,
+            "beats_naive": true,
+            "n_folds": 2,
+            "validation_horizon": 12,
+            "candidates": [
+              {
+                "model_key": "naive",
+                "model_label": "Naive (last value)",
+                "eligible": true,
+                "reason": "",
+                "mae": 175735.7,
+                "rmse": 255142.242635,
+                "mase": 1.847148,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 61436.2,
+                    "rmse": 114625.632585,
+                    "mase": 0.767689
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 290035.2,
+                    "rmse": 395658.852686,
+                    "mase": 2.926607
+                  }
+                ]
+              },
+              {
+                "model_key": "drift",
+                "model_label": "Drift",
+                "eligible": true,
+                "reason": "",
+                "mae": 186041.8,
+                "rmse": 253508.073197,
+                "mase": 1.992705,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 95998.0,
+                    "rmse": 109348.982576,
+                    "mase": 1.199563
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 276085.6,
+                    "rmse": 397667.163817,
+                    "mase": 2.785848
+                  }
+                ]
+              },
+              {
+                "model_key": "moving_average",
+                "model_label": "Moving Average",
+                "eligible": true,
+                "reason": "",
+                "mae": 178085.6,
+                "rmse": 290081.008895,
+                "mase": 1.944602,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 122756.2,
+                    "rmse": 162967.119728,
+                    "mase": 1.533925
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 233415.0,
+                    "rmse": 417194.898061,
+                    "mase": 2.355279
+                  }
+                ]
+              },
+              {
+                "model_key": "simple_exp_smoothing",
+                "model_label": "Simple Exponential Smoothing",
+                "eligible": true,
+                "reason": "",
+                "mae": 193589.215268,
+                "rmse": 292735.209203,
+                "mase": 2.122173,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 140327.3545,
+                    "rmse": 176581.323744,
+                    "mase": 1.753489
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 246851.076036,
+                    "rmse": 408889.094662,
+                    "mase": 2.490857
+                  }
+                ]
+              },
+              {
+                "model_key": "holt_linear",
+                "model_label": "Holt Linear Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 156376.758828,
+                "rmse": 277370.545226,
+                "mase": 1.674226,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 80079.217589,
+                    "rmse": 103785.117638,
+                    "mase": 1.000646
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 232674.300066,
+                    "rmse": 450955.972815,
+                    "mase": 2.347805
+                  }
+                ]
+              },
+              {
+                "model_key": "damped_holt",
+                "model_label": "Damped Holt Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 150647.212487,
+                "rmse": 273064.249603,
+                "mase": 1.6141,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 78157.01765,
+                    "rmse": 103505.984683,
+                    "mase": 0.976627
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 223137.407324,
+                    "rmse": 442622.514523,
+                    "mase": 2.251573
+                  }
+                ]
+              },
+              {
+                "model_key": "seasonal_naive",
+                "model_label": "Seasonal Naive",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              },
+              {
+                "model_key": "holt_winters_additive",
+                "model_label": "Holt-Winters (additive seasonal)",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              }
+            ],
+            "n_imputed_for_fit": 0,
+            "floor_applied": true,
+            "interval_source": "validation_residuals",
+            "notes": [
+              "Best-available model, but MASE is 1.61 (>= 1): the series is noisy relative to its own period-to-period movement, so treat the point forecast as indicative rather than precise."
+            ]
+          },
+          "Europe": {
+            "selected_model_key": "moving_average",
+            "selected_model_label": "Moving Average",
+            "selection_method": "rolling_origin_backtest",
+            "selection_metric": "mase",
+            "selected_score": 3.311219,
+            "beats_naive": true,
+            "n_folds": 2,
+            "validation_horizon": 12,
+            "candidates": [
+              {
+                "model_key": "naive",
+                "model_label": "Naive (last value)",
+                "eligible": true,
+                "reason": "",
+                "mae": 105139.3,
+                "rmse": 136601.34057,
+                "mase": 3.742854,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 85810.2,
+                    "rmse": 89382.816023,
+                    "mase": 3.890075
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 124468.4,
+                    "rmse": 183819.865118,
+                    "mase": 3.595632
+                  }
+                ]
+              },
+              {
+                "model_key": "drift",
+                "model_label": "Drift",
+                "eligible": true,
+                "reason": "",
+                "mae": 95374.825,
+                "rmse": 136663.195456,
+                "mase": 3.333385,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 70317.45,
+                    "rmse": 73644.487179,
+                    "mase": 3.187735
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 120432.2,
+                    "rmse": 199681.903733,
+                    "mase": 3.479035
+                  }
+                ]
+              },
+              {
+                "model_key": "moving_average",
+                "model_label": "Moving Average",
+                "eligible": true,
+                "reason": "",
+                "mae": 95232.666667,
+                "rmse": 126237.680766,
+                "mase": 3.311219,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 68121.2,
+                    "rmse": 72569.93362,
+                    "mase": 3.088171
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 122344.133333,
+                    "rmse": 179905.427911,
+                    "mase": 3.534267
+                  }
+                ]
+              },
+              {
+                "model_key": "simple_exp_smoothing",
+                "model_label": "Simple Exponential Smoothing",
+                "eligible": true,
+                "reason": "",
+                "mae": 105072.551085,
+                "rmse": 136518.787853,
+                "mase": 3.74013,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 85713.450823,
+                    "rmse": 89289.938001,
+                    "mase": 3.885689
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 124431.651347,
+                    "rmse": 183747.637705,
+                    "mase": 3.594571
+                  }
+                ]
+              },
+              {
+                "model_key": "holt_linear",
+                "model_label": "Holt Linear Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 120621.590226,
+                "rmse": 162740.382226,
+                "mase": 4.433859,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 115453.942196,
+                    "rmse": 120568.890788,
+                    "mase": 5.233929
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 125789.238257,
+                    "rmse": 204911.873664,
+                    "mase": 3.633788
+                  }
+                ]
+              },
+              {
+                "model_key": "damped_holt",
+                "model_label": "Damped Holt Trend",
+                "eligible": true,
+                "reason": "",
+                "mae": 115855.039382,
+                "rmse": 157870.935314,
+                "mase": 4.271288,
+                "n_folds": 2,
+                "folds": [
+                  {
+                    "fold": 1,
+                    "train_end": "2021-05-31 00:00:00",
+                    "n_train": 5,
+                    "n_validation": 5,
+                    "mae": 112428.770318,
+                    "rmse": 117316.282143,
+                    "mase": 5.096788
+                  },
+                  {
+                    "fold": 2,
+                    "train_end": "2021-10-31 00:00:00",
+                    "n_train": 10,
+                    "n_validation": 5,
+                    "mae": 119281.308446,
+                    "rmse": 198425.588485,
+                    "mase": 3.445788
+                  }
+                ]
+              },
+              {
+                "model_key": "seasonal_naive",
+                "model_label": "Seasonal Naive",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              },
+              {
+                "model_key": "holt_winters_additive",
+                "model_label": "Holt-Winters (additive seasonal)",
+                "eligible": false,
+                "reason": "Could not be fitted and scored on any validation fold.",
+                "mae": null,
+                "rmse": null,
+                "mase": null,
+                "n_folds": 0,
+                "folds": []
+              }
+            ],
+            "n_imputed_for_fit": 0,
+            "floor_applied": true,
+            "interval_source": "validation_residuals",
+            "notes": [
+              "Best-available model, but MASE is 3.31 (>= 1): the series is noisy relative to its own period-to-period movement, so treat the point forecast as indicative rather than precise."
+            ]
+          }
+        }
+      },
+      "validation_metrics": {},
+      "series_diagnostics": {
+        "per_group": {
+          "APAC": {
+            "status": "ok",
+            "reason": "",
+            "requested_frequency": "months",
+            "inferred_frequency": "days",
+            "frequency_mismatch": false,
+            "first_period": "2021-01-31 00:00:00",
+            "last_period": "2022-03-31 00:00:00",
+            "n_periods": 15,
+            "n_observed": 15,
+            "n_missing": 0,
+            "missing_ratio": 0.0,
+            "n_trimmed_partial": 0,
+            "duplicate_timestamps": 13,
+            "is_constant": false,
+            "is_all_zero": false,
+            "n_outliers": 0,
+            "outlier_periods": [],
+            "seasonal_periods": 12,
+            "seasonality_supported": true,
+            "horizon": 12,
+            "history_to_horizon_ratio": 1.25,
+            "horizon_exceeds_history": false,
+            "warnings": [
+              "Only 15 periods of history for a 12-period horizon (less than 2x); treat the later periods as indicative only."
+            ]
+          },
+          "Americas": {
+            "status": "ok",
+            "reason": "",
+            "requested_frequency": "months",
+            "inferred_frequency": "days",
+            "frequency_mismatch": false,
+            "first_period": "2021-01-31 00:00:00",
+            "last_period": "2022-03-31 00:00:00",
+            "n_periods": 15,
+            "n_observed": 15,
+            "n_missing": 0,
+            "missing_ratio": 0.0,
+            "n_trimmed_partial": 0,
+            "duplicate_timestamps": 9,
+            "is_constant": false,
+            "is_all_zero": false,
+            "n_outliers": 1,
+            "outlier_periods": [
+              "2022-01-31 00:00:00"
+            ],
+            "seasonal_periods": 12,
+            "seasonality_supported": true,
+            "horizon": 12,
+            "history_to_horizon_ratio": 1.25,
+            "horizon_exceeds_history": false,
+            "warnings": [
+              "Only 15 periods of history for a 12-period horizon (less than 2x); treat the later periods as indicative only.",
+              "1 extreme value(s) detected; they are retained, and model selection favours whichever model handles them best."
+            ]
+          },
+          "Europe": {
+            "status": "ok",
+            "reason": "",
+            "requested_frequency": "months",
+            "inferred_frequency": "days",
+            "frequency_mismatch": false,
+            "first_period": "2021-01-31 00:00:00",
+            "last_period": "2022-03-31 00:00:00",
+            "n_periods": 15,
+            "n_observed": 15,
+            "n_missing": 0,
+            "missing_ratio": 0.0,
+            "n_trimmed_partial": 0,
+            "duplicate_timestamps": 1,
+            "is_constant": false,
+            "is_all_zero": false,
+            "n_outliers": 0,
+            "outlier_periods": [],
+            "seasonal_periods": 12,
+            "seasonality_supported": true,
+            "horizon": 12,
+            "history_to_horizon_ratio": 1.25,
+            "horizon_exceeds_history": false,
+            "warnings": [
+              "Only 15 periods of history for a 12-period horizon (less than 2x); treat the later periods as indicative only."
+            ]
+          }
+        }
+      },
+      "excluded_groups": [],
+      "result_granularity": "region",
+      "visualization": {
+        "prediction_type": "forecasting",
+        "target": "amount",
+        "dimensions": [
+          "region"
+        ],
+        "frequency": "months",
+        "horizon": 12,
+        "has_history": true,
+        "has_forecast": true,
+        "has_ranking": false,
+        "has_growth": false,
+        "has_comparison": false,
+        "n_groups": 3,
+        "views": [
+          "grouped_time_series"
+        ]
+      },
+      "warnings": [],
+      "errors": [],
+      "clarification": null,
+      "elapsed_ms": 594.3,
+      "target_column": "amount",
+      "dimensions": [
+        "region"
+      ],
+      "horizon": 12,
+      "table_name": "sales",
+      "ranking_metric": "sum",
+      "model_accuracy": 0.0
+    },
+    "config": {
+      "prediction_type": "forecasting",
+      "table": "sales",
+      "dataset_tables": [
+        "sales"
+      ],
+      "target": "amount",
+      "target_request": "revenue",
+      "target_semantics": {
+        "dtype": "numeric",
+        "semantic_role": "measure",
+        "n_distinct": 2138,
+        "is_binary": false,
+        "is_continuous": true,
+        "supported": [
+          "regression",
+          "forecasting"
+        ],
+        "reason": "'amount' is a continuous numeric measure (2138 distinct values). It supports regression and time-series forecasting."
+      },
+      "aggregation": "sum",
+      "time_column": "saledate",
+      "time_frequency": "months",
+      "horizon": 12,
+      "forecast_start": "2022-04-30 00:00:00",
+      "forecast_end": "2023-03-31 00:00:00",
+      "history_start": "2021-01-01 00:00:00",
+      "history_end": "2022-03-31 00:00:00",
+      "group_dimensions": [
+        "region"
+      ],
+      "dimension_specs": [
+        {
+          "target_table": "geo",
+          "group_column": "region",
+          "join_key_base": "geoid",
+          "join_key_target": "geoid",
+          "requires_join": true,
+          "semantic_hint": "region",
+          "resolution_method": "exact_name",
+          "resolution_confidence": 1.0,
+          "n_distinct": 3,
+          "ambiguous": false,
+          "runner_up": null
+        }
+      ],
+      "dimension_origin": "new",
+      "filters": [],
+      "operations": [],
+      "top_n": null,
+      "ranking_metric": "sum",
+      "growth_baseline_periods": 12,
+      "compare_against": null,
+      "model_strategy": "auto",
+      "confidence_level": 0.95,
+      "feature_columns": [],
+      "question": "Forecast revenue by region for the next 12 months.",
+      "source_entities": [],
+      "source_leader": null,
+      "resolved_by": {
+        "target": "interpreter",
+        "prediction_type": "The question asks about future periods and 'amount' is a continuous measure with a time axis.",
+        "time_column": "saledate (span 454 days, ~days)",
+        "horizon": "explicit"
+      },
+      "warnings": [],
+      "clarification": null,
+      "status": "ok",
+      "errors": [],
+      "result_granularity": "region"
+    },
+    "visualization": {
+      "mode": "forecast",
+      "problem_type": "forecasting",
+      "semantics": {
+        "prediction_type": "forecasting",
+        "target": "amount",
+        "dimensions": [
+          "region"
+        ],
+        "frequency": "months",
+        "horizon": 12,
+        "has_history": true,
+        "has_forecast": true,
+        "has_ranking": false,
+        "has_growth": false,
+        "has_comparison": false,
+        "n_groups": 3,
+        "views": [
+          "grouped_time_series"
+        ]
+      },
+      "charts": [
+        {
+          "type": "grouped_time_series_forecast",
+          "title": "Forecast amount by region",
+          "dimension": "group",
+          "dimensions": [
+            "region"
+          ],
+          "data": [
+            {
+              "group": "APAC",
+              "group_dict": {
+                "region": "APAC"
+              },
+              "historical": [
+                {
+                  "date": "2021-01-31 00:00:00",
+                  "value": 1396661.0
+                },
+                {
+                  "date": "2021-02-28 00:00:00",
+                  "value": 1525965.0
+                },
+                {
+                  "date": "2021-03-31 00:00:00",
+                  "value": 1598667.0
+                },
+                {
+                  "date": "2021-04-30 00:00:00",
+                  "value": 1404466.0
+                },
+                {
+                  "date": "2021-05-31 00:00:00",
+                  "value": 1354717.0
+                },
+                {
+                  "date": "2021-06-30 00:00:00",
+                  "value": 1242486.0
+                },
+                {
+                  "date": "2021-07-31 00:00:00",
+                  "value": 1112622.0
+                },
+                {
+                  "date": "2021-08-31 00:00:00",
+                  "value": 1586060.0
+                },
+                {
+                  "date": "2021-09-30 00:00:00",
+                  "value": 1288322.0
+                },
+                {
+                  "date": "2021-10-31 00:00:00",
+                  "value": 1404095.0
+                },
+                {
+                  "date": "2021-11-30 00:00:00",
+                  "value": 1650047.0
+                },
+                {
+                  "date": "2021-12-31 00:00:00",
+                  "value": 1637713.0
+                },
+                {
+                  "date": "2022-01-31 00:00:00",
+                  "value": 2697065.0
+                },
+                {
+                  "date": "2022-02-28 00:00:00",
+                  "value": 938028.0
+                },
+                {
+                  "date": "2022-03-31 00:00:00",
+                  "value": 1172409.0
+                }
+              ],
+              "forecast": [
+                {
+                  "date": "2022-04-30 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 273812.11814510636,
+                  "upper": 2071005.8818548936
+                },
+                {
+                  "date": "2022-05-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 2443216.8974253647
+                },
+                {
+                  "date": "2022-06-30 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 2728824.4548956435
+                },
+                {
+                  "date": "2022-07-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 2969602.7637097873
+                },
+                {
+                  "date": "2022-08-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 3181732.7121968893
+                },
+                {
+                  "date": "2022-09-30 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 3373512.845000509
+                },
+                {
+                  "date": "2022-10-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 3549872.878286138
+                },
+                {
+                  "date": "2022-11-30 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 3714024.794850729
+                },
+                {
+                  "date": "2022-12-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 3868199.645564681
+                },
+                {
+                  "date": "2023-01-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 4014021.844986695
+                },
+                {
+                  "date": "2023-02-28 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 4152717.6948960028
+                },
+                {
+                  "date": "2023-03-31 00:00:00",
+                  "value": 1172409.0,
+                  "lower": 0.0,
+                  "upper": 4285239.909791287
+                }
+              ]
+            },
+            {
+              "group": "Americas",
+              "group_dict": {
+                "region": "Americas"
+              },
+              "historical": [
+                {
+                  "date": "2021-01-31 00:00:00",
+                  "value": 1020201.0
+                },
+                {
+                  "date": "2021-02-28 00:00:00",
+                  "value": 996219.0
+                },
+                {
+                  "date": "2021-03-31 00:00:00",
+                  "value": 1106224.0
+                },
+                {
+                  "date": "2021-04-30 00:00:00",
+                  "value": 980392.0
+                },
+                {
+                  "date": "2021-05-31 00:00:00",
+                  "value": 920101.0
+                },
+                {
+                  "date": "2021-06-30 00:00:00",
+                  "value": 918918.0
+                },
+                {
+                  "date": "2021-07-31 00:00:00",
+                  "value": 926198.0
+                },
+                {
+                  "date": "2021-08-31 00:00:00",
+                  "value": 935697.0
+                },
+                {
+                  "date": "2021-09-30 00:00:00",
+                  "value": 666148.0
+                },
+                {
+                  "date": "2021-10-31 00:00:00",
+                  "value": 950453.0
+                },
+                {
+                  "date": "2021-11-30 00:00:00",
+                  "value": 858746.0
+                },
+                {
+                  "date": "2021-12-31 00:00:00",
+                  "value": 819826.0
+                },
+                {
+                  "date": "2022-01-31 00:00:00",
+                  "value": 1770440.0
+                },
+                {
+                  "date": "2022-02-28 00:00:00",
+                  "value": 717332.0
+                },
+                {
+                  "date": "2022-03-31 00:00:00",
+                  "value": 775719.0
+                }
+              ],
+              "forecast": [
+                {
+                  "date": "2022-04-30 00:00:00",
+                  "value": 726242.1270059008,
+                  "lower": 128787.7657332517,
+                  "upper": 1323696.48827855
+                },
+                {
+                  "date": "2022-05-31 00:00:00",
+                  "value": 706039.3935870036,
+                  "lower": 0.0,
+                  "upper": 1550967.4541977388
+                },
+                {
+                  "date": "2022-06-30 00:00:00",
+                  "value": 686038.6875022954,
+                  "lower": 0.0,
+                  "upper": 1720859.9964301349
+                },
+                {
+                  "date": "2022-07-31 00:00:00",
+                  "value": 666237.9884784343,
+                  "lower": 0.0,
+                  "upper": 1861146.7110237326
+                },
+                {
+                  "date": "2022-08-31 00:00:00",
+                  "value": 646635.2964448116,
+                  "lower": 0.0,
+                  "upper": 1982583.861704173
+                },
+                {
+                  "date": "2022-09-30 00:00:00",
+                  "value": 627228.6313315254,
+                  "lower": 0.0,
+                  "upper": 2090686.9610499544
+                },
+                {
+                  "date": "2022-10-31 00:00:00",
+                  "value": 608016.0328693719,
+                  "lower": 0.0,
+                  "upper": 2188731.692507741
+                },
+                {
+                  "date": "2022-11-30 00:00:00",
+                  "value": 588995.56039184,
+                  "lower": 0.0,
+                  "upper": 2278851.6816133107
+                },
+                {
+                  "date": "2022-12-31 00:00:00",
+                  "value": 570165.2926390833,
+                  "lower": 0.0,
+                  "upper": 2362528.376457031
+                },
+                {
+                  "date": "2023-01-31 00:00:00",
+                  "value": 551523.3275638544,
+                  "lower": 0.0,
+                  "upper": 2440839.907186521
+                },
+                {
+                  "date": "2023-02-28 00:00:00",
+                  "value": 533067.7821393777,
+                  "lower": 0.0,
+                  "upper": 2514599.727842197
+                },
+                {
+                  "date": "2023-03-31 00:00:00",
+                  "value": 514796.79216914566,
+                  "lower": 0.0,
+                  "upper": 2584439.410024825
+                }
+              ]
+            },
+            {
+              "group": "Europe",
+              "group_dict": {
+                "region": "Europe"
+              },
+              "historical": [
+                {
+                  "date": "2021-01-31 00:00:00",
+                  "value": 540330.0
+                },
+                {
+                  "date": "2021-02-28 00:00:00",
+                  "value": 514542.0
+                },
+                {
+                  "date": "2021-03-31 00:00:00",
+                  "value": 485884.0
+                },
+                {
+                  "date": "2021-04-30 00:00:00",
+                  "value": 500395.0
+                },
+                {
+                  "date": "2021-05-31 00:00:00",
+                  "value": 519673.0
+                },
+                {
+                  "date": "2021-06-30 00:00:00",
+                  "value": 464758.0
+                },
+                {
+                  "date": "2021-07-31 00:00:00",
+                  "value": 414015.0
+                },
+                {
+                  "date": "2021-08-31 00:00:00",
+                  "value": 463519.0
+                },
+                {
+                  "date": "2021-09-30 00:00:00",
+                  "value": 407463.0
+                },
+                {
+                  "date": "2021-10-31 00:00:00",
+                  "value": 419559.0
+                },
+                {
+                  "date": "2021-11-30 00:00:00",
+                  "value": 454762.0
+                },
+                {
+                  "date": "2021-12-31 00:00:00",
+                  "value": 482510.0
+                },
+                {
+                  "date": "2022-01-31 00:00:00",
+                  "value": 813414.0
+                },
+                {
+                  "date": "2022-02-28 00:00:00",
+                  "value": 346283.0
+                },
+                {
+                  "date": "2022-03-31 00:00:00",
+                  "value": 362502.0
+                }
+              ],
+              "forecast": [
+                {
+                  "date": "2022-04-30 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 238615.7282405909,
+                  "upper": 776183.6050927425
+                },
+                {
+                  "date": "2022-05-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 127281.77559645538,
+                  "upper": 887517.557736878
+                },
+                {
+                  "date": "2022-06-30 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 41852.22905423876,
+                  "upper": 972947.1042790946
+                },
+                {
+                  "date": "2022-07-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1044967.5435188182
+                },
+                {
+                  "date": "2022-08-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1108418.82424749
+                },
+                {
+                  "date": "2022-09-30 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1165783.1668662047
+                },
+                {
+                  "date": "2022-10-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1218535.124150561
+                },
+                {
+                  "date": "2022-11-30 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1267635.4488070894
+                },
+                {
+                  "date": "2022-12-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1313751.4819448942
+                },
+                {
+                  "date": "2023-01-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1357369.1105635194
+                },
+                {
+                  "date": "2023-02-28 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1398855.140099949
+                },
+                {
+                  "date": "2023-03-31 00:00:00",
+                  "value": 507399.6666666667,
+                  "lower": 0.0,
+                  "upper": 1438494.5418915225
+                }
+              ]
+            }
+          ],
+          "shown": 3,
+          "total": 3,
+          "truncated": false,
+          "note": ""
+        }
+      ]
+    },
+    "columns": [
+      "metric",
+      "value"
+    ],
+    "rows": [
+      {
+        "metric": "APAC \u00b7 2022-04-30",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-05-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-06-30",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-07-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-08-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-09-30",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-10-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-11-30",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2022-12-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2023-01-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2023-02-28",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "APAC \u00b7 2023-03-31",
+        "value": "1,172,409.00"
+      },
+      {
+        "metric": "Americas \u00b7 2022-04-30",
+        "value": "726,242.13"
+      },
+      {
+        "metric": "Americas \u00b7 2022-05-31",
+        "value": "706,039.39"
+      },
+      {
+        "metric": "Americas \u00b7 2022-06-30",
+        "value": "686,038.69"
+      },
+      {
+        "metric": "Americas \u00b7 2022-07-31",
+        "value": "666,237.99"
+      },
+      {
+        "metric": "Americas \u00b7 2022-08-31",
+        "value": "646,635.30"
+      },
+      {
+        "metric": "Americas \u00b7 2022-09-30",
+        "value": "627,228.63"
+      },
+      {
+        "metric": "Americas \u00b7 2022-10-31",
+        "value": "608,016.03"
+      },
+      {
+        "metric": "Americas \u00b7 2022-11-30",
+        "value": "588,995.56"
+      },
+      {
+        "metric": "Americas \u00b7 2022-12-31",
+        "value": "570,165.29"
+      },
+      {
+        "metric": "Americas \u00b7 2023-01-31",
+        "value": "551,523.33"
+      },
+      {
+        "metric": "Americas \u00b7 2023-02-28",
+        "value": "533,067.78"
+      },
+      {
+        "metric": "Americas \u00b7 2023-03-31",
+        "value": "514,796.79"
+      },
+      {
+        "metric": "Europe \u00b7 2022-04-30",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-05-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-06-30",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-07-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-08-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-09-30",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-10-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-11-30",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2022-12-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2023-01-31",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2023-02-28",
+        "value": "507,399.67"
+      },
+      {
+        "metric": "Europe \u00b7 2023-03-31",
+        "value": "507,399.67"
+      }
+    ],
+    "row_count": 36,
+    "status": "ok",
+    "warnings": []
+  },
+  "insight": "The forecast for the next 12 months (April\u202f2022\u202f\u2013\u202fMarch\u202f2023) projects revenue of **$14,068,908** for APAC, **$7,424,986.91** for Americas, and **$6,088,796** for Europe.  \nThese totals were derived using the best\u2011performing models\u2014Damped Holt Trend, Moving Average, and Naive\u2014selected through chronological validation.",
+  "config": {
+    "prediction_type": "forecasting",
+    "table": "sales",
+    "dataset_tables": [
+      "sales"
+    ],
+    "target": "amount",
+    "target_request": "revenue",
+    "target_semantics": {
+      "dtype": "numeric",
+      "semantic_role": "measure",
+      "n_distinct": 2138,
+      "is_binary": false,
+      "is_continuous": true,
+      "supported": [
+        "regression",
+        "forecasting"
+      ],
+      "reason": "'amount' is a continuous numeric measure (2138 distinct values). It supports regression and time-series forecasting."
+    },
+    "aggregation": "sum",
+    "time_column": "saledate",
+    "time_frequency": "months",
+    "horizon": 12,
+    "forecast_start": "2022-04-30 00:00:00",
+    "forecast_end": "2023-03-31 00:00:00",
+    "history_start": "2021-01-01 00:00:00",
+    "history_end": "2022-03-31 00:00:00",
+    "group_dimensions": [
+      "region"
+    ],
+    "dimension_specs": [
+      {
+        "target_table": "geo",
+        "group_column": "region",
+        "join_key_base": "geoid",
+        "join_key_target": "geoid",
+        "requires_join": true,
+        "semantic_hint": "region",
+        "resolution_method": "exact_name",
+        "resolution_confidence": 1.0,
+        "n_distinct": 3,
+        "ambiguous": false,
+        "runner_up": null
+      }
+    ],
+    "dimension_origin": "new",
+    "filters": [],
+    "operations": [],
+    "top_n": null,
+    "ranking_metric": "sum",
+    "growth_baseline_periods": 12,
+    "compare_against": null,
+    "model_strategy": "auto",
+    "confidence_level": 0.95,
+    "feature_columns": [],
+    "question": "Forecast revenue by region for the next 12 months.",
+    "source_entities": [],
+    "source_leader": null,
+    "resolved_by": {
+      "target": "interpreter",
+      "prediction_type": "The question asks about future periods and 'amount' is a continuous measure with a time axis.",
+      "time_column": "saledate (span 454 days, ~days)",
+      "horizon": "explicit"
+    },
+    "warnings": [],
+    "clarification": null,
+    "status": "ok",
+    "errors": [],
+    "result_granularity": "region"
+  }
+}

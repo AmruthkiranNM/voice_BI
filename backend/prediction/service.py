@@ -298,7 +298,7 @@ def predict_rows(
 
         ranking_metric = "growth" if task_type == "growth_analysis" else "sum"
 
-        return predictor.predict_grouped_forecast(
+        res = predictor.predict_grouped_forecast(
             df=df,
             dimensions=dim_info_list,
             target_col=resolved_target_col,
@@ -308,6 +308,8 @@ def predict_rows(
             ranking_metric=ranking_metric,
             group_filter=group_filter,
         )
+        res.task_type = task_type
+        return res
 
     if task_type == "forecasting":
         logger.info(f"[Service] Executing forecasting for {table_name}")

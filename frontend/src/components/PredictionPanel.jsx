@@ -14,9 +14,15 @@ export default function PredictionPanel({ result, insight }) {
   const charts = visualization?.charts || [];
 
   // Per-row predictions live under `row_predictions`; `predictions` is the
+  // Per-row predictions live under `row_predictions`; `predictions` is the
   // legacy name kept for older payloads.
   const rowPredictions = prediction?.row_predictions || prediction?.predictions || [];
   const firstPred = rowPredictions[0] || null;
+
+  const isForecasting = prediction?.task_type && prediction.task_type.includes('forecast');
+  const meta = prediction?.model_metadata;
+  const diag = prediction?.series_diagnostics;
+  const hasMetadata = isForecasting && (meta || diag || prediction?.horizon);
 
   const accuracy = prediction?.model_accuracy;
 
@@ -25,7 +31,7 @@ export default function PredictionPanel({ result, insight }) {
   // — its series live per group in `raw_forecast_results` and reach this
   // component as `visualization.charts`, so keying the guard off row
   // predictions hid every grouped and multidimensional forecast entirely.
-  if (!charts.length && !firstPred) {
+  if (!charts.length && !firstPred && !isForecasting) {
     return (
       <div className="panel-card text-center py-10 text-zinc-400">
         <TbAlertTriangle className="w-8 h-8 mx-auto mb-3 text-amber-400" />
@@ -170,8 +176,6 @@ export default function PredictionPanel({ result, insight }) {
             <div className="flex-1 w-full relative">
               <ChartRenderer chart={chart} targetColumn={targetColumn} />
             </div>
-            {/* A chart may show fewer groups than were forecast. Say so, so a
-                capped chart is never mistaken for the full result. */}
             {chart.note && (
               <p className="mt-3 text-[11px] text-zinc-500 leading-relaxed">{chart.note}</p>
             )}
@@ -179,6 +183,85 @@ export default function PredictionPanel({ result, insight }) {
           );
         })}
       </div>
+
+      {hasMetadata && (
+        <div className="panel-card mt-6">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-4 flex items-center gap-2">
+            Technical Details
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+            {meta?.selected_model_label && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Selected Model</span>
+                <span className="text-zinc-200 font-mono">{meta.selected_model_label}</span>
+              </div>
+            )}
+            {diag?.inferred_frequency && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Frequency</span>
+                <span className="text-zinc-200 capitalize font-mono">{diag.inferred_frequency}</span>
+              </div>
+            )}
+            {prediction?.horizon != null && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Horizon</span>
+                <span className="text-zinc-200 font-mono">{prediction.horizon} periods</span>
+              </div>
+            )}
+            {diag?.n_observed != null && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Training Obs.</span>
+                <span className="text-zinc-200 font-mono">{diag.n_observed}</span>
+              </div>
+            )}
+            {meta?.selected_score != null && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">MASE</span>
+                <span className={`font-mono ${meta.selected_score < 1.0 ? 'text-emerald-400' : meta.selected_score < 1.5 ? 'text-amber-400' : 'text-red-400'}`}>
+                  {meta.selected_score.toFixed(4)}
+                  {meta.selected_score < 1.0 ? ' \u2713' : ' (>1)'}
+                </span>
+              </div>
+            )}
+            {meta?.beats_naive != null && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Reliability</span>
+                <span className={`font-mono ${meta.beats_naive && meta.selected_score != null && meta.selected_score < 0.8 ? 'text-emerald-400' : meta.beats_naive ? 'text-amber-400' : 'text-red-400'}`}>
+                  {meta.beats_naive
+                    ? (meta.selected_score != null && meta.selected_score < 0.8 ? 'High' : 'Moderate')
+                    : 'Low'}
+                </span>
+              </div>
+            )}
+            {meta?.selection_method && (
+              <div>
+                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Selection Method</span>
+                <span className="text-zinc-400 font-mono text-[10px]">{meta.selection_method.replace(/_/g, ' ')}</span>
+              </div>
+            )}
+          </div>
+          {meta?.notes && meta.notes.length > 0 && (
+            <div className="border-t border-zinc-700 pt-3 mt-2 space-y-1">
+              {meta.notes.map((note, i) => (
+                <p key={i} className="text-[11px] text-amber-300/80 leading-relaxed flex gap-2">
+                  <span className="mt-0.5 shrink-0">&#9888;</span>
+                  <span>{note}</span>
+                </p>
+              ))}
+            </div>
+          )}
+          {diag?.warnings && diag.warnings.length > 0 && (
+            <div className="border-t border-zinc-700 pt-3 mt-2 space-y-1">
+              {diag.warnings.map((w, i) => (
+                <p key={i} className="text-[11px] text-zinc-500 leading-relaxed flex gap-2">
+                  <span className="mt-0.5 shrink-0">&#8505;</span>
+                  <span>{w}</span>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -383,17 +466,8 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
 
     const lastHist = histData[histData.length - 1];
     const displayHist = [...histData];
-    const displayFc = [];
-    
-    if (lastHist) {
-      displayFc.push({
-        date: lastHist.date,
-        value: lastHist.value,
-        lower: lastHist.value,
-        upper: lastHist.value,
-      });
-    }
-    displayFc.push(...fcData);
+    const displayFc = [...fcData];
+
 
     const allDates = Array.from(new Set([
       ...displayHist.map(d => d.date),
@@ -640,9 +714,8 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
        const fcMap = new Map((groupData.forecast || []).map(d => [d.date, d.value]));
        
        const lastHist = (groupData.historical || [])[(groupData.historical || []).length - 1];
-       if (lastHist) {
-          fcMap.set(lastHist.date, lastHist.value); // Join lines conceptually
-          if (!anyLastHistDate) anyLastHistDate = lastHist.date;
+       if (lastHist && !anyLastHistDate) {
+          anyLastHistDate = lastHist.date;
        }
        
        if (idx === 0) fcCount = (groupData.forecast || []).length;

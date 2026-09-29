@@ -95,6 +95,6 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 # ──────────────────────────────────────────────
 # Signs session tokens. The default only works for a single local dev
 # instance — set JWT_SECRET in .env for anything shared/deployed.
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-secret-change-me")
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-insecure-secret-change-me-to-a-secure-key")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))  # 7 days

@@ -172,7 +172,11 @@ def choose_dataset_table(
     """
     from services.database import get_all_table_names
 
-    tables = candidate_tables or get_all_table_names()
+    if candidate_tables is None:
+        tables = get_all_table_names()
+    else:
+        tables = candidate_tables
+        
     profiles: list[DatasetProfile] = []
 
     for table in tables:

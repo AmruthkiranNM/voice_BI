@@ -423,5 +423,5 @@ def resolve_horizon(
 
 def _offset_for(frequency: str) -> str:
     return {
-        "days": "D", "weeks": "W", "months": "ME", "quarters": "QE", "years": "YE",
-    }.get(normalize_frequency(frequency), "ME")
+        "days": "D", "weeks": "W", "months": "M", "quarters": "Q", "years": "Y",
+    }.get(normalize_frequency(frequency), "M")
