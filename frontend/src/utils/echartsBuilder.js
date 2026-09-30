@@ -405,8 +405,23 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
     }
 
     case 'treemap': {
-      const tmData = labels.slice(0, 30).map((l, i) => ({ name: l, value: Math.abs(datasets[0]?.data[i] ?? 0) }))
-        .sort((a, b) => b.value - a.value);
+      let tmData = [];
+      if (datasets.length > 1) {
+         tmData = labels.map((group, i) => {
+            const children = datasets
+              .map(ds => ({ name: ds.label, value: Math.abs(ds.data[i] || 0) }))
+              .filter(d => d.value > 0)
+              .sort((a,b) => b.value - a.value);
+            return {
+               name: group,
+               value: children.reduce((s, c) => s + c.value, 0),
+               children
+            };
+         }).filter(g => g.value > 0).sort((a, b) => b.value - a.value);
+      } else {
+         tmData = labels.slice(0, 30).map((l, i) => ({ name: l, value: Math.abs(datasets[0]?.data[i] ?? 0) }))
+           .sort((a, b) => b.value - a.value);
+      }
       return {
         color: colors,
         title: chartTitle('Treemap', `${primaryMetric} by ${labelColName} — sized by value`),
@@ -590,7 +605,7 @@ export function buildEChartsOption(type, labels, datasets, extra = {}) {
 }
 
 /** Prepare labels and datasets from raw result and optional semantic spec */
-export function prepareChartData(result, spec = null) {
+export function prepareChartData(result, spec = null, effectiveType = 'bar') {
   const { columns = [], rows = [] } = result || {};
   if (!columns.length || !rows.length) return null;
 
@@ -622,12 +637,13 @@ export function prepareChartData(result, spec = null) {
     DATE_COL_NAMES.test(labelCol);
 
   const isDetail = spec?.intent === 'detail';
+  const isMultiSeries = ['stackedBar', 'groupedBar', 'multiLine', 'stackedArea', 'treemap'].includes(effectiveType);
 
   // ── Hierarchical grouping path ──
-  // When the spec says "isHierarchical", do NOT pivot into multi-series.
+  // When the spec says "isHierarchical", do NOT pivot into multi-series if we want a flat bar chart.
   // Instead: create compound labels "Group — Item", use only actual result rows
   // (no fake zero filling), and sort by group then by metric within group.
-  if (!isDetail && spec?.isHierarchical && spec.groupDimension && spec.itemDimension) {
+  if (!isDetail && spec?.isHierarchical && spec.groupDimension && spec.itemDimension && !isMultiSeries) {
     const groupCol = spec.groupDimension;
     const itemCol = spec.itemDimension;
     const measureCol = numericCols[0];
@@ -682,13 +698,20 @@ export function prepareChartData(result, spec = null) {
     };
   }
 
-  // ── Two-dimension pivot path (non-hierarchical) ──
+  // ── Two-dimension pivot path (non-hierarchical OR multi-series hierarchical) ──
   // e.g. rows grouped by month AND country: pivot the secondary category into
   // its own series instead of showing one bar per row with a repeated x-axis label.
-  const secondaryCol = spec?.secondaryDimension;
-  if (!isDetail && secondaryCol && columns.includes(secondaryCol)) {
+  let secondaryCol = spec?.secondaryDimension;
+  let pivotLabelCol = labelCol;
+  
+  if (spec?.isHierarchical && isMultiSeries) {
+    pivotLabelCol = spec.groupDimension;
+    secondaryCol = spec.itemDimension;
+  }
+
+  if (!isDetail && secondaryCol && columns.includes(secondaryCol) && columns.includes(pivotLabelCol)) {
     const measureCol = numericCols[0];
-    const labels = [...new Set(rows.map(r => String(r[labelCol] ?? '')))].sort((a, b) =>
+    const labels = [...new Set(rows.map(r => String(r[pivotLabelCol] ?? '')))].sort((a, b) =>
       isTime ? a.localeCompare(b) : 0,
     );
     const categories = [...new Set(rows.map(r => String(r[secondaryCol] ?? '')))];
@@ -696,11 +719,11 @@ export function prepareChartData(result, spec = null) {
       label: cat,
       originalColumn: secondaryCol,
       data: labels.map(l => {
-        const row = rows.find(r => String(r[labelCol] ?? '') === l && String(r[secondaryCol] ?? '') === cat);
+        const row = rows.find(r => String(r[pivotLabelCol] ?? '') === l && String(r[secondaryCol] ?? '') === cat);
         return row ? Number(row[measureCol]) || 0 : 0;
       }),
     }));
-    return { labels, datasets, isTime, labelCol: labelCol.replace(/_/g, ' '), numericCols };
+    return { labels, datasets, isTime, labelCol: pivotLabelCol.replace(/_/g, ' '), numericCols };
   }
 
   // ── Standard single-dimension path ──

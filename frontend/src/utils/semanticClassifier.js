@@ -277,11 +277,6 @@ export function resolveVisualizationSpec(result, intent = '', query = '', plan =
     rows: result.rows
   };
 
-  const chartRec = recommendChartType(mockResult, intent, query);
-
-  // Override chart recommendation for hierarchical grouping → horizontal bar
-  const recommendedChart = isHierarchical ? 'horizontalBar' : chartRec.type;
-
   const spec = {
     intent: intent || 'auto',
     dimension: primaryDimension?.column,
@@ -289,7 +284,6 @@ export function resolveVisualizationSpec(result, intent = '', query = '', plan =
     primaryMeasure: primaryMeasure?.column,
     secondaryMeasures: secondaryMeasures.map(m => m.column),
     excludedFields: excludedFields.map(m => m.column),
-    recommendedChart,
     columnsProfile,
     // Hierarchical grouping metadata
     isHierarchical,
@@ -297,6 +291,9 @@ export function resolveVisualizationSpec(result, intent = '', query = '', plan =
     itemDimension,
     hierarchyTitle,
   };
+
+  const chartRec = recommendChartType(mockResult, intent, query, spec);
+  spec.recommendedChart = chartRec.type;
 
   console.log('--- VISUALIZATION DECISION ENGINE ---');
   console.log('Query:', query);

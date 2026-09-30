@@ -1,7 +1,7 @@
 /**
  * chartRecommender.js
  * Intelligently recommends the best chart type based on the query result
- * and detected intent/keywords. No backend calls — pure data inspection.
+ * and detected intent/keywords/semantic specification.
  */
 
 const TIME_PATTERN = /^\d{4}[-/]|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/i;
@@ -45,8 +45,8 @@ const INTENT_MAP = {
 const KEYWORD_MAP = {
   trend: 'line',
   over: 'line',
-  monthly: 'area',
-  yearly: 'area',
+  monthly: 'line',
+  yearly: 'line',
   growth: 'area',
   top: 'horizontalBar',
   best: 'horizontalBar',
@@ -57,19 +57,24 @@ const KEYWORD_MAP = {
   breakdown: 'donut',
   share: 'donut',
   portion: 'donut',
+  percentage: 'donut',
+  percent: 'donut',
   compare: 'bar',
   comparison: 'bar',
   scatter: 'scatter',
   correlation: 'scatter',
+  relationship: 'scatter',
   treemap: 'treemap',
   contribution: 'treemap',
+  split: 'stackedBar',
+  cumulative: 'cumulative',
   heatmap: 'heatmap',
   funnel: 'funnel',
   waterfall: 'waterfall',
   gauge: 'gauge',
 };
 
-function inspectData(result) {
+export function inspectData(result) {
   const { columns = [], rows = [] } = result || {};
   if (!columns.length || !rows.length) return null;
 
@@ -100,58 +105,89 @@ function inspectData(result) {
   };
 }
 
-export function recommendChartType(result, intent, query = '') {
+export function recommendChartType(result, intent, query = '', spec = null) {
   const info = inspectData(result);
   if (!info) return { type: 'bar', confidence: 0, reason: 'No data' };
 
-  const { isTimeSeries, rowCount, numericCount, isSingleValue, isFewRows, isManyRows, hasMultiMetrics } = info;
+  const { isTimeSeries, rowCount, numericCount, isSingleValue, isFewRows, hasMultiMetrics } = info;
+  const q = query.toLowerCase();
 
+  // 1. Single Value
   if (isSingleValue && numericCount === 1 && rowCount === 1) {
     return { type: 'kpiCard', confidence: 0.99, reason: 'Single KPI value' };
   }
 
+  // 2. Hierarchical (Two categorical dimensions)
+  if (spec && spec.isHierarchical) {
+    if (q.includes('composition') || q.includes('split') || q.includes('breakdown')) {
+      return { type: 'stackedBar', confidence: 0.9, reason: 'Hierarchical composition requested' };
+    }
+    if (q.includes('share') || q.includes('contribution') || q.includes('percentage')) {
+      return { type: 'treemap', confidence: 0.9, reason: 'Hierarchical part-to-whole requested' };
+    }
+    if (q.includes('rank') || q.includes('top') || q.includes('best')) {
+      return { type: 'horizontalBar', confidence: 0.9, reason: 'Hierarchical ranking' };
+    }
+    // Default hierarchical fallback
+    return { type: 'stackedBar', confidence: 0.7, reason: 'Default hierarchical comparison' };
+  }
+
+  // 3. Time Series
+  if (isTimeSeries) {
+    if (q.includes('cumulative')) {
+      return { type: 'cumulative', confidence: 0.9, reason: 'Cumulative time series requested' };
+    }
+    if (hasMultiMetrics || (spec && spec.secondaryDimension)) {
+      if (q.includes('composition') || q.includes('share') || q.includes('split')) {
+         return { type: 'stackedArea', confidence: 0.9, reason: 'Time series composition' };
+      }
+      return { type: 'multiLine', confidence: 0.88, reason: 'Time series with multiple metrics/groups' };
+    }
+    return { type: 'line', confidence: 0.88, reason: 'Standard time series' };
+  }
+
+  // 4. Part-to-whole (Pie/Donut)
+  if (numericCount === 1 && isFewRows && (q.includes('share') || q.includes('portion') || q.includes('distribution') || q.includes('percent'))) {
+    return { type: 'donut', confidence: 0.9, reason: 'Part-to-whole on few categories' };
+  }
+
+  // 5. Ranking
+  if (numericCount === 1 && (q.includes('top') || q.includes('rank') || q.includes('best') || rowCount > 8)) {
+    return { type: 'horizontalBar', confidence: 0.85, reason: 'Ranking or many items' };
+  }
+
+  // 6. Relationship (Scatter)
+  if (numericCount >= 2 && (q.includes('vs') || q.includes('correlation') || q.includes('relationship') || q.includes('compare'))) {
+    return { type: 'scatter', confidence: 0.85, reason: 'Comparing multiple metrics' };
+  }
+
+  // 7. Multi-metric comparison (Grouped bar)
+  if (numericCount >= 2 && rowCount <= 8) {
+    return { type: 'groupedBar', confidence: 0.8, reason: 'Multi-metric categorical comparison' };
+  }
+
+  // 8. Intent/Keyword fallback
   if (intent) {
     const intentKey = intent.toLowerCase().replace(/\s+/g, '_');
     for (const [k, v] of Object.entries(INTENT_MAP)) {
-      if (intentKey.includes(k)) return { type: v, confidence: 0.92, reason: `Intent: ${intent}` };
+      if (intentKey.includes(k)) return { type: v, confidence: 0.7, reason: `Intent matches ${k}` };
     }
   }
 
-  if (query) {
-    const q = query.toLowerCase();
-    for (const [k, v] of Object.entries(KEYWORD_MAP)) {
-      if (q.includes(k)) return { type: v, confidence: 0.85, reason: `Keyword: ${k}` };
-    }
+  for (const [k, v] of Object.entries(KEYWORD_MAP)) {
+    if (q.includes(k)) return { type: v, confidence: 0.6, reason: `Keyword matches ${k}` };
   }
 
-  if (isTimeSeries) {
-    if (hasMultiMetrics) return { type: 'multiLine', confidence: 0.88, reason: 'Time series with multiple metrics' };
-    return { type: 'area', confidence: 0.88, reason: 'Time series data detected' };
-  }
-  if (isFewRows && numericCount === 1) {
-    return { type: 'donut', confidence: 0.82, reason: 'Few categories — composition view' };
-  }
-  if (isManyRows && numericCount === 1) {
-    return { type: 'horizontalBar', confidence: 0.82, reason: 'Ranking / many items' };
-  }
-  if (hasMultiMetrics && rowCount <= 8) {
-    return { type: 'groupedBar', confidence: 0.78, reason: 'Multi-metric comparison' };
-  }
-  if (numericCount >= 2) {
-    return { type: 'scatter', confidence: 0.72, reason: 'Two numeric columns — correlation' };
-  }
-
-  return { type: 'bar', confidence: 0.6, reason: 'Default bar chart' };
+  return { type: 'bar', confidence: 0.5, reason: 'Default categorical comparison' };
 }
 
 /* ═══════════════════════════════════════════════════════════
    DATA-AWARE CHART COMPATIBILITY
    Returns { [chartTypeId]: { enabled, recommended, reason } }
 ═══════════════════════════════════════════════════════════ */
-
-export function getChartCompatibility(result, intent, query = '') {
+export function getChartCompatibility(result, intent, query = '', spec = null) {
   const info = inspectData(result);
-  const rec = recommendChartType(result, intent, query);
+  const rec = recommendChartType(result, intent, query, spec);
 
   const compat = {};
   for (const ct of ALL_CHART_TYPES) {
@@ -159,7 +195,6 @@ export function getChartCompatibility(result, intent, query = '') {
   }
 
   if (!info) {
-    // No data — disable everything
     for (const id of Object.keys(compat)) {
       compat[id].reason = 'No data available to visualize.';
     }
@@ -168,6 +203,7 @@ export function getChartCompatibility(result, intent, query = '') {
 
   const { rowCount, numericCount, isTimeSeries, isFewRows, hasMultiMetrics } = info;
   const hasData = rowCount >= 1 && numericCount >= 1;
+  const isHierarchical = spec?.isHierarchical;
 
   for (const ct of ALL_CHART_TYPES) {
     const id = ct.id;
@@ -179,112 +215,131 @@ export function getChartCompatibility(result, intent, query = '') {
     switch (id) {
       // ── Bar family ──
       case 'bar':
+        if (isTimeSeries) {
+           compat[id].reason = 'Line/Area is better for time series.';
+        } else if (isHierarchical) {
+           compat[id].reason = 'Use Stacked Bar or Treemap for hierarchical data.';
+        } else {
+           compat[id].enabled = true;
+           compat[id].reason = 'Good for categorical comparison.';
+        }
+        break;
+
       case 'horizontalBar':
-        compat[id].enabled = true;
-        compat[id].reason = rowCount > 8
-          ? 'Good for ranking many items.'
-          : 'Good for comparing categories.';
+        if (isTimeSeries) {
+           compat[id].reason = 'Horizontal bar is poor for time series.';
+        } else {
+           compat[id].enabled = true;
+           compat[id].reason = 'Good for ranking items.';
+        }
         break;
 
       case 'groupedBar':
-        if (numericCount >= 2) {
+        if (numericCount >= 2 || (isHierarchical && !isTimeSeries)) {
           compat[id].enabled = true;
-          compat[id].reason = 'Compares multiple metrics side by side.';
+          compat[id].reason = 'Compares metrics/groups side by side.';
         } else {
-          compat[id].reason = 'Requires at least 2 numeric columns.';
+          compat[id].reason = 'Requires at least 2 numeric columns or hierarchical groups.';
         }
         break;
 
       case 'stackedBar':
-        if (numericCount >= 2) {
+        if (numericCount >= 2 || (isHierarchical && !isTimeSeries)) {
           compat[id].enabled = true;
           compat[id].reason = 'Shows composition across categories.';
         } else {
-          compat[id].reason = 'Requires at least 2 numeric columns.';
+          compat[id].reason = 'Requires multiple metrics or hierarchical groups.';
         }
         break;
 
       // ── Line family ──
       case 'line':
-        compat[id].enabled = rowCount >= 2;
-        compat[id].reason = rowCount >= 2
-          ? 'Good for trends and sequences.'
-          : 'Requires at least 2 data points.';
+        if (isTimeSeries) {
+           compat[id].enabled = rowCount >= 2;
+           compat[id].reason = rowCount >= 2 ? 'Good for time trends.' : 'Requires 2+ points.';
+        } else {
+           compat[id].reason = 'Not recommended for unordered categories.';
+        }
         break;
 
       case 'multiLine':
-        if (numericCount >= 2 && rowCount >= 2) {
+        if (isTimeSeries && (numericCount >= 2 || isHierarchical || spec?.secondaryDimension)) {
           compat[id].enabled = true;
-          compat[id].reason = 'Compares trends across metrics.';
+          compat[id].reason = 'Compares trends across metrics or groups.';
         } else {
-          compat[id].reason = numericCount < 2
-            ? 'Requires at least 2 numeric columns.'
-            : 'Requires at least 2 data points.';
+          compat[id].reason = 'Requires time series with multiple metrics or groups.';
         }
         break;
 
       case 'area':
-        compat[id].enabled = rowCount >= 2;
-        compat[id].reason = rowCount >= 2
-          ? 'Shows trends with magnitude.'
-          : 'Requires at least 2 data points.';
+        if (isTimeSeries) {
+           compat[id].enabled = rowCount >= 2;
+           compat[id].reason = rowCount >= 2 ? 'Shows trends with magnitude.' : 'Requires 2+ points.';
+        } else {
+           compat[id].reason = 'Not recommended for unordered categories.';
+        }
         break;
 
       case 'stackedArea':
-        if (numericCount >= 2 && rowCount >= 2) {
+        if (isTimeSeries && (numericCount >= 2 || isHierarchical || spec?.secondaryDimension)) {
           compat[id].enabled = true;
           compat[id].reason = 'Shows composition change over time.';
         } else {
-          compat[id].reason = numericCount < 2
-            ? 'Requires at least 2 numeric columns.'
-            : 'Requires at least 2 data points.';
+          compat[id].reason = 'Requires time series with multiple metrics or groups.';
         }
         break;
 
       case 'cumulative':
-        compat[id].enabled = rowCount >= 2;
-        compat[id].reason = rowCount >= 2
-          ? 'Shows running total over sequence.'
-          : 'Requires at least 2 data points.';
+        if (isTimeSeries) {
+           compat[id].enabled = rowCount >= 2;
+           compat[id].reason = rowCount >= 2 ? 'Shows running total over time.' : 'Requires 2+ points.';
+        } else {
+           compat[id].reason = 'Requires time-ordered data.';
+        }
         break;
 
       // ── Part-of-whole ──
       case 'donut':
       case 'pie':
-        if (rowCount > 20) {
-          compat[id].enabled = true;
-          compat[id].reason = 'Too many categories for ideal display. Consider Horizontal Bar or Treemap.';
-        } else if (rowCount >= 2) {
-          compat[id].enabled = true;
-          compat[id].reason = 'Shows proportion of each category.';
+        if (isHierarchical) {
+           compat[id].reason = 'Use Treemap for hierarchical part-to-whole.';
+        } else if (isTimeSeries) {
+           compat[id].reason = 'Use Line/Area for time series.';
+        } else if (rowCount > 10) {
+           compat[id].reason = 'Too many categories. Use Bar or Treemap.';
+        } else if (rowCount >= 2 && numericCount === 1) {
+           compat[id].enabled = true;
+           compat[id].reason = 'Shows proportion of each category.';
         } else {
-          compat[id].reason = 'Requires at least 2 categories.';
+           compat[id].reason = 'Requires 2-10 categories and exactly 1 metric.';
         }
         break;
 
       case 'treemap':
-        compat[id].enabled = rowCount >= 2;
-        compat[id].reason = rowCount >= 2
-          ? 'Shows hierarchical composition by area.'
-          : 'Requires at least 2 categories.';
+        if (isHierarchical || (rowCount >= 2 && numericCount === 1 && !isTimeSeries)) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows hierarchical composition by area.';
+        } else {
+          compat[id].reason = 'Requires hierarchical or categorical data.';
+        }
         break;
 
       case 'funnel':
-        compat[id].enabled = rowCount >= 2 && rowCount <= 12;
-        compat[id].reason = rowCount < 2
-          ? 'Requires at least 2 stages.'
-          : rowCount > 12
-            ? 'Too many items for a funnel. Try Horizontal Bar.'
-            : 'Shows stages or sequential filtering.';
+        if (!isTimeSeries && !isHierarchical && rowCount >= 2 && rowCount <= 12) {
+          compat[id].enabled = true;
+          compat[id].reason = 'Shows sequential filtering.';
+        } else {
+          compat[id].reason = 'Requires 2-12 categorical stages.';
+        }
         break;
 
       // ── Advanced ──
       case 'scatter':
-        if (numericCount >= 2) {
+        if (numericCount >= 2 && !isTimeSeries) {
           compat[id].enabled = true;
           compat[id].reason = 'Shows correlation between two numeric dimensions.';
         } else {
-          compat[id].reason = 'Not suitable — requires at least 2 numeric columns.';
+          compat[id].reason = 'Requires at least 2 numeric columns, not optimal for time series.';
         }
         break;
 
@@ -293,18 +348,16 @@ export function getChartCompatibility(result, intent, query = '') {
           compat[id].enabled = true;
           compat[id].reason = 'Shows three numeric dimensions.';
         } else {
-          compat[id].reason = `Not suitable — requires 3 numeric columns, found ${numericCount}.`;
+          compat[id].reason = `Requires 3 numeric columns, found ${numericCount}.`;
         }
         break;
 
       case 'radar':
-        if (rowCount >= 3 && rowCount <= 12) {
+        if (!isTimeSeries && !isHierarchical && rowCount >= 3 && rowCount <= 12) {
           compat[id].enabled = true;
           compat[id].reason = 'Shows multi-dimensional profile.';
         } else {
-          compat[id].reason = rowCount < 3
-            ? 'Requires at least 3 categories for radial axes.'
-            : 'Too many categories for readable radar. Try Bar.';
+          compat[id].reason = 'Requires 3-12 categories.';
         }
         break;
 
@@ -313,17 +366,17 @@ export function getChartCompatibility(result, intent, query = '') {
           compat[id].enabled = true;
           compat[id].reason = 'Matrix view of metric values.';
         } else {
-          compat[id].reason = numericCount < 2
-            ? 'Requires at least 2 numeric columns.'
-            : 'Requires at least 3 rows.';
+          compat[id].reason = 'Requires at least 2 numeric columns and 3 rows.';
         }
         break;
 
       case 'waterfall':
-        compat[id].enabled = rowCount >= 2;
-        compat[id].reason = rowCount >= 2
-          ? 'Shows incremental positive/negative changes.'
-          : 'Requires at least 2 data points.';
+        if (isTimeSeries) {
+          compat[id].enabled = rowCount >= 2;
+          compat[id].reason = 'Shows incremental positive/negative changes.';
+        } else {
+          compat[id].reason = 'Requires ordered sequential data.';
+        }
         break;
 
       case 'gauge':
@@ -331,9 +384,7 @@ export function getChartCompatibility(result, intent, query = '') {
           compat[id].enabled = true;
           compat[id].reason = 'Shows single value on a gauge.';
         } else {
-          compat[id].reason = rowCount !== 1
-            ? 'Gauge requires exactly 1 row of data.'
-            : 'Requires at least 1 numeric column.';
+          compat[id].reason = 'Gauge requires exactly 1 row of data.';
         }
         break;
 
@@ -342,7 +393,7 @@ export function getChartCompatibility(result, intent, query = '') {
           compat[id].enabled = true;
           compat[id].reason = 'Shows key metrics as cards.';
         } else {
-          compat[id].reason = 'Best for 1–3 rows of aggregated metrics.';
+          compat[id].reason = 'Best for 1-3 rows of aggregated metrics.';
         }
         break;
 
@@ -352,7 +403,6 @@ export function getChartCompatibility(result, intent, query = '') {
     }
   }
 
-  // Mark the recommended type
   if (rec.type && compat[rec.type]) {
     compat[rec.type].recommended = true;
   }
@@ -360,12 +410,9 @@ export function getChartCompatibility(result, intent, query = '') {
   return compat;
 }
 
-/* ═══════════════════════════════════════════════════════════
-   Suggest alternatives when a chart type is unsupported
-═══════════════════════════════════════════════════════════ */
-export function suggestAlternatives(result, intent, query = '') {
-  const compat = getChartCompatibility(result, intent, query);
-  const rec = recommendChartType(result, intent, query);
+export function suggestAlternatives(result, intent, query = '', spec = null) {
+  const compat = getChartCompatibility(result, intent, query, spec);
+  const rec = recommendChartType(result, intent, query, spec);
 
   const alternatives = ALL_CHART_TYPES
     .filter(ct => compat[ct.id]?.enabled && ct.id !== 'kpiCard')
@@ -378,7 +425,6 @@ export function suggestAlternatives(result, intent, query = '') {
     alternatives,
   };
 }
-
 
 export const CHART_TYPE_GROUPS = [
   {

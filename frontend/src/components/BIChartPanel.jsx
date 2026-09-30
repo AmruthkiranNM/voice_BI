@@ -77,16 +77,14 @@ export default function BIChartPanel({ result, intent, query = '', plan }) {
     };
   }, [spec, result]);
 
-  const chartData = useMemo(() => prepareChartData(semanticResult, spec), [semanticResult, spec]);
-  
   const recommendation = useMemo(
     () => ({ type: spec?.recommendedChart || 'bar' }),
     [spec]
   );
   
   const compatibility = useMemo(
-    () => getChartCompatibility(semanticResult, intent, query),
-    [semanticResult, intent, query],
+    () => getChartCompatibility(semanticResult, intent, query, spec),
+    [semanticResult, intent, query, spec],
   );
 
   const [activeType, setActiveType] = useState(null);
@@ -103,6 +101,8 @@ export default function BIChartPanel({ result, intent, query = '', plan }) {
   const moreMenuRef = useRef(null);
 
   const effectiveType = activeType || recommendation.type;
+
+  const chartData = useMemo(() => prepareChartData(semanticResult, spec, effectiveType), [semanticResult, spec, effectiveType]);
 
   // Reset active type when result changes
   useEffect(() => {
