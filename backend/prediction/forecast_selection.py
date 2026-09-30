@@ -179,6 +179,11 @@ def _score_candidate(
     )
     residuals: list[float] = []
     maes, rmses, mases = [], [], []
+    #: Folds too short for this candidate. Reported separately from a genuine
+    #: fitting failure: "not enough history to try" and "tried and failed" are
+    #: different answers when defending a model choice.
+    skipped_for_length = 0
+    longest_train = 0
 
     for fold in fold_data:
         i = fold["fold"]
@@ -187,6 +192,8 @@ def _score_candidate(
         actual_known = fold["actual_known"]
 
         if len(train) < candidate.min_observations:
+            skipped_for_length += 1
+            longest_train = max(longest_train, len(train))
             continue
 
         try:
@@ -235,7 +242,13 @@ def _score_candidate(
 
     if not maes:
         score.eligible = False
-        score.reason = "Could not be fitted and scored on any validation fold."
+        if skipped_for_length:
+            score.reason = (
+                f"Needs {candidate.min_observations} observations to fit; the "
+                f"longest validation fold had {longest_train}. Not attempted."
+            )
+        else:
+            score.reason = "Could not be fitted and scored on any validation fold."
         return score, []
 
     score.n_folds = len(maes)

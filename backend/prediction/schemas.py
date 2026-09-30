@@ -164,7 +164,10 @@ class SeriesDiagnostics:
     outlier_periods: list[str] = dataclasses.field(default_factory=list)
 
     seasonal_periods: int | None = None
-    seasonality_supported: bool = False   # >= 2 full cycles of history
+    seasonality_supported: bool = False
+    #: Whether a seasonal *component* can be estimated (two full cycles), as
+    #: opposed to merely repeated (one cycle).
+    seasonal_estimate_supported: bool = False   # >= 2 full cycles of history
 
     horizon: int = 0
     history_to_horizon_ratio: float = 0.0

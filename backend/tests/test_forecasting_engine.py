@@ -199,15 +199,50 @@ class TestSeriesValidation:
         assert diag.horizon_exceeds_history is True
         assert any("exceeds the observed history" in w for w in diag.warnings)
 
-    def test_seasonality_requires_two_full_cycles(self):
-        short = series_validation.validate_series(
-            _monthly([1.0] * 15), requested_frequency="months", horizon=6)
-        assert short.seasonal_periods == 12
-        assert short.seasonality_supported is False
+    def test_seasonality_is_gated_in_two_tiers(self):
+        """
+        Repeating a cycle and estimating one need different amounts of history.
 
-        long = series_validation.validate_series(
-            _monthly([float(i % 12) for i in range(30)]), requested_frequency="months", horizon=6)
-        assert long.seasonality_supported is True
+        A seasonal naive forecast only replays the previous cycle, so one full
+        cycle is enough to offer it — the backtest then decides whether it
+        generalises. Estimating a seasonal component (Holt-Winters) needs two
+        cycles, and with less than that the model is offered but skipped on
+        every fold, which is why the two flags are reported separately.
+        """
+        under_one_cycle = series_validation.validate_series(
+            _monthly([1.0] * 8), requested_frequency="months", horizon=3)
+        assert under_one_cycle.seasonal_periods == 12
+        assert under_one_cycle.seasonality_supported is False
+        assert under_one_cycle.seasonal_estimate_supported is False
+
+        # One cycle but not two: replayable, not estimable.
+        between = series_validation.validate_series(
+            _monthly([float(i % 12) for i in range(15)]),
+            requested_frequency="months", horizon=6)
+        assert between.seasonality_supported is True
+        assert between.seasonal_estimate_supported is False
+        assert any("not to estimate one" in w for w in between.warnings)
+
+        two_cycles = series_validation.validate_series(
+            _monthly([float(i % 12) for i in range(30)]),
+            requested_frequency="months", horizon=6)
+        assert two_cycles.seasonality_supported is True
+        assert two_cycles.seasonal_estimate_supported is True
+
+    def test_seasonal_candidate_reports_why_it_was_not_scored(self):
+        """A model never attempted must not be reported as having failed."""
+        from prediction import forecast_selection
+        from prediction.forecasting_models import HoltWintersForecaster
+
+        series = _monthly([float(100 + i) for i in range(15)])
+        folds = forecast_selection.build_folds(series, 6)
+        fold_data = forecast_selection.build_fold_data(series, folds)
+        score, _ = forecast_selection._score_candidate(
+            HoltWintersForecaster(seasonal_periods=12), fold_data)
+
+        assert score.eligible is False
+        assert "Not attempted" in score.reason
+        assert "24 observations" in score.reason
 
 
 # ══════════════════════════════════════════════════════════

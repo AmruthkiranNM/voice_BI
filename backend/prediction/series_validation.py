@@ -240,10 +240,16 @@ def validate_series(
 
     seasonal_m = SEASONAL_PERIODS.get(requested, 0)
     diag.seasonal_periods = seasonal_m or None
-    # Allow seasonal models to be evaluated if we have at least 1 full cycle,
-    # rather than strictly requiring 2. The cross-validation backtest will
-    # penalize overfitting if the seasonal model fails to generalize.
+    # One full cycle is enough to *offer* seasonal candidates: a seasonal naive
+    # forecast only needs to repeat the previous cycle, and the backtest will
+    # reject it if it does not generalise. Estimating a seasonal component
+    # (Holt-Winters) needs two, so that model is offered but skipped per fold
+    # by its own min_observations — which is why a series between one and two
+    # cycles reports seasonal support while no seasonal *estimate* is possible.
     diag.seasonality_supported = bool(seasonal_m) and diag.n_observed >= seasonal_m
+    diag.seasonal_estimate_supported = (
+        bool(seasonal_m) and diag.n_observed >= 2 * seasonal_m
+    )
 
     diag.history_to_horizon_ratio = (
         round(diag.n_observed / horizon, 3) if horizon > 0 else 0.0
@@ -279,8 +285,15 @@ def validate_series(
         )
     if seasonal_m and not diag.seasonality_supported:
         diag.warnings.append(
-            f"Fewer than two full seasonal cycles ({2 * seasonal_m} periods); "
-            "seasonality cannot be estimated and seasonal models are excluded."
+            f"Fewer than one full seasonal cycle ({seasonal_m} periods observed "
+            f"of {seasonal_m} needed); seasonal models are excluded."
+        )
+    elif seasonal_m and not diag.seasonal_estimate_supported:
+        diag.warnings.append(
+            f"{diag.n_observed} periods observed: enough to repeat a seasonal "
+            f"cycle of {seasonal_m} but not to estimate one, which needs "
+            f"{2 * seasonal_m}. A seasonal component cannot be fitted at this "
+            "granularity."
         )
     if diag.n_missing:
         diag.warnings.append(
