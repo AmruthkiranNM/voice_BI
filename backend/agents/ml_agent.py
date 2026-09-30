@@ -482,6 +482,44 @@ def run(query: str) -> dict[str, Any]:
     }
 
 
+def _result_field(result, name: str, default=None):
+    """
+    Read a field from a prediction result whose shape varies.
+
+    Some callers hand this module the dataclass, others the serialised dict.
+    Reaching for an attribute that a dict cannot have raised AttributeError
+    part-way through building the response, which is how a task type that
+    reached the row-prediction branch took the whole request down instead of
+    simply having no charts to draw.
+    """
+    if isinstance(result, dict):
+        return result.get(name, default)
+    return getattr(result, name, default)
+
+
+def _build_hierarchy_chart(hierarchy: dict) -> dict:
+    """
+    One grouped bar per parent, its children beside it.
+
+    Values come straight from the hierarchy the engine produced; nothing is
+    aggregated or re-scaled here.
+    """
+    series = []
+    for parent, children in (hierarchy or {}).items():
+        for child in children or []:
+            series.append({
+                "parent": str(parent),
+                "child": str(child.get("child")),
+                "value": child.get("final_value"),
+            })
+    return {
+        "type": "grouped_bar",
+        "title": "Forecast by group",
+        "dimension": "parent",
+        "data": series,
+    }
+
+
 def _build_visualization_metadata(prediction_result, is_single_customer: bool, task_type: str = "classification") -> dict[str, Any]:
     """
     Build structured visualization metadata from the prediction result.
@@ -489,17 +527,39 @@ def _build_visualization_metadata(prediction_result, is_single_customer: bool, t
     This tells the frontend what kind of charts to render and with what data,
     without the frontend needing to understand the ML internals.
     """
+    # A result carries what it is. When a caller does not pass task_type the
+    # payload still knows, and guessing "classification" sent hierarchical
+    # results into the row-prediction branch.
+    derived = _result_field(prediction_result, "derived_insights", {}) or {}
+    if isinstance(derived, dict) and derived.get("task_type"):
+        task_type = derived["task_type"]
+
+    if task_type == "hierarchical_ranking":
+        return {
+            "mode": "forecast",
+            "problem_type": "forecasting",
+            "prediction_type": task_type,
+            # The hierarchy itself travels with the envelope: the renderer
+            # needs the parent/child structure, not just a flattened chart.
+            "prediction_data": derived,
+            "charts": [_build_hierarchy_chart(derived.get("hierarchy") or {})],
+        }
+
     if task_type == "forecasting":
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
+            "prediction_type": task_type,
             "charts": [_build_forecasting_charts(prediction_result)],
         }
     elif task_type == "trend_direction_forecast":
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
-            "charts": [_build_forecasting_charts(prediction_result, title=f"Trend: {prediction_result.direction.title()}")],
+            "prediction_type": task_type,
+            "charts": [_build_forecasting_charts(
+                prediction_result,
+                title=f"Trend: {str(_result_field(prediction_result, 'direction', '')).title()}")],
         }
     elif task_type in ("grouped_forecasting", "grouped_ranking", "growth_analysis"):
         charts = [_build_grouped_forecasting_line_chart(prediction_result)]
@@ -509,12 +569,17 @@ def _build_visualization_metadata(prediction_result, is_single_customer: bool, t
         return {
             "mode": "forecast",
             "problem_type": "forecasting",
+            "prediction_type": task_type,
             "charts": charts,
         }
 
-    predictions = prediction_result.predictions
+    # Row predictions live under either name depending on the caller, and a
+    # result that has none simply has nothing to chart.
+    predictions = (_result_field(prediction_result, "predictions")
+                   or _result_field(prediction_result, "row_predictions")
+                   or [])
     if not predictions:
-        return {"charts": []}
+        return {"prediction_type": task_type, "charts": []}
 
     first_pred = predictions[0]
     is_classification = first_pred.probability is not None

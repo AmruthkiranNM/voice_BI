@@ -17,6 +17,7 @@ but are no longer on this path.
 from __future__ import annotations
 
 import dataclasses
+import re
 import logging
 from typing import Any
 
@@ -96,6 +97,16 @@ def _success_response(config: PredictionConfig, result, query: str) -> dict[str,
 
     from agents import explanation as explanation_layer
     insight = explanation_layer.explain(query, evidence, fallback=evidence)
+
+    # The engine computed figures; an answer containing none is not describing
+    # them. Rather than let the model report having nothing, fall back to the
+    # deterministic evidence, which is always complete.
+    if _has_digits(evidence) and not _has_digits(insight):
+        logger.warning(
+            "[PredictionAgent] Generated answer carried no figures; "
+            "returning the deterministic evidence instead."
+        )
+        insight = evidence
 
     prediction = dataclasses.asdict(result)
     # Keys the existing prediction UI reads directly. They are projections of
@@ -294,6 +305,57 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
 # Evidence for the explanation layer
 # ──────────────────────────────────────────────────────────
 
+#: How many series the evidence lists individually before summarising the rest.
+MAX_GROUPS_IN_EVIDENCE = 10
+
+
+def _totals_by_group(result) -> list[tuple[str, float]]:
+    """
+    Each series' forecast total over the horizon, largest first.
+
+    Computed from ``forecast_rows`` rather than the aggregated view, because
+    that view holds whatever the ranking metric was — a growth percentage when
+    growth was requested — and this block is labelled as totals.
+    """
+    totals: dict[str, float] = {}
+    for row in result.forecast_rows:
+        if row.get("value") is None:
+            continue
+        group = str(row.get("group"))
+        totals[group] = totals.get(group, 0.0) + float(row["value"])
+    return sorted(totals.items(), key=lambda kv: -kv[1])
+
+
+def _has_digits(text: str) -> bool:
+    """Whether a piece of text states any figure at all."""
+    return bool(re.search(r"\d", text or ""))
+
+
+def _reliability_line(model: dict) -> str:
+    """
+    State reliability explicitly, because "best available" is not "reliable".
+
+    Selection always returns the lowest validation error among the candidates,
+    even when every candidate is worse than repeating the last value. MASE is
+    the scale: below 1 the model beat the naive baseline on held-out periods,
+    at or above 1 it did not, and the answer has to say so rather than let the
+    presence of a number imply confidence.
+    """
+    score = model.get("selected_score")
+    beats = model.get("beats_naive")
+    if score is None:
+        return ("RELIABILITY: not validated — no chronological backtest was "
+                "possible, so this is a fallback rather than a tested forecast.")
+    if score < 1 and beats:
+        return (f"RELIABILITY: validated — MASE {score:.2f} is below 1, so the "
+                f"model was more accurate than the naive baseline on held-out "
+                f"periods.")
+    return (f"RELIABILITY: NOT reliable — MASE {score:.2f} is at or above 1, "
+            f"meaning the model was no better than simply repeating the last "
+            f"observed value on held-out periods. Treat the figures as "
+            f"indicative only.")
+
+
 def build_evidence(config: PredictionConfig, result) -> str:
     """
     Deterministic evidence describing the result.
@@ -329,15 +391,37 @@ def build_evidence(config: PredictionConfig, result) -> str:
             )
         ranked = len([r for r in result.ranking_rows if r.get("value") is not None])
         lines.append(f"({ranked} entities were forecast and ranked.)")
-    elif result.forecast_rows and not config.is_grouped:
-        total = sum(r["value"] for r in result.forecast_rows if r.get("value") is not None)
-        lines.append(f"FORECAST TOTAL over the horizon: {total:,.2f}")
-        first = next((r for r in result.forecast_rows if r.get("value") is not None), None)
-        last = next((r for r in reversed(result.forecast_rows)
-                     if r.get("value") is not None), None)
-        if first and last:
-            lines.append(f"FIRST PERIOD {str(first['period'])[:10]}: {first['value']:,.2f}")
-            lines.append(f"LAST PERIOD {str(last['period'])[:10]}: {last['value']:,.2f}")
+    elif result.forecast_rows:
+        # A forecast that was not ranked still has to carry its numbers.
+        # Without this, a grouped forecast with no ranking operation produced
+        # evidence of headings alone, and the answer honestly reported having
+        # no figures to share.
+        if config.is_grouped:
+            totals = _totals_by_group(result)
+            lines.append(f"FORECAST TOTALS BY {(label or 'group').upper()} "
+                         f"over the horizon:")
+            for group, value in totals[:MAX_GROUPS_IN_EVIDENCE]:
+                lines.append(f"  {group}: {value:,.2f}")
+            if len(totals) > MAX_GROUPS_IN_EVIDENCE:
+                lines.append(f"  (+{len(totals) - MAX_GROUPS_IN_EVIDENCE} more series)")
+            combined = sum(v for _, v in totals)
+            lines.append(
+                f"({len(totals)} series forecast, largest first; combined total "
+                f"{combined:,.2f}.)"
+            )
+        else:
+            total = sum(r["value"] for r in result.forecast_rows
+                        if r.get("value") is not None)
+            lines.append(f"FORECAST TOTAL over the horizon: {total:,.2f}")
+            first = next((r for r in result.forecast_rows
+                          if r.get("value") is not None), None)
+            last = next((r for r in reversed(result.forecast_rows)
+                         if r.get("value") is not None), None)
+            if first and last:
+                lines.append(
+                    f"FIRST PERIOD {str(first['period'])[:10]}: {first['value']:,.2f}")
+                lines.append(
+                    f"LAST PERIOD {str(last['period'])[:10]}: {last['value']:,.2f}")
     elif result.forecast_rows:
         # Grouped forecast with no ranking requested: without per-group totals
         # the explanation has no figures and can only say it has none.
@@ -410,6 +494,7 @@ def build_evidence(config: PredictionConfig, result) -> str:
         if model.get("beats_naive") is not None:
             line += f"; beats the naive baseline: {model['beats_naive']}"
         lines.append(line + ".")
+        lines.append(_reliability_line(model))
     elif model.get("per_group"):
         chosen = {m.get("selected_model_label") for m in model["per_group"].values()}
         lines.append(

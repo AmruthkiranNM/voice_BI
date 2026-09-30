@@ -248,12 +248,28 @@ def run(
     is_truncated_by_limit = execution_result.get("is_truncated", False)
 
     # Handle empty results
-    if row_count == 0:
-        insight = (
-            "No matching records were found in your data. Try broadening "
-            "your question or check that your CSV contains the categories "
-            "or dates you are asking about."
-        )
+    # One row of NULLs is an aggregate that matched nothing, not an answer.
+    all_null = (row_count == 1 and rows
+                and all(v is None for v in rows[0].values()))
+    if row_count == 0 or all_null:
+        # An empty result is most often a period the data does not reach, so
+        # say what it does reach instead of asking the user to guess.
+        from services import time_context
+
+        cov = time_context.coverage()
+        if cov.known:
+            insight = (
+                f"No records matched that request. Your data covers "
+                f"{cov.min_date} to {cov.max_date}, so a period outside that "
+                f"range returns nothing. Try a date inside it, or ask without "
+                f"a time period."
+            )
+        else:
+            insight = (
+                "No matching records were found in your data. Try broadening "
+                "your question or check that your CSV contains the categories "
+                "or dates you are asking about."
+            )
         logger.info("[Insight Agent] No data — returning empty insight.")
         return insight
 

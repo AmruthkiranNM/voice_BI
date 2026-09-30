@@ -31,9 +31,9 @@ CRITICAL RULES:
 - Before using AVG/SUM/MAX/MIN on a column, check its type in the schema below. NEVER aggregate a TEXT/VARCHAR column numerically — AVG() or SUM() on text silently returns 0, which is wrong. If the question asks for an "average"/"total" of a column that is actually categorical text (e.g. a size label like Small/Medium/Large, a Yes/No flag, a status), there is no numeric average — instead return a breakdown: SELECT <category_column>, COUNT(*) AS count ... GROUP BY <category_column> (combined with any other requested grouping, e.g. country).
 - Only add a date/time WHERE filter when the question names a period (e.g. "last month", "this year"). For general "over time" / "trend" questions, include ALL rows — do NOT filter to recent dates.
 - RELATIVE vs NAMED periods — do not confuse them:
-  * RELATIVE to today (e.g. "last month", "this year", "past 7 days") → filter with date('now', ...), e.g. date_column >= date('now', '-1 month').
+  * RELATIVE to today (e.g. "last month", "this year", "past 7 days") → use the literal windows listed under DATA COVERAGE, or anchor on the literal date, e.g. date_column >= date('{today}', '-30 days'). Never date('now', ...).
   * NAMED calendar periods with no year given (e.g. "in April", "the month of May", "in Q1") → these refer to the calendar month/quarter itself, NOT a rolling window from today. Filter with strftime('%m', date_column) = '04' (April = '04', May = '05', etc.), never date('now', ...). The data may be from any year — do not restrict by year unless one is stated.
-- For date filtering, use SQLite date functions like date('now', '-1 month') only for RELATIVE periods.
+- For date filtering, anchor SQLite date functions on the literal date, e.g. date('{today}', '-30 days'), and only for RELATIVE periods.
 - For trends, use strftime('%Y-%m', date_column) when grouping by month.
 - When grouping by day of week or month, return the NAME, not the number, so the answer is readable. Day of week:
   CASE strftime('%w', date_column) WHEN '0' THEN 'Sunday' WHEN '1' THEN 'Monday' WHEN '2' THEN 'Tuesday' WHEN '3' THEN 'Wednesday' WHEN '4' THEN 'Thursday' WHEN '5' THEN 'Friday' ELSE 'Saturday' END AS day_of_week
@@ -42,7 +42,8 @@ CRITICAL RULES:
   * For time comparisons, filter two periods with CASE WHEN or separate subqueries.
   * For growth %, compute: ROUND(100.0 * (new - old) / NULLIF(old, 0), 2) AS growth_pct.
   * For ranking, use ORDER BY ... DESC LIMIT N.
-- Today's date is {today}.
+- Today's date is {today} (the latest date present in this data).
+{coverage_block}
 - MULTIPLE ANALYTICAL QUESTIONS (COMPOUND QUERIES):
   * You may use multiple CTEs inside one WITH statement to solve multi-step analytical requests.
   * You MUST return exactly one PostgreSQL SELECT/WITH statement.
@@ -106,7 +107,15 @@ def run(
             f"IMPORTANT: Query {scope}. "
             f"Do not use any other table.\n\n{schema_context}"
         )
-    today = datetime.now().strftime("%Y-%m-%d")
+    # "Today" means the last date the data knows about. Anchoring relative
+    # periods to the wall clock is what makes "last quarter" filter to a window
+    # an uploaded extract has never contained, returning nothing. The wall
+    # clock is only a fallback for a dataset with no date column at all.
+    from services import time_context
+
+    cov = time_context.coverage(pinned_tables or rag_context.get("retrieved_tables"))
+    today = cov.anchor or datetime.now().strftime("%Y-%m-%d")
+    coverage_block = time_context.prompt_block(cov)
 
     detected_filters = _detect_categorical_filters(query, rag_context)
     if detected_filters:
@@ -129,6 +138,7 @@ def run(
         plan_text=plan_text,
         schema_context=schema_context,
         today=today,
+        coverage_block=coverage_block,
         retry_section=retry_section,
     )
 

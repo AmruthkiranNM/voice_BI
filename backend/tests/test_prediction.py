@@ -84,7 +84,14 @@ class TestImports:
     def test_import_models(self):
         from prediction import models
         assert callable(models.create_model)
-        assert "random_forest" in models.MODEL_REGISTRY
+        # The registry holds one entry per model; the older short names are
+        # aliases, kept working but deliberately outside it so that "train
+        # every registered model" does not train the same classifier twice.
+        assert "random_forest_classifier" in models.MODEL_REGISTRY
+        assert "random_forest" not in models.MODEL_REGISTRY
+        assert models.resolve_model_key("random_forest") == "random_forest_classifier"
+        assert models.create_model("random_forest") is not None
+        assert models.get_model_label("gradient_boosting") == "Gradient Boosting Classifier"
 
     def test_import_evaluator(self):
         from prediction import evaluator
@@ -257,7 +264,9 @@ class TestEndToEnd:
 
         # Check the results format
         results_by_key = {r["model_key"]: r for r in experiment.training_results}
-        for key in ["logistic_regression", "random_forest", "gradient_boosting"]:
+        assert len(results_by_key) == 3, "each classifier must appear exactly once"
+        for key in ["logistic_regression", "random_forest_classifier",
+                    "gradient_boosting_classifier"]:
             assert key in results_by_key
             res = results_by_key[key]
             assert res["training_status"] == "SUCCESS"

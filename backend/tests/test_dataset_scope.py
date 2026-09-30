@@ -11,8 +11,10 @@ from main import app
 from services.database import get_all_table_names
 
 
-def test_upload_accumulates_tables(temp_database):
-    client = TestClient(app)
+def test_upload_accumulates_tables(temp_database, authenticated_client):
+    # Uploads sit behind require_auth, so this runs signed in; anonymous
+    # access is covered by the auth tests.
+    client = authenticated_client
 
     sales = pd.DataFrame({"product": ["A"], "revenue": [100]})
     buf1 = io.StringIO()

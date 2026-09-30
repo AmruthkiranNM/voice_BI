@@ -130,10 +130,19 @@ MODEL_REGISTRY: dict[str, dict] = {
 }
 
 
-# Keep original keys working if possible, but the original ones were "random_forest"
-# We'll map the old names in the registry to avoid breaking classification tests if they hardcode keys
-MODEL_REGISTRY["random_forest"] = MODEL_REGISTRY["random_forest_classifier"]
-MODEL_REGISTRY["gradient_boosting"] = MODEL_REGISTRY["gradient_boosting_classifier"]
+#: Older key names kept working for saved artifacts and callers that hardcode
+#: them. They are deliberately NOT in MODEL_REGISTRY: anything that trains
+#: "every registered model" iterates that dict, so an alias living inside it
+#: made each aliased classifier train twice and appear twice in the results.
+MODEL_ALIASES: dict[str, str] = {
+    "random_forest": "random_forest_classifier",
+    "gradient_boosting": "gradient_boosting_classifier",
+}
+
+
+def resolve_model_key(key: str) -> str:
+    """Canonical registry key for a possibly-aliased model key."""
+    return MODEL_ALIASES.get(key, key)
 
 DEFAULT_CLASSIFICATION_KEY = "random_forest_classifier"
 DEFAULT_REGRESSION_KEY = "random_forest_regressor"
@@ -151,7 +160,7 @@ def create_model(key: str | None = None, problem_type: str = "classification"):
         else:
             key = DEFAULT_FORECASTING_KEY
         
-    entry = MODEL_REGISTRY.get(key)
+    entry = MODEL_REGISTRY.get(resolve_model_key(key))
     if entry is None:
         raise ValueError(
             f"Unknown model key '{key}'. Available: {list(MODEL_REGISTRY.keys())}"
@@ -170,5 +179,5 @@ def get_model_label(key: str | None = None, problem_type: str = "classification"
             key = DEFAULT_REGRESSION_KEY
         else:
             key = DEFAULT_FORECASTING_KEY
-    entry = MODEL_REGISTRY.get(key)
+    entry = MODEL_REGISTRY.get(resolve_model_key(key))
     return entry["label"] if entry else key

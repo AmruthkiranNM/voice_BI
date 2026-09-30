@@ -74,6 +74,10 @@ def process_query(
 
     # Agent step logs for transparency
     agent_logs = []
+    # Deterministic notes about repairs made to the query, surfaced with
+    # the answer so a silently changed question is never presented as the
+    # original.
+    pipeline_notes: list[str] = []
 
     def log_step(agent_name: str, status: str, detail: Any = None):
         entry = {
@@ -249,9 +253,37 @@ def process_query(
                 # generating the same bad SQL.  Instead of asking it again,
                 # we deterministically strip the spurious WHERE date clause
                 # and re-execute — no new LLM call required.
-                if exec_result["row_count"] == 0:
+                if _is_empty_answer(exec_result):
                     zero_diag = _diagnose_zero_rows(sql, query)
                     if zero_diag:
+                        # A query can simply be anchored to the real clock
+                        # while the data ends earlier. Re-reading the same
+                        # period against the data's latest date keeps the
+                        # question the user actually asked.
+                        from services import time_context
+
+                        cov = time_context.coverage(
+                            rag_context.get("pinned_tables")
+                            or rag_context.get("retrieved_tables"))
+                        reanchored = _reanchor_relative_dates(sql, cov.anchor)
+                        if reanchored:
+                            logger.warning(
+                                "[Orchestrator] 0 rows from a clock-relative filter - "
+                                "re-anchoring to the data's latest date %s.", cov.anchor)
+                            reanchored_result = execution.run(reanchored)
+                            if (reanchored_result["success"]
+                                    and not _is_empty_answer(reanchored_result)):
+                                sql = reanchored
+                                exec_result = reanchored_result
+                                pipeline_notes.append(
+                                    f"Read that period against the latest date in "
+                                    f"your data ({cov.anchor}), not today's date.")
+                                log_step("Execution Agent", "completed_reanchored", {
+                                    "row_count": exec_result["row_count"],
+                                    "anchor": cov.anchor,
+                                })
+                                break
+
                         fixed_sql = _strip_spurious_date_filter(sql)
                         if fixed_sql:
                             logger.warning(
@@ -259,7 +291,8 @@ def process_query(
                                 "auto-fixing SQL by removing date WHERE clause."
                             )
                             fixed_result = execution.run(fixed_sql)
-                            if fixed_result["success"] and fixed_result["row_count"] > 0:
+                            if (fixed_result["success"]
+                                    and not _is_empty_answer(fixed_result)):
                                 sql = fixed_sql
                                 exec_result = fixed_result
                                 log_step("Execution Agent", "completed_auto_fixed", {
@@ -298,6 +331,8 @@ def process_query(
             })
         else:
             insight_text = insight.run(query, sql, exec_result, plan=plan)
+            if pipeline_notes:
+                insight_text = insight_text + "\n\n" + " ".join(pipeline_notes)
             log_step("Insight Agent", "completed", {
                 "insight_length": len(insight_text),
             })
@@ -377,6 +412,47 @@ def process_query(
         )
     finally:
         config.OLLAMA_MODEL = original_model
+
+
+def _is_empty_answer(exec_result: dict) -> bool:
+    """
+    Whether a successful query actually answered anything.
+
+    An aggregate over a window that matched no rows does not return zero rows:
+    it returns one row of NULLs. Treating that as data is how "no sales last
+    month" gets reported for a month that has sales, when the real problem is
+    a filter that matched nothing.
+    """
+    if exec_result.get("row_count", 0) == 0:
+        return True
+    rows = exec_result.get("rows") or []
+    if len(rows) != 1:
+        return False
+    return all(v is None for v in rows[0].values())
+
+
+def _reanchor_relative_dates(sql: str, anchor: str) -> str | None:
+    """
+    Point a clock-relative query at the data's own timeline.
+
+    ``date('now', '-3 months')`` asks about the last three months of the real
+    calendar. When the data stopped before that, the honest repair is not to
+    drop the period the user asked for but to read it against the most recent
+    date the data actually has.
+
+    Returns the rewritten SQL, or None when nothing was anchored to the clock.
+    """
+    if not anchor:
+        return None
+
+    # Only the 'now' literal itself is rewritten, so a column or alias that
+    # merely contains the word is left alone.
+    rewritten = re.sub(r"(['\"])\s*now\s*\1", f"'{anchor}'", sql, flags=re.IGNORECASE)
+    rewritten = re.sub(r"\bCURRENT_TIMESTAMP\b", f"datetime('{anchor}')",
+                       rewritten, flags=re.IGNORECASE)
+    rewritten = re.sub(r"\bCURRENT_DATE\b", f"date('{anchor}')",
+                       rewritten, flags=re.IGNORECASE)
+    return rewritten if rewritten != sql else None
 
 
 def _strip_spurious_date_filter(sql: str) -> str | None:

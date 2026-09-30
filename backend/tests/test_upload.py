@@ -10,10 +10,9 @@ from main import app
 
 
 @pytest.fixture
-def client(temp_database):
-    return TestClient(app)
-
-
+def client(authenticated_client):
+    """Route tests run signed in; anonymous access is covered by the auth tests."""
+    return authenticated_client
 def test_upload_csv_creates_table_with_preview(client, temp_database):
     df = pd.DataFrame({
         "product_name": ["Widget", "Gadget"],

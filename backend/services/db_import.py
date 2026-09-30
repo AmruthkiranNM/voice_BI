@@ -18,7 +18,11 @@ duration of a single test/import request.
 import logging
 
 import pandas as pd
-import psycopg2
+
+try:  # optional: only installations that import from PostgreSQL need the driver
+    import psycopg2
+except ImportError:  # pragma: no cover - depends on the deployment
+    psycopg2 = None
 
 from config import MAX_UPLOAD_ROWS
 from services.ingest import ingest_dataframe, rebuild_index
@@ -37,6 +41,11 @@ def _connect(connection_string: str):
             "Supabase, Neon, and RDS Postgres."
         )
     try:
+        if psycopg2 is None:
+            raise RuntimeError(
+                "Importing from PostgreSQL needs the psycopg2 package, "
+                "which is not installed in this environment."
+            )
         return psycopg2.connect(connection_string, connect_timeout=CONNECT_TIMEOUT_SECONDS)
     except psycopg2.OperationalError as e:
         # psycopg2 error messages don't include the password, safe to surface directly.

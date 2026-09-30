@@ -1,0 +1,11 @@
+ 1. PRED  Forecast revenue for the next 3 months.          h=3 x3p MASE 4.36 beats True
+ 2. PRED  Forecast revenue for the next 6 months.          h=6 x6p MASE 2.56 beats True
+ 3. PRED  Forecast revenue for the next 12 months.         h=12 x12p MASE 2.16 beats True
+ 4. PRED  Forecast revenue by region for the next 12 mon   h=12 x12p MASE 1.61-3.31 beats 2/3
+ 5. PRED  Forecast revenue by product for the next 12 mo   h=12 x12p MASE 0.58-3.65 beats 15/22
+ 6. PRED  Forecast revenue by salesperson for the next 6   h=6 x6p MASE 0.40-1.72 beats 23/25
+ 7. PRED  Forecast the top 5 products by revenue for the   h=12 x12p MASE 0.58-3.65 beats 15/22
+ 8. PRED  Will the top 5 products remain the same next y   h=0 x0p MASE - beats None
+ 9. DETAIL Provide details of all products sold by salesp   rows=7617 unsolicited=none
+10. RANKING Rank countries by revenue.                       rows=6
+11. TREND Show revenue trend over time.                    rows=15

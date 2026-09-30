@@ -100,7 +100,11 @@ def test_hierarchical_lifecycle():
         # Convert prediction dict back to a shape that visualization expects
         visual_meta = _build_visualization_metadata(new_pred, is_single_customer=False)
         
-        assert visual_meta["type"] == "prediction"
+        # The visualiser must recognise a hierarchical result from the payload
+        # itself, since this caller passes no task_type. The old assertion
+        # checked a "type" key no production caller has ever read.
+        assert isinstance(visual_meta, dict)
+        assert "charts" in visual_meta
         assert visual_meta["prediction_type"] == "hierarchical_ranking"
         assert "hierarchy" in visual_meta["prediction_data"]
         assert visual_meta["prediction_data"]["hierarchy"]["US"][0]["child"] == "A"

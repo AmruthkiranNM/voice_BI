@@ -312,6 +312,19 @@ class UniversalPredictionResult:
     
     # Classification / Regression row predictions
     row_predictions: list[PredictionRow] = dataclasses.field(default_factory=list)
+
+    @property
+    def predictions(self) -> list[PredictionRow]:
+        """
+        Alias for ``row_predictions``.
+
+        The field was renamed, but callers — including agents.ml_agent — kept
+        reading ``.predictions``. Since the attribute simply did not exist, the
+        read raised instead of returning nothing, which is what broke the
+        hierarchical forecast path. One name resolving to one list keeps both
+        spellings honest.
+        """
+        return self.row_predictions
     
     # Time-series / Forecasting
     date_column: str | None = None
