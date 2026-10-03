@@ -514,7 +514,14 @@ def resolve_config(
     if config.time_column:
         exclude.add(config.time_column)
 
-    if not requested_dims:
+    # Regression and classification predict one value per row; "each sale"
+    # there names the rows themselves, not a grouping. Guessing a dimension
+    # from such a question grouped "predict boxes for each sale" by
+    # salesperson via an embedding match on "sale". Only forecasts aggregate
+    # into groups, so only forecasts infer one.
+    infer_grouping = config.prediction_type == cfg.FORECASTING
+
+    if not requested_dims and infer_grouping:
         # Interpretation named no grouping. Infer one from the question itself
         # before giving up — a question that says "by country" is asking to be
         # grouped whether or not the interpreter reported it.

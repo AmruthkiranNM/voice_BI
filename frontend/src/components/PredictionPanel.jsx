@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react';
-import { TbAlertTriangle, TbShieldCheck, TbShieldOff, TbChartBar } from 'react-icons/tb';
+import { useEffect, useRef, useState } from 'react';
+import {
+  TbAlertTriangle, TbShieldCheck, TbShieldOff, TbChartBar,
+  TbArrowsMaximize, TbArrowsMinimize, TbDownload, TbRefresh,
+} from 'react-icons/tb';
 import ReactECharts from 'echarts-for-react';
 
 /**
@@ -670,13 +673,6 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
   return <div className="text-zinc-500 flex items-center justify-center h-full text-sm">Forecast visualization unavailable</div>;
 }
 
-const RELIABILITY_LABEL = {
-  validated: 'validated',
-  weak: 'not reliable',
-  baseline: 'no better than last value',
-  not_validated: 'not validated',
-};
-
 const RELIABILITY_COLOR = {
   validated: '#34d399',
   weak: '#f87171',
@@ -694,13 +690,108 @@ const RELIABILITY_COLOR = {
  * variability actually shows up in a forecast. Nothing is recomputed here:
  * the values plotted are the values the API returned.
  */
+//: How many series the overview draws. More than this is unreadable as lines
+//: and unexplainable in a tooltip; the full list is in the answer text.
+//: Default: every series, matching the answer text. 0 means "all".
+const GROUPED_TOP_N = 0;
+//: 0 means "all series".
+const GROUPED_TOP_N_OPTIONS = [3, 5, 10, 0];
+
+//: Beyond the fixed palette, spread hues evenly so 20+ series stay distinct.
+const seriesColor = (idx, total) =>
+  idx < 10 ? SERIES_COLORS[idx] : `hsl(${Math.round((idx * 360) / Math.max(total, 1))}, 65%, 50%)`;
+const SERIES_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+                       '#ec4899', '#06b6d4', '#84cc16', '#14b8a6', '#6366f1'];
+
+function ToolbarBtn({ onClick, title, icon, active }) {
+  return (
+    <button type="button" title={title} onClick={onClick}
+            className={`bi-control-btn ${active ? 'active' : ''}`}>
+      {icon}
+    </button>
+  );
+}
+
+//: One plain sentence per validation outcome, for the focused view.
+const RELIABILITY_PLAIN = {
+  validated: 'Reliable — beat the simple "same as last month" baseline on past data.',
+  weak: 'Low reliability — use as a rough guide only.',
+  baseline: 'No model beat "same as last month", so that is the forecast.',
+  not_validated: 'Not enough history to test this forecast.',
+};
+
 function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
   const [focus, setFocus] = useState(null);
-  const groups = chart.data || [];
+  const [topN, setTopN] = useState(GROUPED_TOP_N);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
+  const chartRef = useRef(null);
+
+  // Leaving fullscreen with Esc must also reset our state.
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setIsFullscreen(false); };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen?.();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIsFullscreen(false);
+    }
+  };
+
+  const exportPng = () => {
+    const instance = chartRef.current?.getEchartsInstance();
+    if (!instance) return;
+    const a = document.createElement('a');
+    a.href = instance.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#FFFFFF' });
+    a.download = 'forecast.png';
+    a.click();
+  };
+
+  const reset = () => { setFocus(null); setTopN(GROUPED_TOP_N); };
+
+  // Series arrive ranked by forecast total, so the first N are the largest.
+  const groups = topN === 0 ? (chart.data || []) : (chart.data || []).slice(0, topN);
+  const totalSeries = chart.total || (chart.data || []).length;
   const focused = focus ? groups.find(g => g.group === focus) : null;
+
+  const toolbar = (
+    <div className="bi-controls-bar">
+      <div className="bi-topn-wrap">
+        <select value={topN} onChange={(e) => { setTopN(Number(e.target.value)); setFocus(null); }}
+                className="bi-topn-select" title="How many series to show">
+          {GROUPED_TOP_N_OPTIONS.map(n => (
+            <option key={n} value={n}>{n === 0 ? `All (${(chart.data || []).length})` : `Top ${n}`}</option>
+          ))}
+        </select>
+      </div>
+      <div className="bi-sep" />
+      {!focused && (
+        <ToolbarBtn onClick={exportPng} title="Download PNG" icon={<TbDownload size={13} />} />
+      )}
+      <ToolbarBtn onClick={toggleFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+                  icon={isFullscreen ? <TbArrowsMinimize size={13} /> : <TbArrowsMaximize size={13} />} />
+      <ToolbarBtn onClick={reset} title="Reset" icon={<TbRefresh size={13} />} />
+    </div>
+  );
+
+  // One wrapper for both views so fullscreen covers whichever is showing.
+  const frame = (content) => (
+    <div ref={containerRef}
+         className={`flex flex-col h-full w-full ${isFullscreen ? 'bi-chart-fullscreen bg-white p-6 overflow-auto' : ''}`}>
+      {content}
+    </div>
+  );
 
   const focusBar = (
     <div className="px-2 mb-4">
+      <div className="flex justify-end mb-2">{toolbar}</div>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -709,25 +800,24 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
         >
           All series
         </button>
-        {groups.map(g => (
+        {groups.map((g, idx) => (
           <button
             key={g.group}
             type="button"
             onClick={() => setFocus(g.group)}
-            title={g.reliability_note || ''}
             className={`px-3 py-1 rounded-full text-xs border transition-colors flex items-center gap-1.5 ${focused && focused.group === g.group ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'text-zinc-300 border-zinc-700 hover:border-zinc-500'}`}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: RELIABILITY_COLOR[g.reliability] || '#71717a' }} />
+            <span className="w-2 h-2 rounded-full" style={{ background: seriesColor(idx, groups.length) }} />
             {g.group}
           </button>
         ))}
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
-        Select a series to see its prediction interval. Dot colour shows validation:
-        <span style={{ color: RELIABILITY_COLOR.validated }}> validated</span>,
-        <span style={{ color: RELIABILITY_COLOR.baseline }}> no better than last value</span>,
-        <span style={{ color: RELIABILITY_COLOR.weak }}> not reliable</span>.
-        Flat lines are what the winning model predicts, not a display simplification.
+        {focused
+          ? 'Shaded area: the range the actual value is likely to fall in.'
+          : groups.length >= totalSeries
+            ? `All ${totalSeries} series. Click one to see its forecast range.`
+            : `Top ${groups.length} of ${totalSeries} by forecast total. Click one to see its forecast range.`}
       </p>
     </div>
   );
@@ -738,28 +828,27 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       title: `${chart.title}: ${focused.group}`,
       data: { historical: focused.historical || [], forecast: focused.forecast || [] },
     };
-    return (
-      <div className="flex flex-col h-full w-full">
+    return frame(
+      <>
         {focusBar}
         {focused.model && (
           <div className="px-2 mb-2 text-xs text-zinc-400">
             Model: <span className="text-zinc-200">{focused.model}</span>
-            {focused.mase != null && <> · MASE <span className="font-mono text-zinc-200">{Number(focused.mase).toFixed(2)}</span></>}
-            {' · '}
+            {' — '}
             <span style={{ color: RELIABILITY_COLOR[focused.reliability] || '#a1a1aa' }}>
-              {focused.reliability_note || RELIABILITY_LABEL[focused.reliability] || ''}
+              {RELIABILITY_PLAIN[focused.reliability] || ''}
             </span>
           </div>
         )}
-        <div className="flex-1 w-full min-h-[400px] relative">
+        <div className={`flex-1 w-full relative ${isFullscreen ? 'min-h-[70vh]' : 'min-h-[400px]'}`}>
           <ChartRenderer chart={single} targetColumn={targetColumn} />
         </div>
-      </div>
+      </>
     );
   }
 
-    const seriesGroups = chart.data || [];
-    
+    const seriesGroups = groups;
+
     // Data Consistency Check
     if (seriesGroups.length === 0 || seriesGroups.some(g => !g.forecast || g.forecast.length === 0)) {
         return <div className="text-zinc-500 flex items-center justify-center h-full text-sm">Forecast visualization is unavailable because the prediction result is incomplete.</div>;
@@ -801,12 +890,6 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       return val.toLocaleString(undefined, {maximumFractionDigits:0});
     };
 
-    // Each series' own validation result, so a flat line is shown next to the
-    // evidence for it rather than read as a claim of certainty.
-    const validationByGroup = Object.fromEntries(
-      seriesGroups.map(g => [g.group, g])
-    );
-
     // Build series
     const echartSeries = [];
     let anyLastHistDate = null;
@@ -826,8 +909,8 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
        const histSeriesData = allDates.map(d => histMap.has(d) ? histMap.get(d) : '-');
        const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d) : '-');
        
-       const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#14b8a6', '#6366f1'];
-       const color = colors[idx % colors.length];
+       // Same palette as the series buttons, so a button and its line match.
+       const color = seriesColor(idx, seriesGroups.length);
 
        echartSeries.push({
           name: groupData.group + ' (Historical)',
@@ -873,10 +956,11 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
         borderColor: '#3f3f46',
         textStyle: { color: '#f4f4f5' },
         axisPointer: { type: 'line', lineStyle: { color: '#52525b', type: 'dashed' } },
+        confine: true,
         formatter: function(params) {
           const date = params[0].name;
-          let html = `<div style="font-size:12px;margin-bottom:8px;color:#a1a1aa">Month:<br/><span style="color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</span></div>`;
-          
+          let html = `<div style="font-size:12px;margin-bottom:4px;color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</div>`;
+
           const validParams = params.filter(p => p.value !== '-');
           const paramGroups = {};
           
@@ -892,29 +976,29 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
              else paramGroups[groupName].fc = p.value;
           });
           
-          Object.keys(paramGroups).forEach(groupName => {
+          // With a dozen series a full list overflows the chart, so the tooltip
+          // shows the largest few for this month and summarises the rest.
+          // Model details live in the series chips and the focused view.
+          const TOOLTIP_LIMIT = 5;
+          const entries = Object.keys(paramGroups).map(groupName => {
              const { color, hist, fc } = paramGroups[groupName];
-             const displayVal = fc !== null ? fc : hist;
-             const typeLabel = fc !== null ? 'Forecast' : 'Actual';
-             
-             html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span style="color:#d4d4d8;font-weight:500">${groupName} <span style="color:#a1a1aa;font-weight:400;margin-left:4px">(${typeLabel})</span>:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(displayVal).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
-             const v = validationByGroup[groupName];
-             if (fc !== null && v && v.model) {
-               const flag = RELIABILITY_LABEL[v.reliability] || '';
-               html += `<div style="font-size:11px;color:#a1a1aa;margin:-2px 0 6px 16px">${v.model}${v.mase != null ? ` · MASE ${Number(v.mase).toFixed(2)}` : ''}${flag ? ` · <span style="color:${RELIABILITY_COLOR[v.reliability]}">${flag}</span>` : ''}</div>`;
-             }
+             return { groupName, color, isFc: fc !== null, value: Number(fc !== null ? fc : hist) };
+          }).sort((a, b) => b.value - a.value);
+          const isFcMonth = entries.some(e => e.isFc);
+          html += `<div style="font-size:11px;color:#a1a1aa;margin-bottom:6px">${isFcMonth ? 'Forecast' : 'Actual'} · top ${Math.min(TOOLTIP_LIMIT, entries.length)} of ${entries.length}</div>`;
+
+          entries.slice(0, TOOLTIP_LIMIT).forEach(({ groupName, color, value }) => {
+             html +=`<div style="display:flex;gap:12px;align-items:center;font-size:12px;margin-bottom:3px"><span style="width:8px;height:8px;border-radius:50%;background:${color}"></span><span style="color:#d4d4d8;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${groupName}</span><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(value).toLocaleString('en-US', {maximumFractionDigits: 0})}</span></div>`;
           });
+          if (entries.length > TOOLTIP_LIMIT) {
+             html += `<div style="font-size:11px;color:#71717a;margin-top:4px">+${entries.length - TOOLTIP_LIMIT} more</div>`;
+          }
           return html;
         }
       },
-      legend: {
-        type: 'scroll',
-        top: 0,
-        textStyle: { color: '#a1a1aa' },
-        icon: 'circle',
-        data: seriesGroups.map(g => g.group)
-      },
-      grid: { left: '2%', right: '2%', bottom: '5%', top: '15%', containLabel: true },
+      // The series buttons above already act as the legend.
+      legend: { show: false },
+      grid: { left: '2%', right: '2%', bottom: '5%', top: '8%', containLabel: true },
       xAxis: {
         type: 'category',
         data: allDates,
@@ -948,19 +1032,20 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       series: echartSeries
     };
     
-    return (
-      <div className="flex flex-col h-full w-full">
-         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 mt-2 px-2">
+    return frame(
+      <>
+         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 mt-2 px-2">
             <div>
                <h2 className="text-lg md:text-xl font-bold text-zinc-100 uppercase tracking-wide">{humanTitle}</h2>
-               <p className="text-zinc-400 text-sm mt-1">Expected {metricLabel.toLowerCase()} by group for the next {fcCount} periods</p>
+               <p className="text-zinc-400 text-sm mt-1">Expected {metricLabel.toLowerCase()} for the next {fcCount} months</p>
             </div>
          </div>
          {focusBar}
-         <div className="flex-1 w-full min-h-[400px] relative">
-            <ReactECharts option={option} style={{ height: '100%', width: '100%', position: 'absolute' }} opts={{ renderer: 'svg' }} />
+         <div className={`flex-1 w-full relative ${isFullscreen ? 'min-h-[70vh]' : 'min-h-[400px]'}`}>
+            <ReactECharts ref={chartRef} option={option} notMerge
+                          style={{ height: '100%', width: '100%', position: 'absolute' }} opts={{ renderer: 'svg' }} />
          </div>
-      </div>
+      </>
     );
 }
 

@@ -313,7 +313,12 @@ def _lexical_score(hint: str, cand: DimensionCandidate) -> tuple[float, str]:
             return 0.6 * len(overlap) / max(len(h_tokens), len(c_tokens)), "token_match"
 
     # Substring, but only for reasonably long hints to avoid "id" matching everything.
-    if len(h_norm) >= 4 and (h_norm in c_norm or c_norm in h_norm):
+    # The shorter must also cover most of the longer: "sale" is a different
+    # word from "salesperson", and treating it as a match grouped "predict
+    # boxes for each sale" by salesperson.
+    shorter, longer = sorted((h_norm, c_norm), key=len)
+    if (len(shorter) >= 4 and shorter in longer
+            and len(shorter) / len(longer) >= 0.7):
         return 0.55, "token_match"
 
     return 0.0, ""

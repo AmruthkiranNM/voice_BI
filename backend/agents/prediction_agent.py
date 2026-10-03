@@ -101,6 +101,11 @@ def _success_response(config: PredictionConfig, result, query: str) -> dict[str,
     # The engine computed figures; an answer containing none is not describing
     # them. Rather than let the model report having nothing, fall back to the
     # deterministic evidence, which is always complete.
+    # The evidence states plain numbers; a currency symbol on a count of boxes
+    # or customers is the wording layer inventing a unit.
+    if not _is_monetary(config.target):
+        insight = re.sub(r"\$\s?(?=\d)", "", insight)
+
     if _has_digits(evidence) and not _has_digits(insight):
         logger.warning(
             "[PredictionAgent] Generated answer carried no figures; "
@@ -270,7 +275,8 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
         order = [r["group"] for r in result.ranking_rows] or list(by_group)
         ordered = [g for g in order if g in by_group] + \
                   [g for g in by_group if g not in order]
-        shown = [g for g in ordered if by_group[g]["forecast"]][:12]
+        # Every forecast series is sent; the chart decides how many to draw.
+        shown = [g for g in ordered if by_group[g]["forecast"]]
 
         charts.append({
             "type": "grouped_time_series_forecast",
@@ -348,6 +354,17 @@ def _totals_by_group(result) -> list[tuple[str, float]]:
         group = str(row.get("group"))
         totals[group] = totals.get(group, 0.0) + float(row["value"])
     return sorted(totals.items(), key=lambda kv: -kv[1])
+
+
+#: Name fragments that mark a column as money. Same rule the chart uses to
+#: decide whether to prefix a currency symbol.
+_MONETARY_WORDS = ("amount", "revenue", "sales", "price", "cost", "salary",
+                   "balance", "income", "profit", "spend", "value")
+
+
+def _is_monetary(column: str | None) -> bool:
+    name = (column or "").lower()
+    return any(w in name for w in _MONETARY_WORDS)
 
 
 def _has_digits(text: str) -> bool:
@@ -536,7 +553,11 @@ def build_evidence(config: PredictionConfig, result) -> str:
         if model.get("beats_naive") is not None:
             line += f"; beats the naive baseline: {model['beats_naive']}"
         lines.append(line + ".")
-        lines.append(_reliability_line(model))
+        # MASE and the naive baseline belong to time-series backtesting; a
+        # regression or classification model is judged by its held-out
+        # metrics, already stated above.
+        if config.prediction_type == cfg.FORECASTING:
+            lines.append(_reliability_line(model))
     elif model.get("per_group"):
         chosen = {m.get("selected_model_label") for m in model["per_group"].values()}
         lines.append(

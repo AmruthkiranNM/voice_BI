@@ -359,6 +359,20 @@ def classify_task(
             )
             return _apply_capability_gates(decision, capabilities)
 
+        # A numeric measure predicted for each row of the table is regression:
+        # "predict boxes for each sale" wants a number per record, not a
+        # projection of the total and not a category.
+        target_kind = _named_target_kind(question, capabilities)
+        if target_kind == "measure" and _asks_per_record(question, capabilities):
+            decision.engine = ENGINE_REGRESSION
+            decision.task = REGRESSION
+            decision.confidence = 0.8
+            decision.reasons.append(
+                "Names a numeric measure and asks for it per record, with no "
+                "future period — a per-record numeric prediction."
+            )
+            return _apply_capability_gates(decision, capabilities)
+
         if (capabilities.supports_classification or signals["propensity"]
                 or re.search(r"\bwhether\b", question, re.IGNORECASE)):
             decision.engine = ENGINE_CLASSIFICATION
@@ -384,6 +398,62 @@ def classify_task(
     decision.confidence = 0.5
     decision.reasons.append("No decisive signal; defaulting to descriptive analysis.")
     return _apply_capability_gates(decision, capabilities)
+
+
+def _stems(word: str) -> set[str]:
+    """Singular/plural forms, so "sales" meets "sale" and "entries" meets "entry"."""
+    word = word.lower()
+    forms = {word}
+    if word.endswith("ies") and len(word) > 4:
+        forms.add(word[:-3] + "y")
+    if word.endswith("es") and len(word) > 3:
+        forms.add(word[:-2])
+    if word.endswith("s") and len(word) > 2:
+        forms.add(word[:-1])
+    forms.add(word + "s")
+    return forms
+
+
+def _names_column(question: str, columns: list[str]) -> bool:
+    """Whether any of ``columns`` is named in the question as a whole word."""
+    words = set()
+    for w in re.findall(r"[a-z0-9]+", question.lower()):
+        words |= _stems(w)
+    return any(_stems(c.lower()) & words for c in columns)
+
+
+def _named_target_kind(question: str, capabilities: DatasetCapabilities) -> str | None:
+    """Whether the question names a category to classify or a measure to estimate."""
+    if _names_column(question, capabilities.classification_targets):
+        return "label"
+    if _names_column(question, capabilities.measures):
+        return "measure"
+    return None
+
+
+#: Words that refer to a table's rows whatever the table is called.
+_ROW_WORDS = {"record", "row", "entry", "transaction", "item", "line"}
+_EACH_NOUN = re.compile(r"\b(?:each|every|per|individual)\s+([a-z_]+)", re.IGNORECASE)
+
+
+def _asks_per_record(question: str, capabilities: DatasetCapabilities) -> bool:
+    """
+    Whether "each X" refers to the table's own rows rather than to a grouping.
+
+    "Each sale" on a table called sales, or "each record" on any table, means
+    one prediction per row. "Each country" names a grouping and is left to the
+    grouped-forecast path. Only whole-word matches count, so "sale" does not
+    match a column called "salesperson".
+    """
+    table_stems = set()
+    for part in re.split(r"[^a-z0-9]+", (capabilities.table or "").lower()):
+        if part:
+            table_stems |= _stems(part)
+    for match in _EACH_NOUN.finditer(question):
+        noun_forms = _stems(match.group(1))
+        if noun_forms & table_stems or noun_forms & _ROW_WORDS:
+            return True
+    return False
 
 
 def _apply_capability_gates(
