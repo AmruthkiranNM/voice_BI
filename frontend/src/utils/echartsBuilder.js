@@ -22,8 +22,9 @@ export const fmt = (v) => {
 const fmtFull = (v) => {
   if (v == null || Number.isNaN(v)) return '—';
   const n = Number(v);
-  if (!Number.isInteger(n)) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  return n.toLocaleString();
+  // Fixed en-US grouping so tooltips (7,435,918) agree with the axis units (7.44M).
+  if (!Number.isInteger(n)) return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  return n.toLocaleString('en-US');
 };
 
 /** Detect if column name suggests currency */
@@ -75,7 +76,8 @@ const richTooltip = (labels, datasets, tooltipContext) => ({
       const allVals = (ds?.data || []).map(Number).filter(x => !Number.isNaN(x));
       const avg = allVals.length ? allVals.reduce((a, b) => a + b, 0) / allVals.length : 0;
       const diff = avg ? ((val - avg) / Math.abs(avg)) * 100 : 0;
-      const pct = total ? ((val / total) * 100).toFixed(1) : null;
+      // Share of the hovered point only means something with 2+ series.
+      const pct = params.length > 1 && total ? ((val / total) * 100).toFixed(1) : null;
       return `
         <div style="display:flex;align-items:center;gap:8px;margin:3px 0;">
           <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};"></span>
@@ -128,7 +130,8 @@ const itemTooltip = (datasets, tooltipContext) => ({
 /* ═══════════════════════════════════════════════════════════
    HELPERS
 ═══════════════════════════════════════════════════════════ */
-const baseGrid = (bottom = 60) => ({ left: 16, right: 16, top: 56, bottom, containLabel: true });
+// left leaves room for the rotated y-axis name (containLabel ignores axis names).
+const baseGrid = (bottom = 60) => ({ left: 40, right: 16, top: 56, bottom, containLabel: true });
 
 function xAxis(labels, opts = {}) {
   return { type: 'category', data: labels, ...ECHARTS_AXIS_STYLE(), axisLabel: { ...ECHARTS_AXIS_STYLE().axisLabel, rotate: labels.length > 8 ? 35 : 0, ...opts.axisLabel } };

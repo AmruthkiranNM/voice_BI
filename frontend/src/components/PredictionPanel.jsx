@@ -547,16 +547,9 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
           return html;
         }
       },
-      legend: {
-        top: 0,
-        textStyle: { color: '#a1a1aa' },
-        icon: 'circle',
-        data: [
-           {name: 'Actual', icon: 'circle'},
-           {name: 'Forecast', icon: 'path://M0,5 L10,5'},
-           {name: 'Confidence interval', icon: 'roundRect'}
-        ]
-      },
+      // Drawn as HTML above the chart instead: the ECharts legend stacked
+      // its three entries on top of each other under the app's CSS.
+      legend: { show: false },
       grid: { left: '2%', right: '2%', bottom: '5%', top: '15%', containLabel: true },
       xAxis: {
         type: 'category',
@@ -610,7 +603,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
           z: 2,
           markLine: lastHist ? {
              symbol: ['none', 'none'],
-             label: { show: true, position: 'start', formatter: 'Forecast starts', color: '#a1a1aa', fontSize: 10, padding: [0, 0, 10, 0] },
+             label: { show: true, position: 'end', formatter: 'Forecast starts', color: '#a1a1aa', fontSize: 10 },
              lineStyle: { color: '#52525b', type: 'dashed', width: 1 },
              data: [ { xAxis: lastHist.date } ]
           } : null
@@ -658,6 +651,13 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
                   </p>
                </div>
             </div>
+         </div>
+         <div className="flex items-center gap-5 px-2 mb-2 text-xs text-zinc-400">
+            <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e' }} />Actual</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed" style={{ borderColor: '#6366f1' }} />Forecast</span>
+            {fcData.some(d => d.lower != null && d.upper != null) && (
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: 'rgba(99,102,241,0.2)' }} />Likely range</span>
+            )}
          </div>
          <div className="flex-1 w-full min-h-[400px] relative">
             <ReactECharts option={option} style={{ height: '100%', width: '100%', position: 'absolute' }} opts={{ renderer: 'svg' }} />
@@ -943,7 +943,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
     if (anyLastHistDate && echartSeries.length > 0) {
        echartSeries[0].markLine = {
           symbol: ['none', 'none'],
-          label: { show: true, position: 'start', formatter: 'Forecast starts', color: '#a1a1aa', fontSize: 10, padding: [0, 0, 10, 0] },
+          label: { show: true, position: 'end', formatter: 'Forecast starts', color: '#a1a1aa', fontSize: 10 },
           lineStyle: { color: '#52525b', type: 'dashed', width: 1 },
           data: [ { xAxis: anyLastHistDate } ]
        };

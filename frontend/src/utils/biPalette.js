@@ -67,7 +67,9 @@ export function ECHARTS_TOOLTIP_STYLE() {
     borderWidth: 1,
     textStyle: { color: themeInk(), fontSize: 12, fontFamily: 'Inter, system-ui, sans-serif' },
     padding: [10, 14],
-    extraCssText: `box-shadow: 0 10px 25px -5px ${themeLineRgba(0.15)}; border-radius: 8px;`,
+    confine: true,
+    // Keep the tooltip above the chart canvas so bars never paint over it.
+    extraCssText: `box-shadow: 0 10px 25px -5px ${themeLineRgba(0.15)}; border-radius: 8px; z-index: 50; opacity: 1;`,
   };
 }
 
