@@ -205,6 +205,29 @@ def _summary_rows(config: PredictionConfig, result) -> list[dict[str, str]]:
     return rows
 
 
+def _series_validation(result, group) -> dict[str, Any]:
+    """
+    How one series' model was chosen, for display beside that series.
+
+    A grouped chart draws many point forecasts side by side. Each came from its
+    own backtest, and several are flat because a flat model won it; without its
+    validation result next to it, a flat line reads as a claim of certainty.
+    """
+    per_group = (result.model_metadata or {}).get("per_group") or {}
+    entry = per_group.get(group) or per_group.get(str(group)) or {}
+    score = entry.get("selected_score")
+    beats = entry.get("beats_naive")
+    status, sentence = reliability_status(score, beats)
+    return {
+        "model": entry.get("selected_model_label"),
+        "mase": round(float(score), 3) if score is not None else None,
+        "beats_naive": beats,
+        "reliability": status,
+        "reliability_note": sentence,
+        "reliable": status == "validated",
+    }
+
+
 def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
     """
     Translate the engine's semantic view list into renderable chart specs.
@@ -256,7 +279,8 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
             "dimensions": list(config.group_dimensions),
             "data": [{"group": str(g), "group_dict": by_group[g]["group_values"],
                       "historical": by_group[g]["historical"][-50:],
-                      "forecast": by_group[g]["forecast"]} for g in shown],
+                      "forecast": by_group[g]["forecast"],
+                      **_series_validation(result, g)} for g in shown],
             "shown": len(shown),
             "total": len([g for g in by_group if by_group[g]["forecast"]]),
             "truncated": len([g for g in by_group if by_group[g]["forecast"]]) > len(shown),
@@ -331,29 +355,47 @@ def _has_digits(text: str) -> bool:
     return bool(re.search(r"\d", text or ""))
 
 
-def _reliability_line(model: dict) -> str:
+def reliability_status(score: float | None, beats_naive: bool | None) -> tuple[str, str]:
     """
-    State reliability explicitly, because "best available" is not "reliable".
+    Classify a forecast's validation result, because "best available" is not
+    "reliable".
 
     Selection always returns the lowest validation error among the candidates,
-    even when every candidate is worse than repeating the last value. MASE is
-    the scale: below 1 the model beat the naive baseline on held-out periods,
-    at or above 1 it did not, and the answer has to say so rather than let the
-    presence of a number imply confidence.
+    even when every candidate is poor. Four outcomes are distinguishable and
+    each gets a statement that is literally true of it:
+
+    - ``not_validated``: no backtest was possible; a labelled fallback.
+    - ``baseline``: no candidate beat repeating the last value on held-out
+      periods (this includes the naive model winning outright).
+    - ``validated``: beat the naive baseline, and MASE is below 1.
+    - ``weak``: beat the naive baseline, but MASE is 1 or more, so it is still
+      less accurate than a one-step naive forecast measured in-sample.
+
+    Returns (status, sentence).
     """
-    score = model.get("selected_score")
-    beats = model.get("beats_naive")
     if score is None:
-        return ("RELIABILITY: not validated — no chronological backtest was "
-                "possible, so this is a fallback rather than a tested forecast.")
-    if score < 1 and beats:
-        return (f"RELIABILITY: validated — MASE {score:.2f} is below 1, so the "
-                f"model was more accurate than the naive baseline on held-out "
-                f"periods.")
-    return (f"RELIABILITY: NOT reliable — MASE {score:.2f} is at or above 1, "
-            f"meaning the model was no better than simply repeating the last "
-            f"observed value on held-out periods. Treat the figures as "
-            f"indicative only.")
+        return ("not_validated",
+                "not validated — no chronological backtest was possible, so this "
+                "is a fallback rather than a tested forecast.")
+    if beats_naive is False:
+        return ("baseline",
+                f"baseline only — no model beat simply repeating the last observed "
+                f"value on held-out periods (MASE {score:.2f}), so the forecast "
+                f"carries no information beyond that.")
+    if score < 1:
+        return ("validated",
+                f"validated — MASE {score:.2f} is below 1 and the model beat the "
+                f"naive baseline on held-out periods.")
+    return ("weak",
+            f"NOT reliable — the model beat the naive baseline, but MASE "
+            f"{score:.2f} is at or above 1, so its error is still larger than a "
+            f"one-step naive forecast's. Treat the figures as indicative only.")
+
+
+def _reliability_line(model: dict) -> str:
+    """The reliability statement for a single-series forecast's evidence."""
+    _, sentence = reliability_status(model.get("selected_score"), model.get("beats_naive"))
+    return f"RELIABILITY: {sentence}"
 
 
 def build_evidence(config: PredictionConfig, result) -> str:

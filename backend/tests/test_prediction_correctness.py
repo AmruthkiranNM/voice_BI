@@ -191,6 +191,36 @@ class TestReliabilityStatement:
         assert "validated" in line
         assert "NOT reliable" not in line
 
+    def test_naive_winning_is_called_baseline_not_misreported(self):
+        """
+        Naive cannot beat itself, so beats_naive is False even at MASE 0.66.
+        The statement must not claim 0.66 is "at or above 1".
+        """
+        status, sentence = prediction_agent.reliability_status(0.66, False)
+        assert status == "baseline"
+        assert "at or above 1" not in sentence
+        assert "no model beat" in sentence
+
+    def test_beat_naive_but_mase_above_one_is_weak(self):
+        status, sentence = prediction_agent.reliability_status(2.56, True)
+        assert status == "weak"
+        assert "NOT reliable" in sentence
+
+    def test_series_validation_is_attached_per_group(self):
+        """Each grouped series carries its own model and reliability."""
+        result = PredictionResult(model_metadata={"per_group": {
+            "A": {"selected_model_label": "Naive (last value)",
+                  "selected_score": 0.66, "beats_naive": False},
+            "B": {"selected_model_label": "Damped Holt Trend",
+                  "selected_score": 0.58, "beats_naive": True},
+        }})
+        a = prediction_agent._series_validation(result, "A")
+        b = prediction_agent._series_validation(result, "B")
+        assert (a["model"], a["reliability"], a["reliable"]) == \
+            ("Naive (last value)", "baseline", False)
+        assert (b["model"], b["reliability"], b["reliable"]) == \
+            ("Damped Holt Trend", "validated", True)
+
     def test_unvalidated_fallback_says_so(self):
         line = prediction_agent._reliability_line(
             {"selected_score": None, "beats_naive": None})

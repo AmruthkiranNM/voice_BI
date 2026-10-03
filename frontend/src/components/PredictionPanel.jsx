@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { TbAlertTriangle, TbShieldCheck, TbShieldOff, TbChartBar } from 'react-icons/tb';
 import ReactECharts from 'echarts-for-react';
 
@@ -266,13 +266,15 @@ export default function PredictionPanel({ result, insight }) {
   );
 }
 
-function ChartRenderer({ chart, targetColumn = 'Value' }) {
-  const commonAxisProps = {
-    axisLine: { lineStyle: { color: '#3f3f46' } },
-    splitLine: { lineStyle: { color: '#27272a', type: 'dashed' } },
-    axisLabel: { color: '#a1a1aa' }
-  };
+// Shared by every chart in this file, including GroupedForecastChart, so it
+// lives at module scope rather than inside one component.
+const commonAxisProps = {
+  axisLine: { lineStyle: { color: '#3f3f46' } },
+  splitLine: { lineStyle: { color: '#27272a', type: 'dashed' } },
+  axisLabel: { color: '#a1a1aa' }
+};
 
+function ChartRenderer({ chart, targetColumn = 'Value' }) {
   if (chart.type === 'risk_distribution' || chart.type === 'class_distribution') {
     const option = {
       tooltip: { 
@@ -661,6 +663,101 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
     );
   }
   if (chart.type === 'grouped_time_series_forecast') {
+    return <GroupedForecastChart chart={chart} targetColumn={targetColumn} />;
+  }
+
+
+  return <div className="text-zinc-500 flex items-center justify-center h-full text-sm">Forecast visualization unavailable</div>;
+}
+
+const RELIABILITY_LABEL = {
+  validated: 'validated',
+  weak: 'not reliable',
+  baseline: 'no better than last value',
+  not_validated: 'not validated',
+};
+
+const RELIABILITY_COLOR = {
+  validated: '#34d399',
+  weak: '#f87171',
+  baseline: '#fbbf24',
+  not_validated: '#a1a1aa',
+};
+
+/**
+ * Grouped forecast: every series at once, or one series in focus.
+ *
+ * With many series drawn together, each forecast is only its point estimate,
+ * and a flat point estimate next to a jagged history looks like a claim of
+ * certainty. Focusing a series re-draws it with the prediction interval the
+ * backend computed from its validation residuals, which is where the history's
+ * variability actually shows up in a forecast. Nothing is recomputed here:
+ * the values plotted are the values the API returned.
+ */
+function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
+  const [focus, setFocus] = useState(null);
+  const groups = chart.data || [];
+  const focused = focus ? groups.find(g => g.group === focus) : null;
+
+  const focusBar = (
+    <div className="px-2 mb-4">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setFocus(null)}
+          className={`px-3 py-1 rounded-full text-xs border transition-colors ${!focused ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'text-zinc-400 border-zinc-700 hover:border-zinc-500'}`}
+        >
+          All series
+        </button>
+        {groups.map(g => (
+          <button
+            key={g.group}
+            type="button"
+            onClick={() => setFocus(g.group)}
+            title={g.reliability_note || ''}
+            className={`px-3 py-1 rounded-full text-xs border transition-colors flex items-center gap-1.5 ${focused && focused.group === g.group ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'text-zinc-300 border-zinc-700 hover:border-zinc-500'}`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: RELIABILITY_COLOR[g.reliability] || '#71717a' }} />
+            {g.group}
+          </button>
+        ))}
+      </div>
+      <p className="text-[11px] text-zinc-500 mt-2">
+        Select a series to see its prediction interval. Dot colour shows validation:
+        <span style={{ color: RELIABILITY_COLOR.validated }}> validated</span>,
+        <span style={{ color: RELIABILITY_COLOR.baseline }}> no better than last value</span>,
+        <span style={{ color: RELIABILITY_COLOR.weak }}> not reliable</span>.
+        Flat lines are what the winning model predicts, not a display simplification.
+      </p>
+    </div>
+  );
+
+  if (focused) {
+    const single = {
+      type: 'time_series_forecast',
+      title: `${chart.title}: ${focused.group}`,
+      data: { historical: focused.historical || [], forecast: focused.forecast || [] },
+    };
+    return (
+      <div className="flex flex-col h-full w-full">
+        {focusBar}
+        {focused.model && (
+          <div className="px-2 mb-2 text-xs text-zinc-400">
+            Model: <span className="text-zinc-200">{focused.model}</span>
+            {focused.mase != null && <> · MASE <span className="font-mono text-zinc-200">{Number(focused.mase).toFixed(2)}</span></>}
+            {' · '}
+            <span style={{ color: RELIABILITY_COLOR[focused.reliability] || '#a1a1aa' }}>
+              {focused.reliability_note || RELIABILITY_LABEL[focused.reliability] || ''}
+            </span>
+          </div>
+        )}
+        <div className="flex-1 w-full min-h-[400px] relative">
+          <ChartRenderer chart={single} targetColumn={targetColumn} />
+        </div>
+      </div>
+    );
+  }
+
     const seriesGroups = chart.data || [];
     
     // Data Consistency Check
@@ -703,6 +800,12 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
       if (abs >= 1e3) return (val / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
       return val.toLocaleString(undefined, {maximumFractionDigits:0});
     };
+
+    // Each series' own validation result, so a flat line is shown next to the
+    // evidence for it rather than read as a claim of certainty.
+    const validationByGroup = Object.fromEntries(
+      seriesGroups.map(g => [g.group, g])
+    );
 
     // Build series
     const echartSeries = [];
@@ -795,6 +898,11 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              const typeLabel = fc !== null ? 'Forecast' : 'Actual';
              
              html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${color}"></span><span style="color:#d4d4d8;font-weight:500">${groupName} <span style="color:#a1a1aa;font-weight:400;margin-left:4px">(${typeLabel})</span>:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(displayVal).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+             const v = validationByGroup[groupName];
+             if (fc !== null && v && v.model) {
+               const flag = RELIABILITY_LABEL[v.reliability] || '';
+               html += `<div style="font-size:11px;color:#a1a1aa;margin:-2px 0 6px 16px">${v.model}${v.mase != null ? ` · MASE ${Number(v.mase).toFixed(2)}` : ''}${flag ? ` · <span style="color:${RELIABILITY_COLOR[v.reliability]}">${flag}</span>` : ''}</div>`;
+             }
           });
           return html;
         }
@@ -848,15 +956,12 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
                <p className="text-zinc-400 text-sm mt-1">Expected {metricLabel.toLowerCase()} by group for the next {fcCount} periods</p>
             </div>
          </div>
+         {focusBar}
          <div className="flex-1 w-full min-h-[400px] relative">
             <ReactECharts option={option} style={{ height: '100%', width: '100%', position: 'absolute' }} opts={{ renderer: 'svg' }} />
          </div>
       </div>
     );
-  }
-
-
-  return <div className="text-zinc-500 flex items-center justify-center h-full text-sm">Forecast visualization unavailable</div>;
 }
 
 function RiskIcon({ level }) {
