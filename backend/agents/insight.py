@@ -295,6 +295,11 @@ def run(
         max_prompt_rows = 30
 
     results_text = _format_results(rows, max_rows=max_prompt_rows)
+    # Rankings are computed here, never inferred by the LLM from row order.
+    from services.result_facts import facts_block
+    facts = facts_block(rows)
+    if facts:
+        results_text += "\n\n" + facts
 
     # ── Truncation note ──
     truncation_parts = []

@@ -71,7 +71,15 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     
     result = context.get("result") or {}
     rows = result.get("rows", [])
-    
+
+    # "Which one is the lowest?" about the rows already shown: answered by
+    # code from those rows, so no LLM reorders or re-queries them.
+    from services.result_facts import answer_extremum
+    direct = answer_extremum(message, rows)
+    if direct:
+        logger.info(f"[FOLLOWUP:{req_id}] answered from previous rows: {direct}")
+        return direct
+
     # 0. Predictive routing.
     #    Any follow-up that asks about the future goes to the prediction
     #    engine, whether the turn before it was a forecast or an ordinary SQL
