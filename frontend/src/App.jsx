@@ -189,6 +189,8 @@ export default function App() {
     setFakePipelineSeconds(analyzeComplexity(query).targetDurationMs / 1000);
     setError(null);
     setResponse(null);
+    // Follow-ups belong to the previous question's result; start fresh.
+    setChatMessages([]);
     setPendingResponse(null);
     setPendingError(null);
 

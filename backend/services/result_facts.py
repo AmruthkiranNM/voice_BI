@@ -69,13 +69,47 @@ def ranked(rows: list[dict], label: str, metric: str) -> list[tuple[str, float]]
     return sorted(pairs, key=lambda p: p[1], reverse=True)
 
 
+_PERIOD = re.compile(r"^\d{4}(-\d{2}(-\d{2})?|-?Q[1-4]|-W\d{2})?$")
+
+
+def period_changes(rows: list[dict], label: str, metric: str, max_items: int = 40) -> str:
+    """
+    Period-over-period changes when the label is a time period (2021, 2021-03,
+    2021-03-15, 2021-Q1), in chronological order. A missing value breaks the
+    chain rather than counting as zero.
+    """
+    keys = [str(r.get(label) or "") for r in rows]
+    if len(keys) < 2 or not all(_PERIOD.match(k) for k in keys):
+        return ""
+    series = sorted((k, r.get(metric)) for k, r in zip(keys, rows))
+    parts = []
+    for (k0, v0), (k1, v1) in zip(series, series[1:]):
+        if v0 is None or v1 is None:
+            parts.append(f"{k1}: n/a (missing data)")
+            continue
+        a, b = _num(v0), _num(v1)
+        diff = b - a
+        pct = f"{diff / abs(a) * 100:+.1f}%" if a else "n/a (previous is 0)"
+        sign = "+" if diff >= 0 else "-"
+        parts.append(f"{k1} vs {k0}: {sign}{format_value(abs(diff), metric)} ({pct})")
+    (kf, vf), (kl, vl) = series[0], series[-1]
+    if vf is not None and vl is not None and _num(vf):
+        a, b = _num(vf), _num(vl)
+        sign = "+" if b >= a else "-"
+        parts.append(f"OVERALL {kl} vs {kf}: {sign}{format_value(abs(b - a), metric)} "
+                     f"({(b - a) / abs(a) * 100:+.1f}%)")
+    return "; ".join(parts[-max_items:])
+
+
 def facts_block(rows: list[dict], max_items: int = 30) -> str:
     """Pre-computed ranking text for an LLM prompt; '' when not applicable."""
     label, metrics = split_columns(rows)
     if not label or not metrics or len(rows) < 2:
         return ""
     lines = ["COMPUTED FACTS (calculated by code; authoritative. Use these for any "
-             "highest/lowest/ranking statement - do NOT infer order from row order):"]
+             "highest/lowest/ranking statement - do NOT infer order from row order. "
+             "Do NOT state any difference, percentage, total or average that is not "
+             "listed here or in the rows):"]
     for metric in metrics:
         order = ranked(rows, label, metric)
         if len(order) < 2:
@@ -84,6 +118,10 @@ def facts_block(rows: list[dict], max_items: int = 30) -> str:
                           for i, (n, v) in enumerate(order[:max_items], 1))
         lines.append(f"- {metric}, highest to lowest: {shown}")
         lines.append(f"  Highest {metric}: {order[0][0]}. Lowest {metric}: {order[-1][0]}.")
+        changes = period_changes(rows, label, metric)
+        if changes:
+            lines.append(f"- {metric}, change from the previous period (use these exact "
+                         f"percentages; do not calculate your own): {changes}")
     return "\n".join(lines) if len(lines) > 1 else ""
 
 

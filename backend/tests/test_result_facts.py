@@ -1,4 +1,12 @@
 from services.result_facts import answer_extremum, facts_block
+from services.time_context import TimeCoverage, years_outside
+
+
+def test_years_outside_coverage():
+    cov = TimeCoverage(min_date="2021-01-01", max_date="2022-03-31")
+    assert years_outside("compare 2022 with 2023", cov) == [2023]
+    assert years_outside("revenue in 2021", cov) == []
+    assert years_outside("compare 2022 with 2023", TimeCoverage()) == []
 
 # Alphabetical row order, so the first row is NOT the highest.
 ROWS = [
@@ -38,6 +46,21 @@ def test_ties_name_all():
 def test_missing_value_not_treated_as_zero():
     rows = [{"k": "a", "v": None}, {"k": "b", "v": 3}, {"k": "c", "v": 5}]
     assert answer_extremum("which one is the lowest", rows).startswith("b")
+
+
+def test_period_changes_are_computed_not_guessed():
+    rows = [{"month": "2022-01", "revenue": 262052},
+            {"month": "2021-12", "revenue": 126959},
+            {"month": "2022-02", "revenue": 107541}]
+    facts = facts_block(rows)
+    # Chronological even though the rows are not.
+    assert "2022-01 vs 2021-12: +$135,093 (+106.4%)" in facts
+    assert "2022-02 vs 2022-01: -$154,511 (-59.0%)" in facts
+
+
+def test_period_changes_skip_missing():
+    rows = [{"m": "2021-01", "v": 10}, {"m": "2021-02", "v": None}, {"m": "2021-03", "v": 12}]
+    assert "n/a (missing data)" in facts_block(rows)
 
 
 def test_facts_block_states_true_order():

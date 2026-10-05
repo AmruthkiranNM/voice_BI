@@ -74,7 +74,7 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
 
     # "Which one is the lowest?" about the rows already shown: answered by
     # code from those rows, so no LLM reorders or re-queries them.
-    from services.result_facts import answer_extremum
+    from services.result_facts import answer_extremum, facts_block
     direct = answer_extremum(message, rows)
     if direct:
         logger.info(f"[FOLLOWUP:{req_id}] answered from previous rows: {direct}")
@@ -167,6 +167,23 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
         from agents import historical_to_predictive_agent
         return historical_to_predictive_agent.run(message, context, history)
     
+    # A year the data never reaches: say so plainly instead of querying for
+    # nothing and returning a generic "couldn't determine".
+    from services import time_context
+    scope_for_cov = context.get("table_names") or (
+        [context["table_name"]] if context.get("table_name") else None
+    )
+    cov = time_context.coverage(scope_for_cov)
+    missing = time_context.years_outside(f"{message} {resolved_question}", cov)
+    if missing:
+        years = ", ".join(str(y) for y in missing)
+        logger.info(f"[FOLLOWUP:{req_id}] years outside coverage: {years}")
+        return (
+            f"There is no data for {years}: your data covers {cov.min_date} to "
+            f"{cov.max_date}, so there is nothing to show for {years}. "
+            f"Try a period inside that range."
+        )
+
     if not needs_new_query:
         from agents.chat import run as run_chat
         return run_chat(message, context, history)
@@ -189,14 +206,33 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
             logger.error(f"[FOLLOWUP:{req_id}] Query failed: {new_result.get('error')}")
             return "I couldn't process that follow-up due to a query error. Please try again."
             
-        new_rows = new_result["result"].get("rows", [])
-        
+        def _empty(res):
+            rows_ = res.get("result", {}).get("rows", []) if res.get("success") else []
+            return not rows_ or all(v is None for r in rows_ for v in r.values())
+
+        if _empty(new_result):
+            # SQL generation is not deterministic and an empty answer may have
+            # been cached; one fresh, uncached attempt before reporting "none".
+            logger.warning(f"[FOLLOWUP:{req_id}] empty result for SQL: {new_result.get('sql')}; retrying uncached")
+            retry = process_query(
+                resolved_question, fast_mode=False, skip_insight=True,
+                table_names=scope, cache_mode=False,
+            )
+            if not _empty(retry):
+                new_result = retry
+
+        new_rows = new_result["result"].get("rows", []) if new_result.get("success") else []
+        if _empty(new_result):
+            where = f" Your data covers {cov.describe()}." if cov.known else ""
+            return f"No records matched that follow-up.{where}"
+
         # 3. Grounded Answer Generation
         logger.info(f"[FOLLOWUP:{req_id}] 17 answer generation started")
         answer_prompt = STRICT_ANSWER_PROMPT.format(
             message=message,
             resolved_question=resolved_question,
             new_results_text=_format_results(new_rows, max_rows=20)
+            + ("\n\n" + facts if (facts := facts_block(new_rows)) else ""),
         )
         
         final_answer = call_llm(answer_prompt, expect_json=False).strip()

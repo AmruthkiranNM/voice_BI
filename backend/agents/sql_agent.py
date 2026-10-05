@@ -200,6 +200,11 @@ def _ensure_filter_tables_joined(
     return sql[:idx] + "".join(join_clauses) + sql[idx:]
 
 
+#: Most distinct values a text column may have for its values to be matched
+#: as names in a question (beyond that it is free text, not a name column).
+_NAME_COLUMN_MAX = 500
+
+
 def _detect_categorical_filters(query: str, rag_context: dict) -> list[tuple[str, str, str]]:
     """
     Deterministically match words in the question against known low-cardinality
@@ -212,6 +217,7 @@ def _detect_categorical_filters(query: str, rag_context: dict) -> list[tuple[str
     import re
     from services.database import get_low_cardinality_values, get_table_schema
 
+    q_lower = " ".join(re.findall(r"[a-z0-9&']+", query.lower()))
     query_words = set(re.findall(r"[a-z0-9]+", query.lower()))
 
     def word_forms(word: str) -> set[str]:
@@ -236,7 +242,28 @@ def _detect_categorical_filters(query: str, rag_context: dict) -> list[tuple[str
                     query_words & word_forms(vw) for vw in value_words
                 ):
                     matches.append((table, col, value))
-    return matches
+
+        # Larger name columns (products, people: more values than the schema
+        # context lists) are matched too, but only on the value's full name
+        # as an exact phrase, so ordinary words in a question never become a
+        # filter by accident.
+        for col, values in get_low_cardinality_values(
+            table, schema=get_table_schema(table), max_distinct=_NAME_COLUMN_MAX,
+        ).items():
+            if col in values_by_col:
+                continue
+            for value in values:
+                name = " ".join(re.findall(r"[a-z0-9&']+", value.lower()))
+                if len(name) < 4 or not re.search(r"[a-z]", name):
+                    continue
+                if re.search(r"(?<![a-z0-9])" + re.escape(name) + r"(?![a-z0-9])", q_lower):
+                    matches.append((table, col, value))
+
+    # A longer name beats one it contains ("Milk Bars" over "Milk").
+    return [m for m in matches
+            if not any(o is not m and o[1] == m[1] and o[0] == m[0]
+                       and m[2].lower() in o[2].lower() and len(o[2]) > len(m[2])
+                       for o in matches)]
 
 
 def _scope_tables(rag_context: dict) -> list[str]:

@@ -15,6 +15,7 @@ so the behaviour is deterministic and testable.
 """
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import date
@@ -107,6 +108,15 @@ def coverage(tables: list[str] | None = None) -> TimeCoverage:
         names, result.describe(), result.columns or "none",
     )
     return result
+
+
+def years_outside(text: str, cov: TimeCoverage) -> list[int]:
+    """Calendar years named in ``text`` that the data does not reach at all."""
+    if not cov.known:
+        return []
+    lo, hi = int(cov.min_date[:4]), int(cov.max_date[:4])
+    named = sorted({int(y) for y in re.findall(r"\b(1[89]\d\d|2\d\d\d)\b", text or "")})
+    return [y for y in named if y < lo or y > hi]
 
 
 def named_periods(anchor: str) -> list[tuple[str, str, str]]:
