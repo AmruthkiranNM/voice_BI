@@ -12,6 +12,7 @@ query into a ranking, recommendation, or aggregation.
 
 import json
 import logging
+import re
 from typing import Any
 
 from services.llm_service import call_llm
@@ -224,6 +225,7 @@ def run(
     sql: str,
     execution_result: dict[str, Any],
     plan: dict[str, Any] | None = None,
+    tables: list[str] | None = None,
 ) -> str:
     """
     Generate business insights from query results using LLM.
@@ -256,8 +258,10 @@ def run(
         # say what it does reach instead of asking the user to guess.
         from services import time_context
 
-        cov = time_context.coverage()
-        if cov.known:
+        cov = time_context.coverage(tables)
+        # The date range only explains an empty result when a date was asked for.
+        dated = bool(re.search(r"strftime|date\(|\d{4}-\d{2}|\b(19|20)\d{2}\b", sql or ""))
+        if cov.known and dated:
             insight = (
                 f"No records matched that request. Your data covers "
                 f"{cov.min_date} to {cov.max_date}, so a period outside that "

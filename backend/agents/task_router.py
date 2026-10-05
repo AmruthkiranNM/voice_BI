@@ -284,6 +284,19 @@ def classify_task(
         A TaskDecision. ``blocked`` lists capabilities the dataset lacks.
     """
     signals = _signals(question)
+    # "Estimate revenue for 2023" over data that ends in 2022 asks about a
+    # period that has not happened: an estimate of the future is a forecast.
+    # A bare "revenue in 2023" stays descriptive and is answered "no data".
+    if (table and not signals["future_time"]
+            and re.search(r"\b(estimat\w*|expect\w*|anticipat\w*)\b", question or "", re.IGNORECASE)):
+        try:
+            from services import time_context
+            cov = time_context.coverage([table])
+            if cov.known and any(y > int(cov.max_date[:4])
+                                 for y in time_context.years_outside(question, cov)):
+                signals["future_time"] = True
+        except Exception as exc:
+            logger.debug("[TaskRouter] coverage check skipped: %s", exc)
     decision = TaskDecision(signals=signals)
 
     if capabilities is None and table:

@@ -1,5 +1,6 @@
 import logging
 import json
+import re
 from typing import Any
 
 from services.llm_service import call_llm
@@ -51,6 +52,8 @@ RULES:
 3. Do not mention that you ran a query. Just answer the question.
 4. Do NOT rank, identify "top"/"best"/"worst" items, or generate recommendations unless the question explicitly asks for them.
 5. Do NOT invent numbers that aren't in the result rows.
+6. A period or group with no value (absent or empty/None) has NO DATA. Never call it higher, lower or zero; compare only items that have values on both sides, and say plainly which periods have no data.
+7. If COMPUTED FACTS are given, take every ranking, difference and percentage from them.
 
 Write your final answer now:"""
 
@@ -75,6 +78,19 @@ def run_followup(message: str, context: dict[str, Any], history: list[dict[str, 
     # "Which one is the lowest?" about the rows already shown: answered by
     # code from those rows, so no LLM reorders or re-queries them.
     from services.result_facts import answer_extremum, facts_block
+
+    # "How reliable / accurate is this?" about a prediction: the engine's own
+    # validation lines answer it, word for word.
+    evidence = result.get("evidence") or ""
+    if evidence and re.search(r"\b(reliab|accura|trust|confiden|error|precise|valid|sure|good is|mase|r2|r²)",
+                              message, re.IGNORECASE):
+        lines = [l.strip() for l in evidence.splitlines()
+                 if re.match(r"\s*(MODEL|RELIABILITY|MASE|ACCURACY|ROC|R²|MODEL R|VALIDATION|BACKTEST)",
+                             l, re.IGNORECASE)]
+        if lines:
+            logger.info(f"[FOLLOWUP:{req_id}] reliability answered from prediction evidence")
+            return "\n".join(lines)
+
     direct = answer_extremum(message, rows)
     if direct:
         logger.info(f"[FOLLOWUP:{req_id}] answered from previous rows: {direct}")

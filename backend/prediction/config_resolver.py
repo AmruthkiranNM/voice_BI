@@ -129,6 +129,13 @@ _FINAL_PERIOD_MARKERS = re.compile(
     r"by the end of|at the end of|end of the (?:horizon|period|forecast)",
     re.IGNORECASE,
 )
+#: Words that ask for a breakdown into groups, rather than one total.
+_GROUPING_CUE = re.compile(
+    r"\b(by|per|each|every|which|across|among|between|breakdown|broken down|split|"
+    r"group(?:ed)?|segment\w*|compare|vs|versus)\b|"
+    r"\b(highest|lowest|most|least|best|worst|top|bottom|rank\w*)\b",
+    re.IGNORECASE,
+)
 _COMPARE_MARKERS = re.compile(
     r"\b(remain|stay|still|same|keep|hold|retain|enter|entering|overtake|"
     r"replace|fall out|drop out|change places)\b",
@@ -520,6 +527,11 @@ def resolve_config(
     # salesperson via an embedding match on "sale". Only forecasts aggregate
     # into groups, so only forecasts infer one.
     infer_grouping = config.prediction_type == cfg.FORECASTING
+    # Only a question that asks for a breakdown is grouped. "Forecast total
+    # revenue" and "revenue for Australia" name a total and a filter; guessing
+    # a grouping from their words split them by salesperson / by country.
+    if infer_grouping and not _GROUPING_CUE.search(question or ""):
+        infer_grouping = False
 
     if not requested_dims and infer_grouping:
         # Interpretation named no grouping. Infer one from the question itself

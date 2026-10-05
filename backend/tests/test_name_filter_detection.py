@@ -30,5 +30,15 @@ def test_longest_name_wins():
     assert found == ["Milk Bars"]
 
 
+def test_word_inside_product_name_is_not_a_category_filter():
+    found = _detect("Compare After Nines and Milk Bars by month")
+    assert ("products", "category", "Bars") not in found
+    assert {v for _, c, v in found if c == "product"} == {"After Nines", "Milk Bars"}
+
+
+def test_category_still_detected_on_its_own():
+    assert ("products", "category", "Bars") in _detect("revenue of bars vs bites")
+
+
 def test_no_names_no_filters():
     assert _detect("total revenue by country") == []

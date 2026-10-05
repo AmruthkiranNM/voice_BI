@@ -272,7 +272,9 @@ def _apply_filters(df: pd.DataFrame, config: PredictionConfig) -> pd.DataFrame:
         wanted = {str(v) for v in f.values}
 
         if column in df.columns:
+            before = df
             df = df[df[column].astype(str).isin(wanted)]
+            _note_empty_filter(before, df, column, wanted, config)
             continue
 
         joined = _join_dimension_column(df, column, config)
@@ -282,10 +284,28 @@ def _apply_filters(df: pd.DataFrame, config: PredictionConfig) -> pd.DataFrame:
             )
             continue
         df, added = joined
+        before = df
         df = df[df[column].astype(str).isin(wanted)]
+        _note_empty_filter(before, df, column, wanted, config)
         df = df.drop(columns=[c for c in added if c in df.columns])
 
     return df
+
+
+#: Prefix of the warning that names a filter value absent from the data.
+EMPTY_FILTER_PREFIX = "No rows have "
+
+
+def _note_empty_filter(before, after, column, wanted, config) -> None:
+    """When a filter removes every row, record which value is missing and what exists."""
+    if before.empty or not after.empty:
+        return
+    present = sorted(before[column].dropna().astype(str).unique())
+    listed = ", ".join(present[:15]) + (f" (+{len(present) - 15} more)" if len(present) > 15 else "")
+    config.warnings.append(
+        f"{EMPTY_FILTER_PREFIX}{column} = {', '.join(sorted(wanted))}. "
+        f"Values present in this data: {listed}."
+    )
 
 
 def _join_dimension_column(df: pd.DataFrame, column: str, config: PredictionConfig):
@@ -335,7 +355,10 @@ def _run_forecasting(config: PredictionConfig) -> PredictionResult:
 
     if df.empty:
         result.status = cfg.STATUS_INSUFFICIENT_DATA
-        result.errors.append("No rows remain after applying the requested filters.")
+        specific = [w for w in config.warnings if w.startswith(EMPTY_FILTER_PREFIX)]
+        result.errors.append(
+            specific[0] if specific
+            else "No rows remain after applying the requested filters.")
         return result
 
     result.dataset_context = {

@@ -134,6 +134,9 @@ def _success_response(config: PredictionConfig, result, query: str) -> dict[str,
         "row_count": 0,
         "status": result.status,
         "warnings": result.warnings,
+        # Engine-computed facts, kept so follow-ups ("how reliable is this?")
+        # are answered from them rather than from a fresh LLM guess.
+        "evidence": evidence,
     }
     payload["row_count"] = len(payload["rows"])
     return {"result": payload, "insight": insight, "config": config.to_dict()}

@@ -33,13 +33,9 @@ _MONETARY = ("amount", "revenue", "sales", "price", "cost", "salary",
 def _is_number(v) -> bool:
     if isinstance(v, bool) or v is None:
         return False
-    if isinstance(v, (int, float)):
-        return True
-    try:
-        float(str(v).replace(",", ""))
-        return True
-    except ValueError:
-        return False
+    # Measures come back from the database as numbers; text that looks
+    # numeric ("2021", "02" from strftime) is a label.
+    return isinstance(v, (int, float))
 
 
 def _num(v) -> float:
@@ -122,7 +118,86 @@ def facts_block(rows: list[dict], max_items: int = 30) -> str:
         if changes:
             lines.append(f"- {metric}, change from the previous period (use these exact "
                          f"percentages; do not calculate your own): {changes}")
+    comparison = comparison_facts(rows)
+    if comparison:
+        lines.append(comparison)
     return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def _diff_text(a: float, b: float, metric: str) -> str:
+    sign = "+" if b >= a else "-"
+    pct = f" ({(b - a) / abs(a) * 100:+.1f}%)" if a else ""
+    return f"{sign}{format_value(abs(b - a), metric)}{pct}"
+
+
+def comparison_facts(rows: list[dict], max_items: int = 24) -> str:
+    """
+    Side-by-side differences, whatever shape the comparison query returned:
+
+    - wide:  month | revenue_2021 | revenue_2022       (two numeric columns)
+    - long:  year | month | revenue                    (a short series column)
+    - one period column spanning years: 2021-01 ... 2022-03 (same month, each year)
+
+    Only pairs with a value on both sides are compared; a side with no value
+    is listed as having no data, never as lower.
+    """
+    if len(rows) < 2:
+        return ""
+    cols = list(rows[0].keys())
+    label, metrics = split_columns(rows)
+    if not label or not metrics:
+        return ""
+    out = []
+
+    labels = [c for c in cols if c not in metrics]
+    if len(metrics) >= 2 and len(labels) == 1:
+        a, b = metrics[0], metrics[1]
+        for r in rows[:max_items]:
+            va, vb = r.get(a), r.get(b)
+            if va is None or vb is None:
+                out.append(f"{r.get(label)}: no data for {a if va is None else b}")
+            else:
+                out.append(f"{r.get(label)}: {b} vs {a} {_diff_text(_num(va), _num(vb), b)}")
+        head = f"- Per-row comparison, {b} vs {a}:"
+    elif len(labels) == 2 and len(metrics) == 1:
+        metric = metrics[0]
+        series_col = min(labels, key=lambda c: len({str(r.get(c)) for r in rows}))
+        key_col = next(c for c in labels if c != series_col)
+        series = sorted({str(r.get(series_col)) for r in rows})
+        if not 2 <= len(series) <= 4:
+            return ""
+        table = {}
+        for r in rows:
+            table.setdefault(str(r.get(key_col)), {})[str(r.get(series_col))] = r.get(metric)
+        first, last = series[0], series[-1]
+        for key in sorted(table)[:max_items]:
+            va, vb = table[key].get(first), table[key].get(last)
+            if va is None or vb is None:
+                missing = first if va is None else last
+                out.append(f"{key}: no data for {missing}")
+            else:
+                out.append(f"{key}: {last} vs {first} {_diff_text(_num(va), _num(vb), metric)}")
+        head = f"- {metric} by {key_col}, {last} vs {first}:"
+    elif len(labels) == 1 and len(metrics) == 1:
+        keys = [str(r.get(label) or "") for r in rows]
+        if not all(re.match(r"^\d{4}-\d{2}$", k) for k in keys):
+            return ""
+        years = sorted({k[:4] for k in keys})
+        if len(years) < 2:
+            return ""
+        metric = metrics[0]
+        val = {str(r.get(label)): r.get(metric) for r in rows}
+        first, last = years[0], years[-1]
+        for mm in sorted({k[5:] for k in keys}):
+            va, vb = val.get(f"{first}-{mm}"), val.get(f"{last}-{mm}")
+            if va is None or vb is None:
+                out.append(f"month {mm}: no data for {first if va is None else last}")
+            else:
+                out.append(f"month {mm}: {last} vs {first} {_diff_text(_num(va), _num(vb), metric)}")
+        head = f"- {metric}, same month {last} vs {first}:"
+    else:
+        return ""
+    return head + " " + "; ".join(out) if out else ""
 
 
 def _tokens(text: str) -> list[str]:

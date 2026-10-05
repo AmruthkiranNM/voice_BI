@@ -93,6 +93,18 @@ def process_query(
         # ════════════════════════════════════════════
         # STEP 0: Router Agent
         # ════════════════════════════════════════════
+        # Requests to change data are refused up front. The validator would
+        # block a DELETE, but the SQL writer instead turns "delete the India
+        # sales" into a SELECT of those rows, and the answer then reads as if
+        # they "will be deleted".
+        if _MODIFY_REQUEST.match(query or ""):
+            return _plain_answer(
+                query,
+                "I can only read and analyse your data - I can't delete, change or "
+                "add records. Make that change in the source file or database, "
+                "then reconnect it here.",
+                agent_logs, time.time() - pipeline_start, status="read_only")
+
         from agents import task_router
 
         decision = task_router.route(query, scope_tables=table_names)
@@ -115,6 +127,30 @@ def process_query(
         if pipeline_type == "PREDICTIVE":
             logger.info("[Orchestrator] Routing query to PREDICTIVE pipeline.")
             from agents import prediction_agent
+            from services.entity_check import unknown_names
+
+            # A name the data does not contain would otherwise be dropped and
+            # the forecast presented as if it were for that name.
+            unknown = unknown_names(query, table_names)
+            if unknown:
+                logger.warning("[Orchestrator] Names not in data: %s", unknown)
+                names = ", ".join(f'"{n}"' for n in unknown)
+                return {
+                    "success": True, "query": query, "sql": None,
+                    "result": {"columns": [], "rows": [], "row_count": 0,
+                               "status": "not_in_data", "unknown_names": unknown},
+                    "insight": (
+                        f"{names} doesn't appear anywhere in the selected data, so a "
+                        f"prediction for it isn't possible - forecasting the overall "
+                        f"total instead would be misleading. Check the spelling, or "
+                        f"ask about a value that is in the data."
+                    ),
+                    "llm_mode": "none",
+                    "metadata": {"pipeline_type": "CAPABILITY_LIMIT", "task": decision.task,
+                                 "engine": decision.engine,
+                                 "pipeline_time_seconds": round(time.time() - pipeline_start, 3)},
+                    "agent_logs": agent_logs,
+                }
 
             # The active data source is passed through, so a prediction is
             # always scoped to the dataset the user is looking at rather than
@@ -201,6 +237,42 @@ def process_query(
             )
             log_step("SQL Generator Agent", f"attempt_{attempt}", {"sql": sql})
             logger.info("[DEBUG] Generated SQL: %s", sql)
+
+            # The model was told to answer NOT_IN_DATA rather than invent a
+            # proxy definition for a measure no column records.
+            missing = re.search(r"NOT_IN_DATA\s*:?\s*([^\n;]*)", sql or "", re.IGNORECASE)
+            if missing:
+                measure = missing.group(1).strip().strip("'\"<>.") or None
+                logger.warning("[Orchestrator] Measure not in data: %s", measure)
+                return _not_in_data_response(
+                    query, measure, rag_context, agent_logs, time.time() - pipeline_start)
+
+            # No query at all ("...", or prose): the model found nothing in
+            # the schema to answer with. Say so instead of a "security" error.
+            if not re.match(r"\s*(SELECT|WITH)\b", sql or "", re.IGNORECASE) \
+                    and not re.search(r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|PRAGMA)\b",
+                                      sql or "", re.IGNORECASE):
+                logger.warning("[Orchestrator] No SQL produced (%r) - data cannot answer.", (sql or "")[:60])
+                return _not_in_data_response(
+                    query, None, rag_context, agent_logs, time.time() - pipeline_start)
+
+            # "WHERE 0" / "WHERE 1=0": the model could not interpret the
+            # question and wrote a query that can never match.
+            if re.search(r"\bWHERE\s+(0|FALSE|1\s*=\s*0)\s*(;|$|\bGROUP|\bORDER|\bLIMIT)",
+                         sql, re.IGNORECASE):
+                return _plain_answer(
+                    query,
+                    "I couldn't understand that question. Try asking about a measure "
+                    "and how to break it down, for example \"total revenue by country\".",
+                    agent_logs, time.time() - pipeline_start, status="not_understood")
+
+            # A measure filled with a constant (0.0 AS churn_rate) is invented.
+            invented = _constant_measures(sql)
+            if invented:
+                logger.warning("[Orchestrator] Constant measure(s) %s - not in data.", invented)
+                return _not_in_data_response(
+                    query, invented[0], rag_context, agent_logs,
+                    time.time() - pipeline_start, sql=sql)
 
             validation_result = validator.run(
                 sql,
@@ -330,7 +402,9 @@ def process_query(
                 "reason": "fast_mode" if fast_mode else "disabled",
             })
         else:
-            insight_text = insight.run(query, sql, exec_result, plan=plan)
+            insight_text = insight.run(
+                query, sql, exec_result, plan=plan,
+                tables=rag_context.get("pinned_tables") or rag_context.get("retrieved_tables"))
             if pipeline_notes:
                 insight_text = insight_text + "\n\n" + " ".join(pipeline_notes)
             log_step("Insight Agent", "completed", {
@@ -573,6 +647,124 @@ def _diagnose_zero_rows(sql: str, query: str) -> str | None:
         )
 
     return None
+
+
+_MODIFY_REQUEST = re.compile(
+    # Only verbs with no analytical reading ("change in revenue" and "add up
+    # sales" are questions, so change/add are not here).
+    r"^\s*(please\s+|can you\s+|could you\s+)?(delete|remove|drop|truncate|erase|"
+    r"wipe|update|insert|rename|alter|overwrite)\b",
+    re.IGNORECASE,
+)
+
+
+def _plain_answer(query: str, message: str, agent_logs: list,
+                  pipeline_time: float, status: str) -> dict[str, Any]:
+    """A fixed, honest reply with no data behind it."""
+    return {
+        "success": True, "query": query, "sql": None,
+        "result": {"columns": [], "rows": [], "row_count": 0, "status": status},
+        "insight": message, "llm_mode": "none",
+        "metadata": {"pipeline_type": "CAPABILITY_LIMIT",
+                     "pipeline_time_seconds": round(pipeline_time, 3)},
+        "agent_logs": agent_logs,
+    }
+
+
+_NUMERIC_LITERAL = re.compile(r"^\(?\s*(NULL|[-+]?\d+(\.\d+)?)\s*\)?$", re.IGNORECASE)
+
+
+def _constant_measures(sql: str) -> list[str]:
+    """
+    Output columns of the outermost SELECT that are a bare number or NULL,
+    e.g. ``0.0 AS churn_rate``.
+
+    That is how a model "answers" a measure the data does not contain: every
+    group gets the same invented constant, which then reads as a real result
+    ("churn is zero everywhere"). Missing data is not zero.
+    """
+    text = (sql or "").strip().rstrip(";")
+    # UNION branches legitimately pad missing columns with NULL.
+    if re.search(r"\bUNION\b", text, re.IGNORECASE):
+        return []
+    # The final SELECT is the one whose columns the user sees.
+    starts = [m.start() for m in re.finditer(r"\bSELECT\b", text, re.IGNORECASE)]
+    if not starts:
+        return []
+    depth_at = []
+    depth = 0
+    for i, ch in enumerate(text):
+        depth_at.append(depth)
+        depth += ch == "("
+        depth -= ch == ")"
+    outer = [s for s in starts if depth_at[s] == 0]
+    if not outer:
+        return []
+    body = text[outer[-1] + 6:]
+    end = re.search(r"\bFROM\b", body, re.IGNORECASE)
+    select_list = body[:end.start()] if end else body
+
+    items, depth, cur = [], 0, ""
+    for ch in select_list:
+        if ch == "," and depth == 0:
+            items.append(cur)
+            cur = ""
+            continue
+        depth += ch == "("
+        depth -= ch == ")"
+        cur += ch
+    items.append(cur)
+
+    found = []
+    for item in items:
+        m = re.match(r"\s*(.+?)\s+AS\s+[\"'`\[]?([\w ]+?)[\"'`\]]?\s*$", item.strip(),
+                     re.IGNORECASE | re.DOTALL)
+        if m and _NUMERIC_LITERAL.match(m.group(1).strip()):
+            found.append(m.group(2).strip())
+    return found
+
+
+def _not_in_data_response(
+    query: str, measure: str | None, rag_context: dict,
+    agent_logs: list, pipeline_time: float, sql: str | None = None,
+) -> dict[str, Any]:
+    """Say the selected data cannot answer, instead of inventing a value."""
+    from services.database import get_table_schema
+
+    tables = rag_context.get("pinned_tables") or rag_context.get("retrieved_tables") or []
+    columns = []
+    for t in tables:
+        try:
+            columns += [c["column_name"] for c in get_table_schema(t)]
+        except Exception:
+            pass
+    what = f"\"{measure.replace('_', ' ')}\"" if measure else "what this question asks about"
+    message = (
+        f"The selected data has no information on {what}, so it can't be "
+        f"calculated - showing a value would mean making one up."
+    )
+    if columns:
+        shown = ", ".join(dict.fromkeys(columns))
+        message += f" The selected tables contain: {shown}."
+    message += " If another dataset records this, switch the data source to it and ask again."
+
+    return {
+        "success": True,
+        "query": query,
+        "sql": sql,
+        "result": {
+            "columns": [], "rows": [], "row_count": 0,
+            "status": "not_in_data",
+            "missing_measure": measure,
+        },
+        "insight": message,
+        "llm_mode": "none",
+        "metadata": {
+            "pipeline_type": "CAPABILITY_LIMIT",
+            "pipeline_time_seconds": round(pipeline_time, 3),
+        },
+        "agent_logs": agent_logs,
+    }
 
 
 def _capability_response(

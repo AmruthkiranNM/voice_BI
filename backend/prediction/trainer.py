@@ -280,9 +280,11 @@ def load_artifact(
     try:
         with open(model_path, "rb") as f:
             artifact = pickle.load(f)
-    except (ModuleNotFoundError, AttributeError, ImportError, pickle.UnpicklingError, EOFError) as e:
-        # Saved with an incompatible library version (e.g. a different
-        # scikit-learn); treat as missing so the caller retrains.
+    except Exception as e:
+        # Saved with an incompatible library version (a different
+        # scikit-learn, or numpy's "MT19937 is not a known BitGenerator"
+        # ValueError); a cache that cannot be read is treated as missing so
+        # the caller retrains.
         logger.warning("[Trainer] Could not load %s (%s); re-training required.", model_path.name, e)
         return None
     # Handle legacy format: old ml_engine.py saved a plain dict

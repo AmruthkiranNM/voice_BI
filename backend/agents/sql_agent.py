@@ -6,6 +6,7 @@ Supports error-feedback retries when a previous attempt failed validation or exe
 """
 
 import logging
+import re
 from datetime import datetime
 
 from services.llm_service import call_llm
@@ -55,7 +56,9 @@ CRITICAL RULES:
   * Do not automatically assume plural nouns (like "bars") mean exactly one result with LIMIT 1.
   * If the question asks for "highest selling bar" (singular), LIMIT 1 is appropriate.
   * If the question asks for "highest selling bars" (plural), return the ranked set without a LIMIT, unless an explicit number is given (e.g. "top 3").
-- Output ONLY the raw SQL query — no markdown, no explanation, no code fences.
+- OPAQUE COLUMNS: never assume a column with a meaningless name (m1, col3, x, var_2, field7) holds a specific measure the question names (balance, age, salary). If the only candidate is such a column, the measure is not recorded (see next rule).
+- MEASURES THE DATA DOES NOT RECORD: if the question asks for a measure that no column records and that cannot be computed by a standard, unambiguous formula from the columns (e.g. churn with no churn/exited/status column, profit or margin with no cost column, ratings with no rating column), do NOT invent a definition from proxy columns (e.g. treating a fall in a customer count as churn) and do NOT fill it with a constant. Instead output exactly: NOT_IN_DATA: <the measure>
+- Output ONLY the raw SQL query (or the NOT_IN_DATA line) — no markdown, no explanation, no code fences.
 {retry_section}
 ═══════════════════════════════════════
 OWNER'S QUESTION: {query}
@@ -119,7 +122,16 @@ def run(
 
     detected_filters = _detect_categorical_filters(query, rag_context)
     if detected_filters:
-        lines = "\n".join(f"  - WHERE {t}.{c} = '{v}'" for t, c, v in detected_filters)
+        by_col: dict[tuple[str, str], list[str]] = {}
+        for t, c, v in detected_filters:
+            by_col.setdefault((t, c), []).append(v)
+        # Several names in one column ("After Nines and Milk Bars") are
+        # alternatives, never conditions that must all hold at once.
+        lines = "\n".join(
+            f"  - WHERE {t}.{c} = '{vs[0]}'" if len(vs) == 1
+            else f"  - WHERE {t}.{c} IN (" + ", ".join(f"'{v}'" for v in vs) + ")"
+            for (t, c), vs in by_col.items()
+        )
         plan_text += (
             f"\n\nDETECTED FILTERS — the question names these exact category values; "
             f"apply them as WHERE conditions (do not also filter to any of that "
@@ -145,6 +157,7 @@ def run(
     sql = _clean_sql(call_llm(prompt, expect_json=False))
     sql = _repair_columns(sql, rag_context)
     sql = _fix_text_aggregates(sql, rag_context)
+    sql = _fix_integer_division(sql)
     sql = _ensure_filter_tables_joined(sql, detected_filters, rag_context)
     logger.info("[SQL Agent] Generated SQL: %s", sql[:200])
     return sql
@@ -230,40 +243,79 @@ def _detect_categorical_filters(query: str, rag_context: dict) -> list[tuple[str
             forms.add(word[:-1])
         return forms
 
-    matches = []
-    for table in _scope_tables(rag_context):
-        values_by_col = get_low_cardinality_values(table, schema=get_table_schema(table))
-        for col, values in values_by_col.items():
-            for value in values:
-                value_words = re.findall(r"[a-z0-9]+", value.lower())
-                if not value_words:
-                    continue
-                if all(
-                    query_words & word_forms(vw) for vw in value_words
-                ):
-                    matches.append((table, col, value))
+    tables = _scope_tables(rag_context)
+    small = {t: get_low_cardinality_values(t, schema=get_table_schema(t)) for t in tables}
 
-        # Larger name columns (products, people: more values than the schema
-        # context lists) are matched too, but only on the value's full name
-        # as an exact phrase, so ordinary words in a question never become a
-        # filter by accident.
+    # Pass 1 - larger name columns (products, people: more values than the
+    # schema context lists), matched only on the value's full name as an
+    # exact phrase, so ordinary words in a question never become a filter.
+    name_matches = []
+    for table in tables:
         for col, values in get_low_cardinality_values(
             table, schema=get_table_schema(table), max_distinct=_NAME_COLUMN_MAX,
         ).items():
-            if col in values_by_col:
+            if col in small[table]:
                 continue
             for value in values:
                 name = " ".join(re.findall(r"[a-z0-9&']+", value.lower()))
                 if len(name) < 4 or not re.search(r"[a-z]", name):
                     continue
                 if re.search(r"(?<![a-z0-9])" + re.escape(name) + r"(?![a-z0-9])", q_lower):
+                    name_matches.append((table, col, value, name))
+    # A longer name beats one it contains ("Milk Bars" over "Milk").
+    name_matches = [m for m in name_matches
+                    if not any(o is not m and o[1] == m[1] and m[3] in o[3] and len(o[3]) > len(m[3])
+                               for o in name_matches)]
+
+    # Words inside a matched name belong to that name: "bars" in "Milk Bars"
+    # is not also a request for the Bars category.
+    rest = q_lower
+    for *_, name in name_matches:
+        rest = re.sub(r"(?<![a-z0-9])" + re.escape(name) + r"(?![a-z0-9])", " ", rest)
+    query_words = set(re.findall(r"[a-z0-9]+", rest))
+
+    # Pass 2 - small category-like columns, word by word.
+    matches = []
+    for table in tables:
+        for col, values in small[table].items():
+            for value in values:
+                value_words = re.findall(r"[a-z0-9]+", value.lower())
+                if value_words and all(query_words & word_forms(vw) for vw in value_words):
                     matches.append((table, col, value))
 
-    # A longer name beats one it contains ("Milk Bars" over "Milk").
-    return [m for m in matches
-            if not any(o is not m and o[1] == m[1] and o[0] == m[0]
-                       and m[2].lower() in o[2].lower() and len(o[2]) > len(m[2])
-                       for o in matches)]
+    return matches + [(t, c, v) for t, c, v, _ in name_matches]
+
+
+_AGG_CALL = re.compile(r"\b(SUM|COUNT|TOTAL|MAX|MIN)\s*\(", re.IGNORECASE)
+
+
+def _fix_integer_division(sql: str) -> str:
+    """
+    SQLite divides integers as integers: SUM(exited) / COUNT(*) is 0 or 1,
+    never 0.2. Any aggregate that is the left side of a division is made
+    real (1.0 * SUM(...)) so a rate keeps its fraction. Already-real
+    expressions are unchanged in value.
+    """
+    out, i = [], 0
+    for m in _AGG_CALL.finditer(sql):
+        if m.start() < i:
+            continue
+        depth, j = 0, m.end() - 1
+        while j < len(sql):
+            depth += sql[j] == "("
+            depth -= sql[j] == ")"
+            if depth == 0:
+                break
+            j += 1
+        after = sql[j + 1:].lstrip()
+        before = sql[i:m.start()]
+        if after.startswith("/") and not re.search(r"(\d\.\d*|\.\d+)\s*\*\s*$", before):
+            out.append(before + "1.0 * " + sql[m.start():j + 1])
+        else:
+            out.append(before + sql[m.start():j + 1])
+        i = j + 1
+    out.append(sql[i:])
+    return "".join(out)
 
 
 def _scope_tables(rag_context: dict) -> list[str]:
