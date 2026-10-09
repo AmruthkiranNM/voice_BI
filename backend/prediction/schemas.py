@@ -222,6 +222,12 @@ class ForecastModelMetadata:
     floor_applied: bool = False        # forecasts clipped at 0 (series was non-negative)
     interval_source: str = ""          # validation_residuals | in_sample_residuals | none
     notes: list[str] = dataclasses.field(default_factory=list)
+    #: Why the forecast line has the shape it has (flat / trend / seasonal),
+    #: as measured facts and plain sentences built from them. Computed, never
+    #: written by the LLM.
+    shape: str = ""                    # flat | trend | seasonal
+    shape_facts: dict = dataclasses.field(default_factory=dict)
+    shape_explanation: list[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass

@@ -170,8 +170,10 @@ def _score_candidate(
     """
     Backtest one candidate across every fold.
 
-    Returns its aggregated score and the flat list of out-of-sample residuals,
-    which the winner later uses to size honest prediction intervals.
+    Returns its aggregated score and the out-of-sample residuals as
+    ``(steps_ahead, error)`` pairs, which the winner later uses to size its
+    prediction interval at each horizon from the errors it actually made at
+    that horizon.
     """
     score = CandidateScore(
         model_key=candidate.model_key,
@@ -224,7 +226,7 @@ def _score_candidate(
         scale = fold["scale"]
         mase = float(mae / scale) if scale > 0 else None
 
-        residuals.extend(errors.tolist())
+        residuals.extend((o + 1, float(e)) for o, e in zip(fold["offsets"], errors))
         maes.append(mae)
         rmses.append(rmse)
         if mase is not None:
@@ -343,7 +345,7 @@ def select_and_fit(
             "The series is constant, so every model reduces to the same flat "
             "forecast; the naive baseline is used directly."
         )
-        _finalise(meta, series, full)
+        _finalise(meta, series, full, diagnostics)
         return model, meta
 
     if diagnostics.status == "fallback":
@@ -352,7 +354,7 @@ def select_and_fit(
         meta.selected_model_label = model.model_name
         meta.selection_method = "fallback_no_validation"
         meta.notes.append(diagnostics.reason)
-        _finalise(meta, series, full)
+        _finalise(meta, series, full, diagnostics)
         return model, meta
 
     folds = build_folds(series, horizon)
@@ -370,13 +372,13 @@ def select_and_fit(
             "Not enough history to build a chronological validation fold; the "
             "naive baseline is used rather than an unvalidated model."
         )
-        _finalise(meta, series, full)
+        _finalise(meta, series, full, diagnostics)
         return model, meta
 
     # ── Rolling-origin backtest over every eligible candidate ──
     fold_data = build_fold_data(series, folds)
     scores: list[CandidateScore] = []
-    residuals_by_key: dict[str, list[float]] = {}
+    residuals_by_key: dict[str, list[tuple[int, float]]] = {}
     order_by_key = {c.model_key: i for i, c in enumerate(candidates)}
 
     for candidate in candidates:
@@ -395,7 +397,7 @@ def select_and_fit(
         meta.selected_model_label = model.model_name
         meta.selection_method = "fallback_no_validation"
         meta.notes.append("No candidate could be validated; falling back to the naive baseline.")
-        _finalise(meta, series, full)
+        _finalise(meta, series, full, diagnostics)
         return model, meta
 
     # Rank by MASE when available (scale-free, baseline-relative), else by MAE.
@@ -446,6 +448,28 @@ def select_and_fit(
                 )
                 winner = best_trend
 
+    # ── The mirror rule: no trend, so do not extrapolate one ─────────────
+    # A trend model can edge out a flat one on two or three short folds by
+    # chance (Drift 2.163 vs Naive 2.185 on the chocolate data), and then
+    # draws a slope the trend test says is not there. When the series has no
+    # significant trend and a flat model is within the same 10% tolerance,
+    # the simpler model is preferred.
+    trend_keys_all = {"drift", "holt_linear", "damped_holt"}
+    if winner.model_key in trend_keys_all and not _series_has_significant_trend(series):
+        flat_eligible = [s for s in eligible if s.model_key in _FLAT_MODEL_KEYS]
+        if flat_eligible:
+            best_flat = flat_eligible[0]
+            w_score = winner.mase if use_mase else winner.mae
+            f_score = best_flat.mase if use_mase else best_flat.mae
+            if (w_score is not None and f_score is not None
+                    and f_score <= w_score * 1.10):
+                meta.notes.append(
+                    f"No significant trend in the series; '{best_flat.model_label}' "
+                    f"(score={f_score:.4f}) preferred over trend model "
+                    f"'{winner.model_label}' (score={w_score:.4f}) within 10% tolerance."
+                )
+                winner = best_flat
+
     naive_score = next((s for s in eligible if s.model_key == "naive"), None)
     if naive_score is not None:
         if use_mase and winner.mase is not None and naive_score.mase is not None:
@@ -468,13 +492,16 @@ def select_and_fit(
         meta.selected_model_label = model.model_name
         meta.selection_method = "fallback_no_validation"
         meta.notes.append(f"Selected model failed to refit on full history: {exc}")
-        _finalise(meta, series, full)
+        _finalise(meta, series, full, diagnostics)
         return model, meta
 
     # Size the prediction intervals from out-of-sample validation errors.
     oos = residuals_by_key.get(winner.model_key) or []
     if len(oos) >= 2:
-        model.set_residual_scale(np.asarray(oos, dtype=float))
+        model.set_residual_scale(
+            np.asarray([e for _, e in oos], dtype=float),
+            steps=np.asarray([s for s, _ in oos], dtype=int),
+        )
         meta.interval_source = "validation_residuals"
     else:
         meta.interval_source = "in_sample_residuals"
@@ -500,16 +527,130 @@ def select_and_fit(
             "point forecast as indicative rather than precise."
         )
 
-    _finalise(meta, series, full)
+    _finalise(meta, series, full, diagnostics)
     return model, meta
 
 
-def _finalise(meta: ForecastModelMetadata, original: pd.Series, fitted_on: pd.Series) -> None:
-    """Record whether a non-negativity floor applies to this series."""
+def _finalise(meta: ForecastModelMetadata, original: pd.Series, fitted_on: pd.Series,
+              diagnostics: SeriesDiagnostics | None = None) -> None:
+    """Record whether a non-negativity floor applies, and why the forecast has its shape."""
     observed = pd.Series(original).dropna()
     meta.floor_applied = bool(len(observed) and (observed >= 0).all())
     if not meta.interval_source:
         meta.interval_source = "in_sample_residuals"
+    try:
+        _explain_shape(meta, observed, diagnostics)
+    except Exception as exc:  # an explanation must never break a forecast
+        logger.debug("[Selection] shape explanation skipped: %s", exc)
+
+
+_SEASONAL_KEYS = frozenset({"seasonal_naive", "holt_winters_additive"})
+
+
+def _unit(frequency: str | None) -> str:
+    f = (frequency or "period").lower().rstrip("s")
+    return {"day": "day", "week": "week", "month": "month", "quarter": "quarter",
+            "year": "year"}.get(f, "period")
+
+
+def _fmt(v: float) -> str:
+    return f"{v:,.0f}" if abs(v) >= 100 else f"{v:,.2f}"
+
+
+def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
+                   diagnostics: SeriesDiagnostics | None) -> None:
+    """
+    Why the forecast line is flat, sloped or repeating - in measured numbers.
+
+    A reviewer seeing a moving history and a level forecast asks why the
+    forecast does not move too. The answer is a fact about the data, so it
+    is computed here from the same quantities the selection used: the size
+    of the trend against the period-to-period swing, how much history a
+    seasonal pattern needs against how much there is, and how many models
+    were tested on held-out periods.
+    """
+    key = meta.selected_model_key
+    meta.shape = ("seasonal" if key in _SEASONAL_KEYS
+                  else "flat" if key in _FLAT_MODEL_KEYS else "trend")
+    unit = _unit(diagnostics.requested_frequency if diagnostics else None)
+    n = int(len(observed))
+
+    facts: dict = {"n_periods": n, "unit": unit, "model": meta.selected_model_label}
+    sentences: list[str] = []
+
+    if n >= 3:
+        x = np.arange(n, dtype=float)
+        slope = float(np.polyfit(x, observed.values.astype(float), 1)[0])
+        swing = _naive_scale(observed)
+        facts.update(trend_per_period=round(slope, 4), typical_swing=round(swing, 4),
+                     # bool(): numpy's bool_ is not JSON-serialisable.
+                     trend_significant=bool(_series_has_significant_trend(observed)),
+                     level=round(float(observed.mean()), 4))
+        if meta.shape == "flat":
+            sentences.append(
+                f"The forecast is a level line because the chosen model "
+                f"({meta.selected_model_label}) predicts the typical level of the "
+                f"series, not a pattern - there is no pattern in this history that "
+                f"held up when tested.")
+        elif meta.shape == "trend":
+            sentences.append(
+                f"The forecast is a straight trend because the chosen model "
+                f"({meta.selected_model_label}) continues the direction the series "
+                f"has been moving in.")
+        else:
+            sentences.append(
+                f"The forecast repeats the shape of the last cycle because the "
+                f"chosen model ({meta.selected_model_label}) carries the seasonal "
+                f"pattern forward.")
+        if swing > 0:
+            measured = (f"Over the {n} {unit}s of history the values moved by about "
+                        f"{_fmt(slope)} per {unit} overall, against a typical swing of "
+                        f"{_fmt(swing)} from one {unit} to the next")
+            if facts["trend_significant"]:
+                tail = " - a real direction to project."
+            elif meta.shape == "trend":
+                tail = (" - small overall, but the trend model still predicted the "
+                        "held-out " + unit + "s more accurately than any level model, "
+                        "so the recent direction is carried forward.")
+            else:
+                tail = (" - the ups and downs are far larger than any direction, so "
+                        "there is no reliable trend to project.")
+            sentences.append(measured + tail)
+
+    if diagnostics and diagnostics.seasonal_periods and not diagnostics.seasonal_estimate_supported:
+        need = 2 * int(diagnostics.seasonal_periods)
+        facts.update(seasonal_needed=need, seasonal_available=n)
+        sentences.append(
+            f"A repeating {diagnostics.seasonal_periods}-{unit} pattern (e.g. a "
+            f"yearly cycle) needs at least {need} {unit}s of history to estimate; "
+            f"this series has {n}, so no seasonal shape can be learned yet.")
+
+    tested = [c for c in meta.candidates if c.eligible]
+    if tested:
+        facts["models_tested"] = len(tested)
+        scored = [c for c in tested if c.mase is not None] or tested
+        best = min(scored, key=lambda c: c.mase if c.mase is not None else (c.mae or float("inf")))
+        if best.model_key == key:
+            how = f"{meta.selected_model_label} had the lowest error."
+        elif meta.shape == "trend":
+            how = (f"{best.model_label} scored marginally better (within 10%), but "
+                   f"the series has a significant trend, so "
+                   f"{meta.selected_model_label} was preferred.")
+        else:
+            how = (f"{best.model_label} scored marginally better, but within 10% - "
+                   f"well inside the noise of so few held-out {unit}s - so the "
+                   f"simpler {meta.selected_model_label} was chosen.")
+        sentences.append(f"{len(tested)} models were tested on held-out {unit}s; {how}")
+
+    if meta.interval_source == "validation_residuals":
+        sentences.append(
+            f"The shaded band is where each future {unit} is expected to fall 95% "
+            f"of the time, sized from the model's own errors on held-out {unit}s. "
+            f"The ups and downs of the history show up there - as uncertainty - "
+            f"rather than as invented wiggles in the line.")
+
+    meta.shape_facts = facts
+    meta.shape_explanation = sentences
 
 
 def apply_non_negative_floor(

@@ -88,6 +88,7 @@ class BaseForecaster:
         self.history_index: pd.Index | None = None
         self._y: pd.Series | None = None
         self._resid: np.ndarray | None = None
+        self._resid_steps: np.ndarray | None = None
 
     # -- fitting -------------------------------------------------------
     def fit(self, y: pd.Series) -> "BaseForecaster":
@@ -127,25 +128,76 @@ class BaseForecaster:
             return np.array([])
         return np.asarray(y.values[1:] - y.values[:-1], dtype=float)
 
-    def set_residual_scale(self, residuals: np.ndarray | None) -> None:
+    def set_residual_scale(self, residuals: np.ndarray | None,
+                           steps: np.ndarray | None = None) -> None:
         """
         Override the interval width with out-of-sample validation residuals.
 
         In-sample residuals systematically understate forecast uncertainty, so
         the selection module hands back the residuals the model actually made
         on held-out data whenever backtesting was possible.
+
+        ``steps`` gives how many periods ahead each residual was made. With it,
+        the interval at each horizon is sized from the errors made at that
+        horizon. Without it the residuals are treated as one-step errors.
         """
         if residuals is not None and len(residuals):
             self._resid = np.asarray(residuals, dtype=float)
+            self._resid_steps = (np.asarray(steps, dtype=int)
+                                 if steps is not None and len(steps) == len(residuals) else None)
+
+    #: Two-sided 95% normal quantile.
+    Z_95 = 1.96
+
+    def _horizon_sigmas(self, n: int) -> np.ndarray | None:
+        """
+        Error scale for horizons 1..n.
+
+        Multi-step validation errors already contain the growth of uncertainty
+        with horizon. Scaling them by sqrt(h) again counts that growth twice,
+        which made the band two to five times wider than the data's own spread.
+
+        So each horizon uses the root-mean-square error of the validation
+        errors made at that horizon (pooled with its neighbours, since a short
+        series has only a few folds). RMS rather than standard deviation keeps
+        any systematic over- or under-shoot in the width. The scale never
+        shrinks with horizon, and only beyond the longest validated horizon is
+        it extrapolated, with sqrt(h) growth.
+        """
+        e = self._resid
+        steps = getattr(self, "_resid_steps", None)
+        if e is None or len(e) < 2:
+            return None
+
+        if steps is None:
+            # One-step residuals: classic random-walk growth.
+            sigma = float(np.sqrt(np.mean(e ** 2)))
+            if not np.isfinite(sigma) or sigma <= 0:
+                return None
+            return sigma * np.sqrt(np.arange(1, n + 1))
+
+        max_step = int(steps.max())
+        out = np.empty(n)
+        prev = 0.0
+        for h in range(1, n + 1):
+            anchor = min(h, max_step)
+            window = e[np.abs(steps - anchor) <= 1]
+            if len(window) < 2:
+                window = e[steps <= anchor] if (steps <= anchor).sum() >= 2 else e
+            sigma = float(np.sqrt(np.mean(window ** 2)))
+            if h > max_step:
+                sigma *= np.sqrt(h / max_step)
+            prev = max(prev, sigma)
+            out[h - 1] = prev
+        if not np.all(np.isfinite(out)) or out[0] <= 0:
+            return None
+        return out
 
     def _intervals(self, forecast: pd.Series) -> pd.DataFrame | None:
-        if self._resid is None or len(self._resid) < 2:
+        sigmas = self._horizon_sigmas(len(forecast))
+        if sigmas is None:
             return None
-        sigma = float(np.std(self._resid))
-        if not np.isfinite(sigma) or sigma <= 0:
-            return None
-        h = np.arange(1, len(forecast) + 1)
-        spread = 1.96 * sigma * np.sqrt(h)
+        spread = self.Z_95 * sigmas
         return pd.DataFrame(
             {"lower": forecast.values - spread, "upper": forecast.values + spread},
             index=forecast.index,

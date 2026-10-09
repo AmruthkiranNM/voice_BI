@@ -233,6 +233,9 @@ def _series_validation(result, group) -> dict[str, Any]:
         "reliability": status,
         "reliability_note": sentence,
         "reliable": status == "validated",
+        # Why this series' forecast line is flat / sloped / seasonal.
+        "shape": entry.get("shape"),
+        "explanation": entry.get("shape_explanation") or [],
     }
 
 
@@ -249,9 +252,17 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
     label = " and ".join(config.group_dimensions) if config.group_dimensions else "total"
 
     if "time_series" in views:
+        meta = result.model_metadata or {}
+        status, sentence = reliability_status(meta.get("selected_score"), meta.get("beats_naive"))
         charts.append({
             "type": "time_series_forecast",
             "title": f"Forecast: {config.target}",
+            "model": meta.get("selected_model_label"),
+            "mase": meta.get("selected_score"),
+            "reliability": status,
+            "reliability_note": sentence,
+            "shape": meta.get("shape"),
+            "explanation": meta.get("shape_explanation") or [],
             "data": {
                 "historical": [{"date": r["period"], "value": r["value"]}
                                for r in result.historical_rows],

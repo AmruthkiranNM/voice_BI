@@ -226,16 +226,21 @@ export default function PredictionPanel({ result, insight }) {
                 </span>
               </div>
             )}
-            {meta?.beats_naive != null && (
-              <div>
-                <span className="block text-[10px] uppercase text-zinc-500 mb-1">Reliability</span>
-                <span className={`font-mono ${meta.beats_naive && meta.selected_score != null && meta.selected_score < 0.8 ? 'text-emerald-400' : meta.beats_naive ? 'text-amber-400' : 'text-red-400'}`}>
-                  {meta.beats_naive
-                    ? (meta.selected_score != null && meta.selected_score < 0.8 ? 'High' : 'Moderate')
-                    : 'Low'}
-                </span>
-              </div>
-            )}
+            {meta?.beats_naive != null && (() => {
+              // Same rule as the backend's reliability_status, so the tile can
+              // never contradict the written answer.
+              const s = meta.selected_score;
+              const state = !meta.beats_naive ? 'baseline'
+                : (s != null && s < 1 ? 'validated' : 'weak');
+              return (
+                <div>
+                  <span className="block text-[10px] uppercase text-zinc-500 mb-1">Reliability</span>
+                  <span className="font-mono" style={{ color: RELIABILITY_COLOR[state] }}>
+                    {RELIABILITY_LABEL[state]}
+                  </span>
+                </div>
+              );
+            })()}
             {meta?.selection_method && (
               <div>
                 <span className="block text-[10px] uppercase text-zinc-500 mb-1">Selection Method</span>
@@ -483,14 +488,21 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
     const fcMap = new Map(displayFc.map(d => [d.date, d]));
     
     const histSeriesData = allDates.map(d => histMap.has(d) ? histMap.get(d) : '-');
-    const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).value : '-');
-    const lowerSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).lower : '-');
+    // The dashed forecast starts from the last actual point so the two lines
+    // join instead of leaving a gap. That point is the real last value, not a
+    // forecast, and the tooltip does not label it as one.
+    const bridgeDate = lastHist && lastHist.value != null && !fcMap.has(lastHist.date) ? lastHist.date : null;
+    const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).value
+      : (d === bridgeDate ? lastHist.value : '-'));
+    const hasBand = fcData.some(f => f.lower != null && f.upper != null);
+    const lowerSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).lower
+      : (d === bridgeDate && hasBand ? lastHist.value : '-'));
     const upperSeriesData = allDates.map(d => {
       if (fcMap.has(d)) {
          const f = fcMap.get(d);
          if (f.upper != null && f.lower != null) return f.upper - f.lower;
       }
-      return '-';
+      return d === bridgeDate && hasBand ? 0 : '-';
     });
 
     const totalFc = fcData.reduce((sum, d) => sum + (d.value || 0), 0);
@@ -531,7 +543,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              if (p.seriesName === 'Actual' && p.value !== '-') {
                 html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Actual ${metricLabel.toLowerCase()}:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
              }
-             if (p.seriesName === 'Forecast' && p.value !== '-') {
+             if (p.seriesName === 'Forecast' && p.value !== '-' && fcMap.has(date)) {
                 html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Forecast:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
              }
           });
@@ -540,7 +552,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              const lower = fcMap.get(date).lower;
              const upper = fcMap.get(date).upper;
              if (lower !== upper) {
-               html += `<div style="display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(63,63,70,.6)"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span style="color:#a1a1aa">Confidence interval:</span></div><span style="font-family:ui-monospace,monospace;color:#d4d4d8;font-size:12px;margin-left:auto">${isCurrency?'$':''}${Number(lower).toLocaleString(undefined, {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`;
+               html += `<div style="display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(63,63,70,.6)"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span style="color:#a1a1aa">95% likely range:</span></div><span style="font-family:ui-monospace,monospace;color:#d4d4d8;font-size:12px;margin-left:auto">${isCurrency?'$':''}${Number(lower).toLocaleString(undefined, {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`;
              }
           }
           
@@ -639,7 +651,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
             </div>
             <div className="flex space-x-6 md:space-x-8 text-right mt-4 md:mt-0">
                <div>
-                  <p className="text-[10px] md:text-xs text-zinc-500 uppercase tracking-wider mb-1">Expected {metricLabel}</p>
+                  <p className="text-[10px] md:text-xs text-zinc-500 uppercase tracking-wider mb-1">Total forecast, {fcData.length} periods</p>
                   <p className="text-xl md:text-2xl font-mono text-indigo-400 font-bold">
                      {isCurrency ? '$' : ''}{totalFc.toLocaleString(undefined, {maximumFractionDigits:2})}
                   </p>
@@ -656,12 +668,21 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
             <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e' }} />Actual</span>
             <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed" style={{ borderColor: '#6366f1' }} />Forecast</span>
             {fcData.some(d => d.lower != null && d.upper != null) && (
-              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: 'rgba(99,102,241,0.2)' }} />Likely range</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: 'rgba(99,102,241,0.2)' }} />95% likely range</span>
+            )}
+            {chart.model && (
+              <span className="ml-auto text-zinc-500">
+                Model: <span className="text-zinc-300">{chart.model}</span>
+                {chart.reliability && (
+                  <> · <span style={{ color: RELIABILITY_COLOR[chart.reliability] }}>{RELIABILITY_LABEL[chart.reliability]}</span></>
+                )}
+              </span>
             )}
          </div>
          <div className="flex-1 w-full min-h-[400px] relative">
             <ReactECharts option={option} style={{ height: '100%', width: '100%', position: 'absolute' }} opts={{ renderer: 'svg' }} />
          </div>
+         <ForecastExplanation sentences={chart.explanation} />
       </div>
     );
   }
@@ -679,6 +700,41 @@ const RELIABILITY_COLOR = {
   baseline: '#fbbf24',
   not_validated: '#a1a1aa',
 };
+
+const RELIABILITY_LABEL = {
+  validated: 'Validated',
+  weak: 'Weak (indicative)',
+  baseline: 'Baseline only',
+  not_validated: 'Not validated',
+};
+
+/**
+ * "Why does the forecast look like this?" — the engine's measured reasons
+ * (trend vs swing, history needed for seasonality, models tested, what the
+ * band means). Shown under every forecast line, single or focused.
+ */
+function ForecastExplanation({ sentences }) {
+  const [open, setOpen] = useState(true);
+  if (!sentences || !sentences.length) return null;
+  return (
+    <div className="mt-3 mx-2 rounded-lg border border-zinc-700/60 bg-zinc-900/40 px-4 py-3">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-200"
+      >
+        {open ? '▾' : '▸'} Why does the forecast look like this?
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-1.5 list-disc pl-5">
+          {sentences.map((s, i) => (
+            <li key={i} className="text-xs text-zinc-400 leading-relaxed">{s}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * Grouped forecast: every series at once, or one series in focus.
@@ -814,7 +870,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       </div>
       <p className="text-[11px] text-zinc-500 mt-2">
         {focused
-          ? 'Shaded area: the range the actual value is likely to fall in.'
+          ? 'Shaded area: the 95% likely range for each future value, sized from the model’s errors on held-out months.'
           : groups.length >= totalSeries
             ? `All ${totalSeries} series. Click one to see its forecast range.`
             : `Top ${groups.length} of ${totalSeries} by forecast total. Click one to see its forecast range.`}
@@ -827,6 +883,8 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       type: 'time_series_forecast',
       title: `${chart.title}: ${focused.group}`,
       data: { historical: focused.historical || [], forecast: focused.forecast || [] },
+      // Model and reliability are already stated in the line above the chart.
+      explanation: focused.explanation || [],
     };
     return frame(
       <>
