@@ -113,6 +113,15 @@ def _success_response(config: PredictionConfig, result, query: str) -> dict[str,
         )
         insight = evidence
 
+    # "Will the top 5 stay the same?" needs the *why* as well as the yes/no.
+    # The reasons are computed, so they are attached as written rather than
+    # left to the wording layer, which tends to drop them.
+    if result.comparison and evidence != insight:
+        why = _section(evidence, "WHY IT CHANGES")
+        if why:
+            insight = insight.rstrip() + "\n\n**Why the ranking changes:**\n" + "\n".join(
+                f"- {line}" for line in why)
+
     prediction = dataclasses.asdict(result)
     # Keys the existing prediction UI reads directly. They are projections of
     # the structured result, not separate state — the frontend renders them,
@@ -292,9 +301,25 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
         # Every forecast series is sent; the chart decides how many to draw.
         shown = [g for g in ordered if by_group[g]["forecast"]]
 
+        # The series the question is about: for "will the top 5 stay the
+        # same", the current top 5 plus anything entering the forecast top 5;
+        # for a plain "top 5", the forecast top 5. The chart draws these by
+        # default and keeps the rest one click away.
+        focus_groups: list[str] = []
+        if result.comparison:
+            comp = result.comparison
+            focus_groups = list(dict.fromkeys(
+                [e["group"] for e in comp["current_top"]] + [e["group"] for e in comp["future_top"]]))
+        elif config.top_n:
+            focus_groups = [str(r["group"]) for r in result.ranking_rows[: config.top_n]]
+
         charts.append({
             "type": "grouped_time_series_forecast",
             "title": f"Forecast {config.target} by {label}",
+            "focus_groups": focus_groups,
+            # "comparison": current top N + entrants; "top": forecast top N only.
+            "focus_kind": "comparison" if result.comparison else ("top" if focus_groups else None),
+            "top_n": config.top_n,
             "dimension": "group",
             "dimensions": list(config.group_dimensions),
             "data": [{"group": str(g), "group_dict": by_group[g]["group_values"],
@@ -348,6 +373,122 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
 # ──────────────────────────────────────────────────────────
 # Evidence for the explanation layer
 # ──────────────────────────────────────────────────────────
+
+def _section(evidence: str, header: str) -> list[str]:
+    """The indented lines under one evidence header."""
+    lines, inside = [], False
+    for line in evidence.splitlines():
+        if line.startswith(header):
+            inside = True
+            continue
+        if inside:
+            if line.startswith("  "):
+                lines.append(line.strip())
+            else:
+                break
+    return lines
+
+
+def _comparison_evidence(comparison: dict, config: PredictionConfig) -> list[str]:
+    """
+    Current top-N vs forecast top-N: the answer, the like-for-like numbers,
+    and a measured reason for each entity that moves.
+
+    The current ranking is over the whole history and the forecast over the
+    horizon, so their totals are never compared directly; the recent window of
+    the same length is the like-for-like baseline.
+    """
+    n = comparison["top_n"]
+    unit = (config.time_frequency or "period").rstrip("s")
+    h = config.horizon or 0
+    details = comparison.get("details") or {}
+    cur = {e["group"]: e["rank"] for e in comparison["current_top"]}
+    fut = {e["group"]: e["rank"] for e in comparison["future_top"]}
+    lines: list[str] = []
+
+    if comparison["unchanged_order"]:
+        lines.append(f"ANSWER: Yes - the same {n} stay on top, in the same order.")
+    elif comparison["unchanged_set"]:
+        lines.append(f"ANSWER: Mostly - the same {n} stay on top, but their order changes.")
+    else:
+        lines.append(
+            f"ANSWER: No - the top {n} changes. "
+            + (f"Leaving: {', '.join(comparison['left'])}. " if comparison["left"] else "")
+            + (f"Entering: {', '.join(comparison['entered'])}." if comparison["entered"] else ""))
+
+    any_detail = next(iter(details.values()), None)
+    span = f"all {any_detail['periods_all']} {unit}s" if any_detail else "the whole history"
+    lines.append(f"CURRENT TOP {n} (total over {span}, observed):")
+    for e in comparison["current_top"]:
+        lines.append(f"  {e['rank']}. {e['group']}: {e['value']:,.2f}")
+    lines.append(f"FORECAST TOP {n} (total over the next {h} {unit}s):")
+    for e in comparison["future_top"]:
+        lines.append(f"  {e['rank']}. {e['group']}: {e['value']:,.2f}")
+
+    if details:
+        lines.append(
+            f"LIKE-FOR-LIKE (the totals above cover different lengths of time, so compare "
+            f"the last {h} {unit}s actual with the next {h} {unit}s forecast):")
+        order = [e["group"] for e in comparison["future_top"]] + \
+                [g for g in (e["group"] for e in comparison["current_top"]) if g not in fut]
+        for g in order:
+            d = details.get(g)
+            if not d or d["forecast_total"] is None:
+                continue
+            lines.append(f"  {g}: last {d['recent_periods']} {unit}s actual {d['recent_total']:,.0f} "
+                         f"-> next {h} forecast {d['forecast_total']:,.0f}")
+
+        lines.append(
+            f"WHY IT CHANGES (the current ranking sums every {unit}; the forecast is built "
+            f"from each one's own history, weighted toward its latest {unit}s):")
+        for g in order:
+            d = details.get(g)
+            before, after = cur.get(g), fut.get(g)
+            if not d or before == after or d["avg_forecast"] is None:
+                continue
+            pos = (f"rank {before} -> {after}" if before and after
+                   else f"rank {before} -> outside top {n}" if before
+                   else f"outside top {n} -> rank {after}")
+            lines.append(f"  {g} ({pos}): {_why_moved(d, unit)}")
+    return lines
+
+
+#: What each model does with the history, in words that are always true of it.
+_MODEL_RULE = {
+    "moving_average": "the average of its last 3 {unit}s",
+    "naive": "a repeat of its last {unit}",
+    "simple_exp_smoothing": "a weighted average of all its {unit}s, weighted toward the recent ones",
+    "seasonal_naive": "a repeat of the same {unit}s one cycle earlier",
+    "drift": "its last {unit} plus its average change per {unit}",
+    "holt_linear": "its recent level continued along its recent trend",
+    "damped_holt": "its recent level continued along a flattening trend",
+}
+
+
+def _why_moved(d: dict, unit: str) -> str:
+    """
+    One factual sentence: where the forecast sits against the usual level,
+    the latest actual values, and what the chosen model does with them.
+
+    It describes the computation rather than characterising the months, so it
+    can never claim "its latest months were low" when one of them was not.
+    """
+    usual, fc = d["avg_all"], d["avg_forecast"]
+    latest = ", ".join(f"{p} {v:,.0f}" for p, v in d.get("last_periods", []))
+    if usual and fc < usual * 0.95:
+        level = f"forecast at {fc:,.0f} per {unit}, below its usual {usual:,.0f}"
+    elif usual and fc > usual * 1.05:
+        level = f"forecast at {fc:,.0f} per {unit}, above its usual {usual:,.0f}"
+    else:
+        level = (f"forecast at about its usual level ({fc:,.0f} per {unit}), so it moves "
+                 f"only because others rose or fell around it")
+    rule = _MODEL_RULE.get(d.get("model_key") or "")
+    how = (f"; its model ({d.get('model')}) forecasts {rule.format(unit=unit)}"
+           if rule else (f"; model: {d.get('model')}" if d.get("model") else ""))
+    note = (f" ({', '.join(p[:7] for p in d['spikes_adjusted'])} treated as a one-off spike)"
+            if d.get("spikes_adjusted") else "")
+    return f"{level}. Latest {unit}s: {latest}{how}{note}."
+
 
 #: How many series the evidence lists individually before summarising the rest.
 MAX_GROUPS_IN_EVIDENCE = 10
@@ -519,24 +660,7 @@ def build_evidence(config: PredictionConfig, result) -> str:
             )
 
     if result.comparison:
-        comparison = result.comparison
-        lines.append(f"CURRENT TOP {comparison['top_n']} (observed):")
-        for entry in comparison["current_top"]:
-            lines.append(f"  {entry['rank']}. {entry['group']}: {entry['value']:,.2f}")
-        lines.append(f"FORECAST TOP {comparison['top_n']}:")
-        for entry in comparison["future_top"]:
-            lines.append(f"  {entry['rank']}. {entry['group']}: {entry['value']:,.2f}")
-        if comparison["unchanged_order"]:
-            lines.append("COMPARISON: the same entities, in the same order.")
-        elif comparison["unchanged_set"]:
-            lines.append("COMPARISON: the same entities, in a different order.")
-        else:
-            if comparison["left"]:
-                lines.append(f"COMPARISON: leaving the top {comparison['top_n']}: "
-                             f"{', '.join(comparison['left'])}.")
-            if comparison["entered"]:
-                lines.append(f"COMPARISON: entering the top {comparison['top_n']}: "
-                             f"{', '.join(comparison['entered'])}.")
+        lines.extend(_comparison_evidence(result.comparison, config))
 
     if result.row_predictions:
         lines.append(f"PREDICTED ROWS: {len(result.row_predictions)}.")

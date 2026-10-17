@@ -15,6 +15,29 @@ changing the backend agents or the prediction engine. Newest changes first.
 
 ---
 
+## Top-N follow-ups ("will the top 5 be the same next 6 months?")
+
+- The follow-up keeps the user's N (inherited from "top 5" in the previous
+  question); it used to fall back to top 3.
+- Answer = yes/no, current vs forecast top N, a LIKE-FOR-LIKE table (last 6
+  months actual vs next 6 forecast — the old answer compared a 15-month total
+  with a 6-month total), and one factual reason per product that moved
+  (forecast vs usual level, latest months, what its model does with them).
+  The reasons are appended by code so the LLM can't drop them.
+- **One-off spike adjustment** (`forecast_selection.adjust_isolated_spikes`):
+  an isolated extreme month (Jan 2022, robust z > 3.5, both neighbours normal,
+  never the last month) is replaced by its neighbours' mean *for fitting
+  only*. A 3-month moving average was carrying the spike into 6-month
+  forecasts and pushing products into the top 5. Measured on 26 held-out
+  series (`audit/audit_spike_adjustment.py`): Moving Average error 61.6% →
+  44.9%, no series worse.
+- Real finding for the demo: Orange Choco (current #1) fell to 6.6K/5.7K
+  boxes in Feb–Mar 2022 vs a 12.8K average, so it drops out; Eclairs has
+  been strong for three months, so it rises.
+- Chart shows only the relevant series by default (current top N + any
+  entering), "Relevant (k)" in the selector, others one click away. Each
+  dashed forecast joins its last actual point.
+
 ## Prediction engine and forecast chart
 
 **Why the forecast line is flat (the guide's question at the last demo).**
@@ -85,7 +108,7 @@ Changes:
 ## Testing
 
 - Backend: `cd backend && venv\Scripts\python.exe -m pytest tests -q`
-  (475 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
+  (482 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
   tests regenerate those cached `.pkl` files.
 - Frontend needs Node ≥ 20 (`npm run dev`); Node 18 cannot run Vite.
 - The Groq free tier has a 200k tokens/day limit; long manual test runs can

@@ -225,6 +225,9 @@ class ForecastModelMetadata:
     #: Why the forecast line has the shape it has (flat / trend / seasonal),
     #: as measured facts and plain sentences built from them. Computed, never
     #: written by the LLM.
+    #: Isolated one-period spikes replaced by their neighbours' mean for
+    #: fitting only (reported history is unchanged).
+    spikes_adjusted: list[str] = dataclasses.field(default_factory=list)
     shape: str = ""                    # flat | trend | seasonal
     shape_facts: dict = dataclasses.field(default_factory=dict)
     shape_explanation: list[str] = dataclasses.field(default_factory=list)

@@ -76,6 +76,50 @@ def prepare_fit_slice(series: pd.Series) -> tuple[pd.Series, int]:
     return s, n_gaps
 
 
+#: Robust z above which an isolated point is treated as a one-off for fitting
+#: (Iglewicz & Hoaglin's 3.5 on the modified z-score).
+SPIKE_Z = 3.5
+
+#: Switch, so the audit can measure accuracy with and without the adjustment.
+ADJUST_SPIKES = True
+
+
+def adjust_isolated_spikes(train: pd.Series) -> tuple[pd.Series, list[str]]:
+    """
+    Replace isolated one-period spikes with the mean of their two neighbours,
+    for FITTING only.
+
+    A single extreme period (January 2022 in the chocolate data, when every
+    product roughly doubled and the next month fell back) otherwise sets the
+    level a short-window model carries forward for the whole horizon: a 3-month
+    moving average over [spike, normal, normal] forecasts one-third spike for
+    six months.
+
+    Only *isolated* points are touched - both neighbours must be ordinary - so
+    a genuine level shift (several high periods in a row) is left alone. The
+    last observation is never touched: with nothing after it, a new level and
+    a spike are indistinguishable. Applied to each training slice separately,
+    so no fold sees data it is scored against. Reported history is unchanged.
+    """
+    s = pd.Series(train).astype(float)
+    if len(s) < 5:
+        return s, []
+    values = s.values
+    median = float(np.median(values))
+    mad = float(np.median(np.abs(values - median)))
+    if mad <= 0:
+        return s, []
+    z = 0.6745 * (values - median) / mad
+    extreme = np.abs(z) > SPIKE_Z
+
+    adjusted, periods = s.copy(), []
+    for i in range(1, len(values) - 1):
+        if extreme[i] and not extreme[i - 1] and not extreme[i + 1]:
+            adjusted.iloc[i] = (values[i - 1] + values[i + 1]) / 2.0
+            periods.append(str(s.index[i]))
+    return adjusted, periods
+
+
 def _naive_scale(train: pd.Series) -> float:
     """
     Mean absolute one-step change of the training slice — the denominator of
@@ -146,6 +190,11 @@ def build_fold_data(series: pd.Series, folds: list[tuple[int, int]]) -> list[dic
     prepared: list[dict] = []
     for i, (train_end, val_end) in enumerate(folds, start=1):
         train, _ = prepare_fit_slice(series.iloc[:train_end])
+        # MASE's scale comes from the data as recorded, so scores stay
+        # comparable whether or not a spike was adjusted for fitting.
+        scale = _naive_scale(train)
+        if ADJUST_SPIKES:
+            train, _ = adjust_isolated_spikes(train)
         actual = series.iloc[train_end:val_end]
         actual_known = actual.dropna()
         if train.empty or actual_known.empty:
@@ -158,7 +207,7 @@ def build_fold_data(series: pd.Series, folds: list[tuple[int, int]]) -> list[dic
             "actual_known": actual_known,
             # Positions of the known actuals inside the forecast horizon.
             "offsets": [actual.index.get_loc(ix) for ix in actual_known.index],
-            "scale": _naive_scale(train),
+            "scale": scale,
         })
     return prepared
 
@@ -329,6 +378,16 @@ def select_and_fit(
             f"{n_imputed} internal gap(s) linearly interpolated for model fitting "
             "only; reported history keeps them as nulls."
         )
+
+    if ADJUST_SPIKES and not full.empty:
+        full, spikes = adjust_isolated_spikes(full)
+        if spikes:
+            meta.spikes_adjusted = spikes
+            meta.notes.append(
+                f"One-off spike(s) at {', '.join(p[:7] for p in spikes)} replaced by the "
+                "average of the neighbouring periods for model fitting only, so a single "
+                "unusual period does not set the level for the whole forecast. The "
+                "history shown keeps the real values.")
 
     if full.empty:
         meta.selection_method = "not_forecast"
@@ -587,11 +646,36 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
                      trend_significant=bool(_series_has_significant_trend(observed)),
                      level=round(float(observed.mean()), 4))
         if meta.shape == "flat":
+            level_of = {
+                # The raw mean would not match the line if a spike in those
+                # months was adjusted for fitting, so the figure is then omitted.
+                "moving_average": f"the average of the last 3 {unit}s"
+                                  + ("" if meta.spikes_adjusted
+                                     else f" ({_fmt(float(observed.iloc[-3:].mean()))})"),
+                "naive": f"the last {unit}'s value ({_fmt(float(observed.iloc[-1]))})",
+                "simple_exp_smoothing": f"a weighted average of all {unit}s, "
+                                        f"weighted toward recent ones",
+            }.get(key, "a single level")
             sentences.append(
-                f"The forecast is a level line because the chosen model "
-                f"({meta.selected_model_label}) predicts the typical level of the "
-                f"series, not a pattern - there is no pattern in this history that "
-                f"held up when tested.")
+                f"The forecast is a level line at {level_of}, against a long-run "
+                f"average of {_fmt(float(observed.mean()))} per {unit}. The chosen "
+                f"model ({meta.selected_model_label}) carries that level forward "
+                f"rather than a pattern - no pattern in this history held up when "
+                f"tested on held-out {unit}s.")
+            trend_scores = [c for c in meta.candidates
+                            if c.eligible and c.mase is not None
+                            and c.model_key in {"drift", "holt_linear", "damped_holt"}]
+            win = next((c for c in meta.candidates if c.model_key == key), None)
+            if trend_scores and win is not None and win.mase is not None:
+                best_trend = min(trend_scores, key=lambda c: c.mase)
+                if best_trend.mase > win.mase:
+                    sentences.append(
+                        f"Models that extend a trend were tested too: the best, "
+                        f"{best_trend.model_label}, scored {best_trend.mase:.2f} against "
+                        f"{win.mase:.2f} (lower is better), i.e. "
+                        f"{(best_trend.mase / win.mase - 1) * 100:.0f}% less accurate on "
+                        f"{unit}s it had not seen - so continuing the recent rise or fall "
+                        f"would have made the forecast worse.")
         elif meta.shape == "trend":
             sentences.append(
                 f"The forecast is a straight trend because the chosen model "

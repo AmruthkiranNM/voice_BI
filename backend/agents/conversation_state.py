@@ -236,6 +236,14 @@ def seed_from_bi_result(
             if ranked:
                 seed.source_leader = str(ranked[0].get(entity_column))
 
+    # The size of the ranking the user was shown ("top 5"), so a follow-up
+    # comparison is about the same number of entities.
+    m = re.search(r"\b(?:top|best|highest|leading|largest)\s+(\d+)\b", question or "", re.IGNORECASE)
+    if m:
+        seed.top_n = int(m.group(1))
+    elif rows and re.search(r"\bLIMIT\s+(\d+)", str(result.get("sql") or ""), re.IGNORECASE):
+        seed.top_n = len(rows)
+
     logger.info(
         "[ConversationState] Seed from BI result: target=%s dimensions=%s leader=%s",
         seed.target, seed.group_dimensions, seed.source_leader,

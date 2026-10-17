@@ -614,7 +614,60 @@ def compare_historical_future(result: PredictionResult, config: PredictionConfig
     top_n = config.top_n or min(3, len(future))
     comparison = compare_rankings(current, future, top_n=top_n,
                                   n_excluded=len(result.excluded_groups))
-    return dataclasses.asdict(comparison)
+    out = dataclasses.asdict(comparison)
+    out["details"] = _comparison_details(result, config, comparison)
+    return out
+
+
+def _comparison_details(result: PredictionResult, config: PredictionConfig, comparison) -> dict:
+    """
+    Like-for-like numbers and the measured reason behind each rank change.
+
+    The current ranking sums the whole history (15 months); the forecast sums
+    the horizon (6 months). Their totals are not comparable, so for every
+    entity involved this adds its actual total over the most recent `horizon`
+    periods - the same length as the forecast - and its average per period
+    over the whole history versus the recent window. Forecast models follow
+    the recent level, which is why a product that was strong early but has
+    slowed drops in the forecast ranking.
+    """
+    h = int(config.horizon or 0)
+    if h <= 0:
+        return {}
+    hist: dict[str, list[tuple[str, float]]] = {}
+    for row in result.historical_rows:
+        if row.get("value") is not None:
+            hist.setdefault(str(row.get("group")), []).append((str(row.get("period")), float(row["value"])))
+    fc: dict[str, list[float]] = {}
+    for row in result.forecast_rows:
+        if row.get("value") is not None:
+            fc.setdefault(str(row.get("group")), []).append(float(row["value"]))
+
+    names = {e.group for e in comparison.current_top} | {e.group for e in comparison.future_top}
+    per_group = (result.model_metadata or {}).get("per_group") or {}
+    details = {}
+    for g in names:
+        dated = sorted(hist.get(g, []))
+        series = [v for _, v in dated]
+        if not series:
+            continue
+        recent = series[-h:]
+        last3 = [(p[:7], v) for p, v in dated[-3:]]
+        forecast = fc.get(g, [])
+        details[g] = {
+            "periods_all": len(series),
+            "avg_all": sum(series) / len(series),
+            "recent_periods": len(recent),
+            "recent_total": sum(recent),
+            "avg_recent": sum(recent) / len(recent),
+            "last_periods": last3,
+            "model_key": (per_group.get(g) or {}).get("selected_model_key"),
+            "model": (per_group.get(g) or {}).get("selected_model_label"),
+            "spikes_adjusted": (per_group.get(g) or {}).get("spikes_adjusted") or [],
+            "forecast_total": sum(forecast) if forecast else None,
+            "avg_forecast": sum(forecast) / len(forecast) if forecast else None,
+        }
+    return details
 
 
 def rank_final_period(result: PredictionResult) -> list[dict]:

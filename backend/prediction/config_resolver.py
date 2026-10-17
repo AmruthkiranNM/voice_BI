@@ -631,6 +631,10 @@ def resolve_config(
     if top_n is None:
         match = re.search(r"\btop\s+(\d+)\b", question, re.IGNORECASE)
         top_n = int(match.group(1)) if match else None
+    if top_n is None and inherited_cfg and getattr(inherited_cfg, "top_n", None) \
+            and cfg.OP_COMPARE in operations:
+        # "Will it be the same?" after "top 5 products" is about those 5.
+        top_n = inherited_cfg.top_n
     if top_n:
         config.top_n = int(top_n)
         if cfg.OP_TOP_N not in operations:

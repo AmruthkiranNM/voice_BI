@@ -776,9 +776,16 @@ const RELIABILITY_PLAIN = {
   not_validated: 'Not enough history to test this forecast.',
 };
 
+//: topN value for "only the series the question is about".
+const RELEVANT = -1;
+
 function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
+  // A "top 5" question draws the series it is about (current top 5 plus any
+  // entering the forecast top 5), not every product; the rest stay one click away.
+  const focusGroups = chart.focus_groups || [];
+  const defaultTopN = focusGroups.length ? RELEVANT : GROUPED_TOP_N;
   const [focus, setFocus] = useState(null);
-  const [topN, setTopN] = useState(GROUPED_TOP_N);
+  const [topN, setTopN] = useState(defaultTopN);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
   const chartRef = useRef(null);
@@ -810,18 +817,27 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
     a.click();
   };
 
-  const reset = () => { setFocus(null); setTopN(GROUPED_TOP_N); };
+  const reset = () => { setFocus(null); setTopN(defaultTopN); };
 
   // Series arrive ranked by forecast total, so the first N are the largest.
-  const groups = topN === 0 ? (chart.data || []) : (chart.data || []).slice(0, topN);
+  const groups = topN === RELEVANT
+    ? (chart.data || []).filter(g => focusGroups.includes(g.group))
+    : topN === 0 ? (chart.data || []) : (chart.data || []).slice(0, topN);
   const totalSeries = chart.total || (chart.data || []).length;
-  const focused = focus ? groups.find(g => g.group === focus) : null;
+  // One series on screen: draw it with its band and explanation straight
+  // away. The multi-series view has no band, so a lone flat line there reads
+  // as a claim of certainty.
+  const focused = focus ? groups.find(g => g.group === focus)
+    : (groups.length === 1 ? groups[0] : null);
 
   const toolbar = (
     <div className="bi-controls-bar">
       <div className="bi-topn-wrap">
         <select value={topN} onChange={(e) => { setTopN(Number(e.target.value)); setFocus(null); }}
                 className="bi-topn-select" title="How many series to show">
+          {focusGroups.length > 0 && (
+            <option value={RELEVANT}>{`Relevant (${focusGroups.length})`}</option>
+          )}
           {GROUPED_TOP_N_OPTIONS.map(n => (
             <option key={n} value={n}>{n === 0 ? `All (${(chart.data || []).length})` : `Top ${n}`}</option>
           ))}
@@ -871,6 +887,12 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       <p className="text-[11px] text-zinc-500 mt-2">
         {focused
           ? 'Shaded area: the 95% likely range for each future value, sized from the model’s errors on held-out months.'
+          : topN === RELEVANT
+            ? (chart.top_n && chart.focus_kind === 'comparison'
+                ? `Current top ${chart.top_n} and any entering the forecast top ${chart.top_n} (${groups.length} of ${totalSeries}). Choose "All" to see every series; click one to see its forecast range.`
+                : chart.top_n
+                ? `Forecast top ${chart.top_n} of ${totalSeries}. Choose "All" to see every series; click one to see its forecast range.`
+                : `${groups.length} of ${totalSeries} series. Click one to see its forecast range.`)
           : groups.length >= totalSeries
             ? `All ${totalSeries} series. Click one to see its forecast range.`
             : `Top ${groups.length} of ${totalSeries} by forecast total. Click one to see its forecast range.`}
@@ -965,8 +987,13 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
        if (idx === 0) fcCount = (groupData.forecast || []).length;
        
        const histSeriesData = allDates.map(d => histMap.has(d) ? histMap.get(d) : '-');
-       const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d) : '-');
-       
+       // Each dashed forecast starts from its own last actual point, so it
+       // joins its history line; that point is the real value, and the
+       // tooltip reports it as actual, not forecast.
+       const bridgeDate = lastHist && lastHist.value != null && !fcMap.has(lastHist.date) ? lastHist.date : null;
+       const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d)
+         : (d === bridgeDate ? lastHist.value : '-'));
+
        // Same palette as the series buttons, so a button and its line match.
        const color = seriesColor(idx, seriesGroups.length);
 
@@ -994,7 +1021,8 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
           symbolSize: 6,
           z: 4,
           groupName: groupData.group,
-          isHist: false
+          isHist: false,
+          bridgeDate,
        });
     });
 
@@ -1031,7 +1059,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
                  paramGroups[groupName] = { color: p.color, hist: null, fc: null };
              }
              if (isHist) paramGroups[groupName].hist = p.value;
-             else paramGroups[groupName].fc = p.value;
+             else if (date !== seriesDef.bridgeDate) paramGroups[groupName].fc = p.value;
           });
           
           // With a dozen series a full list overflows the chart, so the tooltip
