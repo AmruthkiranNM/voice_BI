@@ -398,6 +398,90 @@ SEASONAL_CANDIDATES: list[tuple[str, type]] = [
 ]
 
 
+class LevelCombinationForecaster(BaseForecaster):
+    """
+    Equal-weight average of four level forecasts: the long-run mean, simple
+    exponential smoothing, the 3-period moving average, and the last value.
+
+    Why a combination: on short, noisy series, picking the single model that
+    scored best on two or three tiny validation windows mostly picks noise.
+    Averaging models that make *different* mistakes (the mean ignores recent
+    moves, the last value over-reacts to them, SES and the 3-period average
+    sit between) cancels part of each one's error. Measured on this project's
+    data (audit/benchmark_pipeline_designs.py), the combination forecast
+    unseen months more accurately than selecting one model at every training
+    length tried - the standard result of the M forecasting competitions.
+    """
+
+    model_key = "level_combination"
+    model_name = "Combination of level models with mean reversion"
+    min_observations = 3
+
+    #: Upper bound on persistence: a fitted value near 1 would mean "never
+    #: returns to normal", which 15 noisy points cannot establish.
+    MAX_PHI = 0.95
+
+    def _fit(self, y: pd.Series) -> None:
+        v = y.values.astype(float)
+        ses_next = None
+        if HAS_STATSMODELS:
+            try:
+                ses = SimpleExpSmoothing(y, initialization_method="estimated").fit()
+                ses_next = float(np.asarray(ses.forecast(1))[0])
+            except Exception:   # SES failing to converge must not sink the rest
+                pass
+        recent_parts = [float(np.mean(v[-3:])), float(v[-1])] + ([ses_next] if ses_next is not None else [])
+        self.mean = float(v.mean())
+        self.recent = float(np.mean(recent_parts))
+        self._level = float(np.mean([self.mean] + recent_parts))
+        self.components = 1 + len(recent_parts)
+        # Persistence: how much of this period's distance from the long-run
+        # mean carries into the next period (lag-1 autocorrelation of the
+        # de-meaned series). 0 means no carry-over at all.
+        d = v - self.mean
+        denom = float(np.dot(d[:-1], d[:-1]))
+        self.phi = (float(np.clip(np.dot(d[1:], d[:-1]) / denom, 0.0, self.MAX_PHI))
+                    if len(v) >= 4 and denom > 0 else 0.0)
+
+    def _point_forecast(self, steps: int) -> np.ndarray:
+        """
+        Half the flat level combination, half a mean-reverting path that starts
+        at the recent level and closes the gap to the long-run mean by a factor
+        phi each period (an AR(1) forecast around the mean).
+
+        The path changes from month to month exactly as far as the series has
+        shown month-to-month persistence: a series whose recent dip tends to
+        carry over recovers gradually; one with no persistence (phi = 0) has
+        no predictable path, and its forecast stays level. Measured on this
+        project's data (audit/benchmark_mean_reversion.py) this was at least as
+        accurate on unseen months as the flat combination.
+        """
+        h = np.arange(1, steps + 1)
+        path = self.mean + self.phi ** h * (self.recent - self.mean)
+        return (self._level + path) / 2.0
+
+
+class PatternRepeatForecaster(BaseForecaster):
+    """
+    Replays the most recent periods' ups and downs: the "wiggly" forecast a
+    reader expects when the history swings. It is backtested alongside the
+    real candidates so its accuracy can be reported, but it is never selected
+    - it exists to answer "why not a forecast that moves like the history?"
+    with a measured number.
+    """
+
+    model_key = "pattern_repeat"
+    model_name = "Repeat recent ups and downs"
+    min_observations = 3
+    window = 6
+
+    def _fit(self, y: pd.Series) -> None:
+        self._pattern = y.values[-min(self.window, len(y)):].astype(float)
+
+    def _point_forecast(self, steps: int) -> np.ndarray:
+        return np.resize(self._pattern, steps)
+
+
 def build_candidates(
     seasonal_periods: int | None = None,
     include_seasonal: bool = False,

@@ -245,6 +245,7 @@ def _series_validation(result, group) -> dict[str, Any]:
         # Why this series' forecast line is flat / sloped / seasonal.
         "shape": entry.get("shape"),
         "explanation": entry.get("shape_explanation") or [],
+        "holdout": entry.get("holdout") or [],
     }
 
 
@@ -272,6 +273,7 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
             "reliability_note": sentence,
             "shape": meta.get("shape"),
             "explanation": meta.get("shape_explanation") or [],
+            "holdout": meta.get("holdout") or [],
             "data": {
                 "historical": [{"date": r["period"], "value": r["value"]}
                                for r in result.historical_rows],
@@ -462,6 +464,8 @@ _MODEL_RULE = {
     "drift": "its last {unit} plus its average change per {unit}",
     "holt_linear": "its recent level continued along its recent trend",
     "damped_holt": "its recent level continued along a flattening trend",
+    "level_combination": "the average of its long-run mean, SES, its last 3 {unit}s' "
+                         "average and its last {unit}",
 }
 
 

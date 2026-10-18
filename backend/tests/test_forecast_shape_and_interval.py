@@ -101,7 +101,7 @@ def test_explanation_states_measured_reasons():
     series = monthly(NOISY)
     _, meta = fs.select_and_fit(series, _diag(len(series)), 6)
     text = " ".join(meta.shape_explanation)
-    assert "level line" in text
+    assert "line is level because" in text and "persistence 0.00" in text
     assert "24 months" in text and "has 15" in text            # seasonality needs 2 cycles
     assert "620,112" in text                                     # the measured typical swing
     assert "95%" in text
@@ -115,4 +115,66 @@ def test_explanation_never_claims_lowest_error_for_a_tie_break():
     text = " ".join(meta.shape_explanation)
     if best.model_key != meta.selected_model_key:
         assert "had the lowest error" not in text
-        assert "within 10%" in text
+        if meta.selected_model_key == "level_combination":
+            assert "averaging level models forecasts unseen months more accurately" in text
+        else:
+            assert "within 10%" in text
+
+
+def test_noisy_series_without_trend_uses_the_combination():
+    series = monthly(NOISY)
+    _, meta = fs.select_and_fit(series, _diag(len(series)), 6)
+    assert meta.selected_model_key == "level_combination"
+    assert meta.selection_method == "level_combination_rule"
+    assert meta.interval_source == "validation_residuals"     # band from its own backtest
+
+
+def test_holdout_check_and_pattern_reference_are_recorded():
+    series = monthly(NOISY)
+    _, meta = fs.select_and_fit(series, _diag(len(series)), 6)
+    assert len(meta.holdout) == 5                               # min(h, n // 3)
+    assert {"period", "actual", "predicted"} <= set(meta.holdout[0])
+    assert meta.holdout[-1]["actual"] == NOISY[-1]              # real values, not adjusted
+    assert meta.pattern_reference is not None
+    assert meta.pattern_reference.model_key == "pattern_repeat"
+    assert all(c.model_key != "pattern_repeat" for c in meta.candidates)   # never selectable
+
+
+def test_holdout_sentence_reports_which_side_actuals_fell():
+    rising = monthly([10, 11, 9, 10, 12, 11, 10, 9, 11, 10, 18, 19, 21, 20, 22])
+    _, meta = fs.select_and_fit(rising, _diag(len(rising)), 6)
+    text = " ".join(meta.shape_explanation)
+    if all(r["actual"] > r["predicted"] for r in meta.holdout):
+        assert "came in above it" in text
+        assert "middle" not in text
+
+
+def test_persistent_series_forecast_moves_back_toward_its_mean():
+    # A series whose dips carry over (APAC-like): recent months below normal.
+    persistent = monthly([100, 104, 108, 110, 107, 103, 99, 96, 95, 97, 101, 104, 100, 92, 88])
+    model = fm.LevelCombinationForecaster().fit(persistent)
+    fc = model.predict(6)[0].values
+    assert model.phi > 0.05
+    assert np.all(np.diff(fc) > 0)                       # changes every month, upward
+    assert fc[-1] < persistent.mean()                    # approaches, never overshoots, the mean
+
+
+def test_no_persistence_means_no_invented_path():
+    alternating = monthly([100, 140, 95, 150, 90, 145, 100, 150, 95, 140])
+    model = fm.LevelCombinationForecaster().fit(alternating)
+    assert model.phi == 0.0                               # negative carry-over is clipped to 0
+    assert np.ptp(model.predict(6)[0].values) == 0        # level, not a made-up wiggle
+
+
+def test_converging_explanation_quotes_the_path():
+    persistent = monthly([100, 104, 108, 110, 107, 103, 99, 96, 95, 97, 101, 104, 100, 92, 88])
+    _, meta = fs.select_and_fit(persistent, _diag(len(persistent)), 6)
+    if meta.selected_model_key == "level_combination" and meta.shape == "converging":
+        text = " ".join(meta.shape_explanation)
+        assert "changes month by month" in text and "persistence" in text
+
+
+def test_trend_test_rejects_a_few_noisy_points():
+    # Ratio passes, but 6 noisy points are not a statistically real slope.
+    assert not fs._series_has_significant_trend(monthly([10, 30, 12, 34, 15, 33]))
+    assert fs._series_has_significant_trend(monthly([10, 12, 14, 16, 18, 20, 22, 24]))

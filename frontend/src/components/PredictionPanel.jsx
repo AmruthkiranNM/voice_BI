@@ -494,6 +494,12 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
     const bridgeDate = lastHist && lastHist.value != null && !fcMap.has(lastHist.date) ? lastHist.date : null;
     const fcSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).value
       : (d === bridgeDate ? lastHist.value : '-'));
+    // The method re-fitted without the last few known months and asked to
+    // predict them: drawn over the history so the level forecast can be seen
+    // against real swings it did not get to learn from.
+    const holdoutMap = new Map((chart.holdout || []).map(h => [h.date || h.period, h.predicted]));
+    const holdoutSeriesData = allDates.map(d => holdoutMap.has(d) ? holdoutMap.get(d) : '-');
+    const hasHoldout = holdoutMap.size > 0;
     const hasBand = fcData.some(f => f.lower != null && f.upper != null);
     const lowerSeriesData = allDates.map(d => fcMap.has(d) ? fcMap.get(d).lower
       : (d === bridgeDate && hasBand ? lastHist.value : '-'));
@@ -548,6 +554,9 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              }
           });
           
+          if (holdoutMap.has(date)) {
+             html += `<div style="display:flex;align-items:center;gap:16px;margin-top:4px"><span style="color:#a1a1aa">Test prediction (made without this month):</span><span style="font-family:ui-monospace,monospace;color:#d4d4d8;margin-left:auto">${isCurrency?'$':''}${Number(holdoutMap.get(date)).toLocaleString('en-US', {maximumFractionDigits:0})}</span></div>`;
+          }
           if (fcMap.has(date) && fcMap.get(date).lower != null && fcMap.get(date).upper != null) {
              const lower = fcMap.get(date).lower;
              const upper = fcMap.get(date).upper;
@@ -620,6 +629,18 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              data: [ { xAxis: lastHist.date } ]
           } : null
         },
+        ...(hasHoldout ? [{
+          name: 'Test prediction',
+          type: 'line',
+          data: holdoutSeriesData,
+          itemStyle: { color: '#a1a1aa' },
+          lineStyle: { width: 2, type: 'dotted' },
+          showSymbol: true,
+          symbol: 'emptyCircle',
+          symbolSize: 5,
+          z: 4,
+          tooltip: { show: false },
+        }] : []),
         {
           name: 'CI Lower Base',
           type: 'line',
@@ -669,6 +690,11 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
             <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed" style={{ borderColor: '#6366f1' }} />Forecast</span>
             {fcData.some(d => d.lower != null && d.upper != null) && (
               <span className="flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm" style={{ background: 'rgba(99,102,241,0.2)' }} />95% likely range</span>
+            )}
+            {hasHoldout && (
+              <span className="flex items-center gap-1.5" title="The same method, re-fitted without these months, predicting them">
+                <span className="w-4 border-t-2 border-dotted" style={{ borderColor: '#a1a1aa' }} />Tested on past months
+              </span>
             )}
             {chart.model && (
               <span className="ml-auto text-zinc-500">
@@ -907,6 +933,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       data: { historical: focused.historical || [], forecast: focused.forecast || [] },
       // Model and reliability are already stated in the line above the chart.
       explanation: focused.explanation || [],
+      holdout: focused.holdout || [],
     };
     return frame(
       <>

@@ -228,6 +228,19 @@ class ForecastModelMetadata:
     #: Isolated one-period spikes replaced by their neighbours' mean for
     #: fitting only (reported history is unchanged).
     spikes_adjusted: list[str] = dataclasses.field(default_factory=list)
+    #: The chosen method re-fitted without the last few known periods and
+    #: asked to predict them: [{period, actual, predicted}]. Drawn over the
+    #: history so a reader can see how a level forecast meets real swings.
+    holdout: list[dict] = dataclasses.field(default_factory=list)
+    holdout_mae: float | None = None
+    #: Same months, predicted by repeating the preceding months' ups and downs.
+    holdout_pattern_mae: float | None = None
+    #: Backtest score of "repeat recent ups and downs" on the same folds as
+    #: the candidates. Reported, never selected.
+    pattern_reference: CandidateScore | None = None
+    #: For the level combination: persistence (phi), long-run mean and the
+    #: recent level the forecast path starts from.
+    mean_reversion: dict = dataclasses.field(default_factory=dict)
     shape: str = ""                    # flat | trend | seasonal
     shape_facts: dict = dataclasses.field(default_factory=dict)
     shape_explanation: list[str] = dataclasses.field(default_factory=list)

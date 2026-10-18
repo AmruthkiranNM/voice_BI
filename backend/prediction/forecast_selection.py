@@ -27,7 +27,13 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from prediction.forecasting_models import BaseForecaster, NaiveForecaster, build_candidates
+from prediction.forecasting_models import (
+    BaseForecaster,
+    LevelCombinationForecaster,
+    NaiveForecaster,
+    PatternRepeatForecaster,
+    build_candidates,
+)
 from prediction.schemas import (
     CandidateScore,
     ForecastModelMetadata,
@@ -316,7 +322,8 @@ def _score_candidate(
 # Models that produce inherently flat (level-only) forecasts. When a trending
 # series can be better described by a trend model at nearly equal validation
 # cost, prefer the trend model even if the level model scored marginally better.
-_FLAT_MODEL_KEYS = frozenset({"naive", "moving_average", "simple_exp_smoothing"})
+_FLAT_MODEL_KEYS = frozenset({"naive", "moving_average", "simple_exp_smoothing",
+                              "level_combination"})
 
 
 def _series_has_significant_trend(series: pd.Series) -> bool:
@@ -343,7 +350,21 @@ def _series_has_significant_trend(series: pd.Series) -> bool:
         return abs(slope) > 0
     # |slope| / std_resid > 0.3 means one extra period shifts the fit by >30%
     # of one residual standard deviation — a meaningful trend.
-    return abs(slope) / std_resid > 0.30
+    if abs(slope) / std_resid <= 0.30:
+        return False
+    # ...and it must be statistically real, not an accident of a few noisy
+    # points: the slope's t-test at the 5% level. Six to nine noisy months
+    # passed the ratio alone often enough to make trend models win and then
+    # extrapolate a slope that did not continue.
+    n = len(observed)
+    if n < 6:
+        return False
+    se = float(np.sqrt(np.sum(residuals ** 2) / (n - 2) / np.sum((x - x.mean()) ** 2)))
+    if se <= 0:
+        return True
+    from scipy import stats
+    p_value = 2 * stats.t.sf(abs(slope) / se, df=n - 2)
+    return p_value < 0.05
 
 def select_and_fit(
     series: pd.Series,
@@ -446,6 +467,21 @@ def select_and_fit(
         if score.eligible:
             residuals_by_key[score.model_key] = residuals
 
+    # The combination is backtested exactly like every other candidate, so its
+    # score, its comparison with naive and its interval come from its own
+    # held-out errors.
+    combo = LevelCombinationForecaster()
+    combo_score, combo_resid = _score_candidate(combo, fold_data)
+    scores.append(combo_score)
+    if combo_score.eligible:
+        residuals_by_key[combo_score.model_key] = combo_resid
+    candidates.append(combo)
+
+    # Reference only: the "moves like the history" forecast, scored on the
+    # same folds so the explanation can quote it. Never eligible to win.
+    pattern_score, _ = _score_candidate(PatternRepeatForecaster(), fold_data)
+    meta.pattern_reference = pattern_score
+
     meta.candidates = scores
     meta.n_folds = len(folds)
 
@@ -529,6 +565,35 @@ def select_and_fit(
                 )
                 winner = best_flat
 
+    # ── Combination rule: no trend and no estimable season ──────────────
+    # Picking one winner from two or three tiny validation windows mostly
+    # picks noise. On this project's data, selecting per series forecast
+    # unseen months worse than a plain average at every training length
+    # (audit/benchmark_pipeline_designs.py); the equal-weight combination of
+    # level models was among the most accurate. So when the series offers no
+    # trend and no estimable seasonal pattern - nothing for a more specific
+    # model to capture - the combination is used. Series that do trend, or
+    # have two full seasonal cycles, keep the backtested selection above.
+    use_combination = (
+        combo_score.eligible
+        and not _series_has_significant_trend(series)
+        and not diagnostics.seasonal_estimate_supported
+    )
+    combination_rule = False
+    if use_combination and winner.model_key != combo_score.model_key:
+        meta.notes.append(
+            "No significant trend and too little history for a seasonal pattern, so "
+            "the forecast combines four level models (mean, SES, 3-month average, last "
+            "value) instead of trusting whichever single model happened to score best "
+            f"on {len(folds)} short validation windows (here {winner.model_label}, "
+            f"{(winner.mase if use_mase else winner.mae):.2f} vs the combination's "
+            f"{(combo_score.mase if use_mase else combo_score.mae):.2f}). On unseen months, "
+            "combining was more accurate than selecting on this kind of data.")
+        winner = combo_score
+        combination_rule = True
+    elif use_combination:
+        combination_rule = True
+
     naive_score = next((s for s in eligible if s.model_key == "naive"), None)
     if naive_score is not None:
         if use_mase and winner.mase is not None and naive_score.mase is not None:
@@ -554,6 +619,15 @@ def select_and_fit(
         _finalise(meta, series, full, diagnostics)
         return model, meta
 
+    if isinstance(model, LevelCombinationForecaster):
+        meta.mean_reversion = {"phi": round(model.phi, 4), "mean": model.mean,
+                               "recent": model.recent, "level": model._level}
+
+    try:
+        _holdout_check(meta, chosen_cls, kwargs, series, horizon)
+    except Exception as exc:  # a display aid must never break a forecast
+        logger.debug("[Selection] holdout check skipped: %s", exc)
+
     # Size the prediction intervals from out-of-sample validation errors.
     oos = residuals_by_key.get(winner.model_key) or []
     if len(oos) >= 2:
@@ -567,7 +641,8 @@ def select_and_fit(
 
     meta.selected_model_key = winner.model_key
     meta.selected_model_label = winner.model_label
-    meta.selection_method = "rolling_origin_backtest"
+    meta.selection_method = ("level_combination_rule" if combination_rule
+                             else "rolling_origin_backtest")
     meta.selected_score = winner.mase if use_mase else winner.mae
 
     if meta.beats_naive is False:
@@ -588,6 +663,36 @@ def select_and_fit(
 
     _finalise(meta, series, full, diagnostics)
     return model, meta
+
+
+def _holdout_check(meta: ForecastModelMetadata, chosen: BaseForecaster, kwargs: dict,
+                   series: pd.Series, horizon: int) -> None:
+    """
+    Re-fit the chosen method without the last few known periods, predict
+    them, and record the predictions next to the actuals.
+
+    Also records what a "pattern" forecast - repeating the ups and downs of
+    the periods just before - would have scored on the same periods, which is
+    the alternative a reviewer usually has in mind when a forecast is flat.
+    """
+    observed = series.dropna()
+    v = max(2, min(int(horizon), len(observed) // 3))
+    if len(observed) - v < max(3, chosen.min_observations):
+        return
+    train, _ = prepare_fit_slice(observed.iloc[:-v])
+    if ADJUST_SPIKES:
+        train, _ = adjust_isolated_spikes(train)
+    actual = observed.iloc[-v:]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model = chosen.__class__(**kwargs).fit(train)
+        pred, _ = model.predict(v)
+    pred = np.asarray(pred.values, dtype=float)
+    pattern = np.resize(train.values[-v:], v)       # replay the previous v periods
+    meta.holdout = [{"period": str(p), "actual": float(a), "predicted": float(f)}
+                    for p, a, f in zip(actual.index, actual.values, pred)]
+    meta.holdout_mae = float(np.mean(np.abs(actual.values - pred)))
+    meta.holdout_pattern_mae = float(np.mean(np.abs(actual.values - pattern)))
 
 
 def _finalise(meta: ForecastModelMetadata, original: pd.Series, fitted_on: pd.Series,
@@ -631,6 +736,10 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
     key = meta.selected_model_key
     meta.shape = ("seasonal" if key in _SEASONAL_KEYS
                   else "flat" if key in _FLAT_MODEL_KEYS else "trend")
+    mr = meta.mean_reversion or {}
+    if (key == "level_combination" and mr and mr["phi"] >= 0.05
+            and abs(mr["recent"] - mr["mean"]) > 0.02 * abs(mr["mean"] or 1)):
+        meta.shape = "converging"
     unit = _unit(diagnostics.requested_frequency if diagnostics else None)
     n = int(len(observed))
 
@@ -645,7 +754,31 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
                      # bool(): numpy's bool_ is not JSON-serialisable.
                      trend_significant=bool(_series_has_significant_trend(observed)),
                      level=round(float(observed.mean()), 4))
-        if meta.shape == "flat":
+        if meta.shape == "converging":
+            h = max(int(meta.validation_horizon or 1), 1)
+            steps = np.arange(1, h + 1)
+            path = (mr["level"] + mr["mean"] + mr["phi"] ** steps * (mr["recent"] - mr["mean"])) / 2
+            direction = "up" if mr["recent"] < mr["mean"] else "down"
+            facts.update(persistence=mr["phi"], recent_level=round(mr["recent"], 4),
+                         forecast_first=round(float(path[0]), 4),
+                         forecast_last=round(float(path[-1]), 4))
+            sentences.append(
+                f"The forecast changes month by month: it starts near the recent level "
+                f"({_fmt(mr['recent'])}) and moves {direction} toward the long-run average "
+                f"({_fmt(mr['mean'])}), from {_fmt(float(path[0]))} to {_fmt(float(path[-1]))}. "
+                f"That is how this series has behaved: about {mr['phi'] * 100:.0f}% of a "
+                f"{unit}'s distance from its normal level has carried into the next {unit} "
+                f"(persistence {mr['phi']:.2f}), so the forecast closes the gap by that "
+                f"factor each {unit} - measured from the data, not drawn in.")
+        if meta.shape == "flat" and key == "level_combination" and mr:
+            sentences.append(
+                f"The line is level because this series shows no carry-over from one {unit} "
+                f"to the next (persistence {mr['phi']:.2f}): a high or low {unit} has not "
+                f"made the following {unit} high or low, so there is no path to project - "
+                f"only a level, at "
+                f"{_fmt((mr['level'] + mr['mean'] + mr['phi'] * (mr['recent'] - mr['mean'])) / 2)} "
+                f"per {unit}.")
+        if meta.shape == "flat" and key != "level_combination":
             level_of = {
                 # The raw mean would not match the line if a spike in those
                 # months was adjusted for fitting, so the figure is then omitted.
@@ -655,6 +788,9 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
                 "naive": f"the last {unit}'s value ({_fmt(float(observed.iloc[-1]))})",
                 "simple_exp_smoothing": f"a weighted average of all {unit}s, "
                                         f"weighted toward recent ones",
+                "level_combination": "the average of four level forecasts (the long-run "
+                                     f"mean, SES, the last 3 {unit}s' average and the "
+                                     f"last {unit})",
             }.get(key, "a single level")
             sentences.append(
                 f"The forecast is a level line at {level_of}, against a long-run "
@@ -662,6 +798,7 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
                 f"model ({meta.selected_model_label}) carries that level forward "
                 f"rather than a pattern - no pattern in this history held up when "
                 f"tested on held-out {unit}s.")
+        if meta.shape in ("flat", "converging"):
             trend_scores = [c for c in meta.candidates
                             if c.eligible and c.mase is not None
                             and c.model_key in {"drift", "holt_linear", "damped_holt"}]
@@ -669,19 +806,22 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
             if trend_scores and win is not None and win.mase is not None:
                 best_trend = min(trend_scores, key=lambda c: c.mase)
                 if best_trend.mase > win.mase:
+                    gap = (best_trend.mase / win.mase - 1) * 100
+                    verdict = (f"{gap:.0f}% less accurate on {unit}s it had not seen, so "
+                               f"continuing the recent rise or fall would have made the "
+                               f"forecast worse" if gap >= 10
+                               else f"no better on {unit}s it had not seen, so there is no "
+                                    f"evidence for extending the recent rise or fall")
                     sentences.append(
                         f"Models that extend a trend were tested too: the best, "
                         f"{best_trend.model_label}, scored {best_trend.mase:.2f} against "
-                        f"{win.mase:.2f} (lower is better), i.e. "
-                        f"{(best_trend.mase / win.mase - 1) * 100:.0f}% less accurate on "
-                        f"{unit}s it had not seen - so continuing the recent rise or fall "
-                        f"would have made the forecast worse.")
+                        f"{win.mase:.2f} (lower is better) - {verdict}.")
         elif meta.shape == "trend":
             sentences.append(
                 f"The forecast is a straight trend because the chosen model "
                 f"({meta.selected_model_label}) continues the direction the series "
                 f"has been moving in.")
-        else:
+        elif meta.shape == "seasonal":
             sentences.append(
                 f"The forecast repeats the shape of the last cycle because the "
                 f"chosen model ({meta.selected_model_label}) carries the seasonal "
@@ -716,6 +856,11 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
         best = min(scored, key=lambda c: c.mase if c.mase is not None else (c.mae or float("inf")))
         if best.model_key == key:
             how = f"{meta.selected_model_label} had the lowest error."
+        elif key == "level_combination":
+            how = (f"{best.model_label} scored best on these few windows, but picking a "
+                   f"single winner from so little evidence mostly picks noise; on short, "
+                   f"noisy series, averaging level models forecasts unseen {unit}s more "
+                   f"accurately, so the combination is used.")
         elif meta.shape == "trend":
             how = (f"{best.model_label} scored marginally better (within 10%), but "
                    f"the series has a significant trend, so "
@@ -725,6 +870,49 @@ def _explain_shape(meta: ForecastModelMetadata, observed: pd.Series,
                    f"well inside the noise of so few held-out {unit}s - so the "
                    f"simpler {meta.selected_model_label} was chosen.")
         sentences.append(f"{len(tested)} models were tested on held-out {unit}s; {how}")
+
+    pattern = meta.pattern_reference
+    chosen_score = meta.selected_score
+    if (pattern is not None and pattern.eligible and pattern.mase is not None
+            and chosen_score is not None and meta.selection_metric == "mase"):
+        facts.update(pattern_mase=round(pattern.mase, 4))
+        if pattern.mase > chosen_score:
+            sentences.append(
+                f"A forecast that moves like the history - repeating its recent ups and "
+                f"downs - was tested on the same held-out {unit}s: it scored "
+                f"{pattern.mase:.2f} against {chosen_score:.2f} for this forecast (lower is "
+                f"better), {(pattern.mase / chosen_score - 1) * 100:.0f}% less accurate. "
+                f"Past swings do not repeat on schedule, so copying them adds error.")
+        else:
+            sentences.append(
+                f"A forecast repeating the history's recent ups and downs scored "
+                f"{pattern.mase:.2f} against {chosen_score:.2f} here - no worse on these "
+                f"few windows - but it is not used because swings that are not a "
+                f"measured cycle cannot be relied on to recur.")
+
+    if meta.holdout and meta.holdout_mae is not None:
+        v = len(meta.holdout)
+        above = sum(1 for r in meta.holdout if r["actual"] > r["predicted"])
+        below = v - above
+        facts.update(holdout_mae=round(meta.holdout_mae, 4), holdout_above=above,
+                     holdout_below=below)
+        lead = (f"The dotted line shows this method re-fitted without the last {v} known "
+                f"{unit}s and asked to predict them; it missed by "
+                f"{_fmt(meta.holdout_mae)} per {unit} on average. ")
+        if above and below:
+            tail = (f"The real {unit}s landed on both sides of it ({above} above, {below} "
+                    f"below) - the swings scatter around a level rather than following a path.")
+        elif above:
+            tail = (f"All {v} real {unit}s came in above it: this series ran higher than its "
+                    f"history predicted. Too few {unit}s show it yet for any model to confirm "
+                    f"a lasting rise, so the forecast level is set from the evidence and the "
+                    f"band's upper half covers a continued rise.")
+        else:
+            tail = (f"All {v} real {unit}s came in below it: this series ran lower than its "
+                    f"history predicted. Too few {unit}s show it yet for any model to confirm "
+                    f"a lasting fall, so the forecast level is set from the evidence and the "
+                    f"band's lower half covers a continued fall.")
+        sentences.append(lead + tail)
 
     if meta.interval_source == "validation_residuals":
         sentences.append(

@@ -15,6 +15,38 @@ changing the backend agents or the prediction engine. Newest changes first.
 
 ---
 
+## Forecasting pipeline redesign (evidence-based)
+
+Benchmarks: `audit/benchmark_forecasters.py`, `audit/benchmark_pipeline_designs.py`
+(every method predicts months it has not seen; 26 series x several origins).
+
+- **Finding 1 — "wiggly" forecasts are less accurate.** Repeating the last 6
+  months' shape (MASE 1.60), gradient boosting on lags (1.49) and a straight
+  trend (1.73) all lost to level forecasts (mean 1.34). In the live backtest,
+  the level forecast beats "repeat recent ups and downs" on 24/26 series.
+- **Finding 2 — selecting one model per series was the worst design** (1.60):
+  with 2–3 tiny validation windows the "winner" is mostly noise.
+- **Change:** when a series has no significant trend and too little history
+  for seasonality, the forecast is an equal-weight **combination of level
+  models** (mean, SES, 3-month average, last value) —
+  `LevelCombinationForecaster`. Trending or seasonal series keep backtested
+  selection (synthetic trend/season tests still pass).
+- **Trend test** now also needs a slope t-test at 5% (6–9 noisy months used
+  to pass the ratio alone and trigger false trends).
+- Result: pipeline error 1.60 → 1.38 (14% better), best median of all methods.
+- **Mean reversion** (`audit/benchmark_mean_reversion.py`): the combination
+  is half the flat level, half an AR(1) path that starts at the recent level
+  and closes the gap to the long-run mean by the series' measured
+  persistence (phi = lag-1 autocorrelation, clipped to [0, 0.95]) each
+  month. Slightly more accurate (1.810 → 1.797) and the forecast now changes
+  month to month where the data has persistence: APAC 1.293M → 1.318M,
+  Americas 816K → 844K, Europe 391K → 416K. Series with persistence 0.00
+  (total revenue, Orange Choco) stay level, and the explanation says why.
+- **Chart evidence for the guide:** grey dotted "Tested on past months" line —
+  the method re-fitted without the last 5 known months, predicting them —
+  plus explanation sentences quoting: the trend models' score, the
+  "repeat ups and downs" score, and on which side the real months fell.
+
 ## Top-N follow-ups ("will the top 5 be the same next 6 months?")
 
 - The follow-up keeps the user's N (inherited from "top 5" in the previous
@@ -108,7 +140,7 @@ Changes:
 ## Testing
 
 - Backend: `cd backend && venv\Scripts\python.exe -m pytest tests -q`
-  (482 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
+  (489 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
   tests regenerate those cached `.pkl` files.
 - Frontend needs Node ≥ 20 (`npm run dev`); Node 18 cannot run Vite.
 - The Groq free tier has a 200k tokens/day limit; long manual test runs can
