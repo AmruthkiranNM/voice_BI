@@ -19,6 +19,8 @@ from __future__ import annotations
 import dataclasses
 import re
 import logging
+
+import pandas as pd
 from typing import Any
 
 from prediction import config as cfg
@@ -112,6 +114,20 @@ def _success_response(config: PredictionConfig, result, query: str) -> dict[str,
             "returning the deterministic evidence instead."
         )
         insight = evidence
+
+    # Falling back to the evidence is safe but reads like a log. When it holds
+    # computed answer lines, show those as sentences instead.
+    if insight == evidence:
+        insight = _readable(evidence) or evidence
+
+    # The computed answer to "which month ...?" must lead the reply even when
+    # the wording layer leaves it out.
+    # "Which month/quarter ...?" is answered entirely by computed sentences.
+    # The wording layer was seen re-deciding the answer ("Q1 2006 is the
+    # lowest") against the engine's ranking (Q2 2005); a ranking question has
+    # nothing for it to add that could not also contradict the result.
+    if getattr(result, "period_ranking", None) and result.period_ranking.get("ranking"):
+        insight = _readable(evidence) or insight
 
     # "Will the top 5 stay the same?" needs the *why* as well as the yes/no.
     # The reasons are computed, so they are attached as written rather than
@@ -376,6 +392,75 @@ def _visualization_metadata(config: PredictionConfig, result) -> dict[str, Any]:
 # Evidence for the explanation layer
 # ──────────────────────────────────────────────────────────
 
+#: Evidence lines that are already complete sentences for a reader.
+_READABLE_KEYS = ("ANSWER", "RUNNER-UP", "CERTAINTY", "RELIABILITY")
+
+
+def _readable(evidence: str) -> str:
+    """The sentence-like evidence lines, without their labels; '' if none."""
+    out = []
+    for line in evidence.splitlines():
+        key, _, rest = line.partition(": ")
+        if key in _READABLE_KEYS and rest:
+            text = rest[:1].upper() + rest[1:]
+            if key == "ANSWER":
+                text = f"**{text}**"
+            elif key == "RUNNER-UP":
+                text = f"Runner-up: {rest}"
+            out.append(text)
+        elif key == "MODEL" and rest:
+            out.append("Model: " + re.sub(r";\s*beats the naive baseline: \w+\.?", ".", rest))
+    return "\n\n".join(out) if any(l for l in out) and evidence.count("ANSWER: ") else ""
+
+
+def _period_label(period: str, frequency: str) -> str:
+    """'2019-12-31 00:00:00' -> 'December 2019' / 'Q4 2019' / 'week of 2019-12-23'."""
+    try:
+        ts = pd.Timestamp(period)
+    except Exception:
+        return str(period)
+    f = (frequency or "").rstrip("s")
+    if f == "month":
+        return ts.strftime("%B %Y")
+    if f == "quarter":
+        return f"Q{ts.quarter} {ts.year}"
+    if f == "year":
+        return str(ts.year)
+    if f == "week":
+        return f"week ending {ts.date()}"
+    return str(ts.date())
+
+
+def _period_ranking_evidence(pr: dict, config: PredictionConfig) -> list[str]:
+    """'Which month will be highest?' - the answer first, then the full ranking."""
+    rows, unit = pr["ranking"], (config.time_frequency or "period").rstrip("s")
+    top = rows[0]
+    label = _period_label(top["period"], config.time_frequency)
+    what = f"total {config.target}" if pr.get("grouped") else config.target
+    lines = [f"ANSWER: The {pr['direction']} forecast {unit} is {label}, with {what} of "
+             f"{top['value']:,.2f}"
+             + (f" (95% range {top['lower']:,.2f} to {top['upper']:,.2f})."
+                if top.get("lower") is not None else ".")]
+    if len(rows) >= 2:
+        runner = rows[1]
+        lines.append(f"RUNNER-UP: {_period_label(runner['period'], config.time_frequency)} "
+                     f"at {runner['value']:,.2f}.")
+        if pr.get("lead_within_uncertainty"):
+            lines.append(
+                f"CERTAINTY: {label}'s lead over the runner-up ({pr['lead']:,.2f}) is smaller "
+                f"than its own forecast uncertainty, so the top two could swap; treat the "
+                f"order as likely, not certain.")
+        elif "lead" in pr:
+            lines.append(
+                f"CERTAINTY: {label}'s lead over the runner-up ({pr['lead']:,.2f}) is larger "
+                f"than its forecast uncertainty, so it is a clear {pr['direction']}.")
+    lines.append(f"ALL FORECAST {unit.upper()}S, {pr['direction']} first:")
+    for r in rows:
+        lines.append(f"  {r['rank']}. {_period_label(r['period'], config.time_frequency)}: "
+                     f"{r['value']:,.2f}")
+    return lines
+
+
 def _section(evidence: str, header: str) -> list[str]:
     """The indented lines under one evidence header."""
     lines, inside = [], False
@@ -597,7 +682,13 @@ def build_evidence(config: PredictionConfig, result) -> str:
                 f"{str(config.forecast_end)[:10]}."
             )
 
-    if result.ranking_rows:
+    period_rank = getattr(result, "period_ranking", None) or {}
+    if period_rank.get("ranking"):
+        lines.extend(_period_ranking_evidence(period_rank, config))
+
+    # A ranking of *groups* only means something when there are groups; an
+    # ungrouped forecast "ranked" itself as "None".
+    if result.ranking_rows and (config.is_grouped or not period_rank):
         is_growth = config.ranking_metric == "growth"
         lines.append("RANKED GROWTH:" if is_growth else "RANKED FORECAST TOTALS:")
         for row in result.ranking_rows[:5]:

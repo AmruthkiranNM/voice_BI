@@ -90,7 +90,7 @@ export default function PredictionPanel({ result, insight }) {
               />
               <TbChartBar className="w-14 h-14 text-indigo-400" />
               <p className="text-5xl font-bold mt-4 font-mono text-indigo-400">
-                {typeof firstPred.prediction === 'number' ? firstPred.prediction.toLocaleString(undefined, { maximumFractionDigits: 2 }) : firstPred.prediction}
+                {typeof firstPred.prediction === 'number' ? firstPred.prediction.toLocaleString('en-US', { maximumFractionDigits: 2 }) : firstPred.prediction}
               </p>
               <p className="text-sm text-zinc-400 mt-1">Predicted {targetColumn.replace(/_/g, ' ')}</p>
             </>
@@ -332,7 +332,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
         textStyle: { color: '#f4f4f5' },
         formatter: (params) => {
           const p = params[0];
-          let valLabel = isProb ? `${p.value}%` : (isCurrency ? '$' : '') + p.value.toLocaleString();
+          let valLabel = isProb ? `${p.value}%` : (isCurrency ? '$' : '') + p.value.toLocaleString('en-US');
           return `${chart.dimension === 'group' ? 'Group' : 'ID'}: ${p.name}<br/>${isProb ? 'Probability' : 'Value'}: ${valLabel}`;
         }
       },
@@ -418,7 +418,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
           </div>
           <div>
             <p className="text-zinc-500 text-xs mb-1 uppercase tracking-wider">Predictions</p>
-            <p className="text-zinc-300 font-mono text-sm">{chart.total_predicted.toLocaleString()}</p>
+            <p className="text-zinc-300 font-mono text-sm">{chart.total_predicted.toLocaleString('en-US')}</p>
           </div>
         </div>
       </div>
@@ -531,7 +531,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
       const abs = Math.abs(val);
       if (abs >= 1e6) return (val / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
       if (abs >= 1e3) return (val / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-      return val.toLocaleString(undefined, {maximumFractionDigits:0});
+      return val.toLocaleString('en-US', {maximumFractionDigits:0});
     };
 
     const option = {
@@ -543,14 +543,14 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
         axisPointer: { type: 'line', lineStyle: { color: '#52525b', type: 'dashed' } },
         formatter: function(params) {
           const date = params[0].name;
-          let html = `<div style="font-size:12px;margin-bottom:8px;color:#a1a1aa">Month:<br/><span style="color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</span></div>`;
+          let html = `<div style="font-size:12px;margin-bottom:8px;color:#a1a1aa">Period:<br/><span style="color:#f4f4f5;font-weight:500">${formatTooltipDate(date)}</span></div>`;
           
           params.forEach(p => {
              if (p.seriesName === 'Actual' && p.value !== '-') {
-                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Actual ${metricLabel.toLowerCase()}:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Actual ${metricLabel.toLowerCase()}:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString('en-US', {maximumFractionDigits: 2})}</span></div>`;
              }
              if (p.seriesName === 'Forecast' && p.value !== '-' && fcMap.has(date)) {
-                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Forecast:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString(undefined, {maximumFractionDigits: 2})}</span></div>`;
+                html += `<div class="flex items-center gap-4 mb-1"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${p.color}"></span><span style="color:#d4d4d8">Forecast:</span></div><span style="font-family:ui-monospace,monospace;color:#fafafa;font-weight:700;margin-left:auto">${isCurrency?'$':''}${Number(p.value).toLocaleString('en-US', {maximumFractionDigits: 2})}</span></div>`;
              }
           });
           
@@ -561,7 +561,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
              const lower = fcMap.get(date).lower;
              const upper = fcMap.get(date).upper;
              if (lower !== upper) {
-               html += `<div style="display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(63,63,70,.6)"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span style="color:#a1a1aa">95% likely range:</span></div><span style="font-family:ui-monospace,monospace;color:#d4d4d8;font-size:12px;margin-left:auto">${isCurrency?'$':''}${Number(lower).toLocaleString(undefined, {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString(undefined, {maximumFractionDigits:0})}</span></div>`;
+               html += `<div style="display:flex;align-items:center;gap:16px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(63,63,70,.6)"><div class="flex items-center gap-2"><span class="w-2 h-2 rounded-sm bg-indigo-500/30 border border-indigo-500/50"></span><span style="color:#a1a1aa">95% likely range:</span></div><span style="font-family:ui-monospace,monospace;color:#d4d4d8;font-size:12px;margin-left:auto">${isCurrency?'$':''}${Number(lower).toLocaleString('en-US', {maximumFractionDigits:0})} – ${isCurrency?'$':''}${Number(upper).toLocaleString('en-US', {maximumFractionDigits:0})}</span></div>`;
              }
           }
           
@@ -674,7 +674,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
                <div>
                   <p className="text-[10px] md:text-xs text-zinc-500 uppercase tracking-wider mb-1">Total forecast, {fcData.length} periods</p>
                   <p className="text-xl md:text-2xl font-mono text-indigo-400 font-bold">
-                     {isCurrency ? '$' : ''}{totalFc.toLocaleString(undefined, {maximumFractionDigits:2})}
+                     {isCurrency ? '$' : ''}{totalFc.toLocaleString('en-US', {maximumFractionDigits:2})}
                   </p>
                </div>
                <div>
@@ -693,7 +693,7 @@ function ChartRenderer({ chart, targetColumn = 'Value' }) {
             )}
             {hasHoldout && (
               <span className="flex items-center gap-1.5" title="The same method, re-fitted without these months, predicting them">
-                <span className="w-4 border-t-2 border-dotted" style={{ borderColor: '#a1a1aa' }} />Tested on past months
+                <span className="w-4 border-t-2 border-dotted" style={{ borderColor: '#a1a1aa' }} />Tested on past periods
               </span>
             )}
             {chart.model && (
@@ -994,7 +994,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       const abs = Math.abs(val);
       if (abs >= 1e6) return (val / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
       if (abs >= 1e3) return (val / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-      return val.toLocaleString(undefined, {maximumFractionDigits:0});
+      return val.toLocaleString('en-US', {maximumFractionDigits:0});
     };
 
     // Build series
@@ -1178,8 +1178,8 @@ function riskColor(level) {
 function formatValue(v) {
   if (v === null || v === undefined) return '—';
   if (typeof v === 'number') {
-    if (Number.isInteger(v)) return v.toLocaleString();
-    return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (Number.isInteger(v)) return v.toLocaleString('en-US');
+    return v.toLocaleString('en-US', { maximumFractionDigits: 2 });
   }
   return String(v);
 }

@@ -47,6 +47,21 @@ Benchmarks: `audit/benchmark_forecasters.py`, `audit/benchmark_pipeline_designs.
   plus explanation sentences quoting: the trend models' score, the
   "repeat ups and downs" score, and on which side the real months fell.
 
+## "Which month next year will have the highest sales?"
+
+- **Bucket vs span:** `time_resolution.granularity_from_question` reads bucket
+  words ("which month", "monthly", "per quarter", "each week") separately
+  from the horizon ("next year"). Previously "next year" became the bucket
+  and the engine forecast 4 quarters, so "which month" was unanswerable.
+- **Ranking periods:** new `OP_RANK_PERIODS` (`engine.rank_periods`) ranks the
+  forecast *periods* (summed across groups; no fake summed range), with the
+  leader's 95% range, the runner-up, and whether the lead is within the
+  forecast uncertainty. Direction from highest/lowest words.
+- The reply for period rankings is built only from computed sentences — the
+  LLM was seen contradicting the engine ("Q1 2006 lowest" vs computed Q2 2005).
+- An ungrouped forecast no longer prints a group ranking ("None: 722,052").
+- Frontend: en-US number grouping everywhere; "Tested on past periods".
+
 ## Top-N follow-ups ("will the top 5 be the same next 6 months?")
 
 - The follow-up keeps the user's N (inherited from "top 5" in the previous
@@ -140,7 +155,7 @@ Changes:
 ## Testing
 
 - Backend: `cd backend && venv\Scripts\python.exe -m pytest tests -q`
-  (489 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
+  (497 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
   tests regenerate those cached `.pkl` files.
 - Frontend needs Node ≥ 20 (`npm run dev`); Node 18 cannot run Vite.
 - The Groq free tier has a 200k tokens/day limit; long manual test runs can

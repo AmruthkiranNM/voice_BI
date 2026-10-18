@@ -129,6 +129,25 @@ _FINAL_PERIOD_MARKERS = re.compile(
     r"by the end of|at the end of|end of the (?:horizon|period|forecast)",
     re.IGNORECASE,
 )
+def _parse_span(question: str):
+    from prediction.time_resolution import parse_horizon_phrase
+    return parse_horizon_phrase(question)
+
+
+_TIME_NOUN = r"(?:month|quarter|week|day|year)s?"
+#: The ranked thing is a time period: "which month ... highest", "busiest
+#: quarter", "peak week", "the lowest month".
+_PERIOD_RANK = re.compile(
+    rf"\b(?:which|what)\s+{_TIME_NOUN}\b.*\b(?:highest|lowest|most|least|best|worst|"
+    rf"peak|top|maximum|minimum|biggest|smallest|busiest|slowest|strongest|weakest)\b|"
+    rf"\b(?:highest|lowest|best|worst|peak|busiest|slowest|strongest|weakest|top|"
+    rf"biggest|smallest)\s+(?:selling\s+|sales\s+)?{_TIME_NOUN}\b",
+    re.IGNORECASE,
+)
+_LOW_WORDS = re.compile(r"\b(?:lowest|least|worst|minimum|smallest|slowest|weakest)\b",
+                        re.IGNORECASE)
+
+
 #: Words that ask for a breakdown into groups, rather than one total.
 _GROUPING_CUE = re.compile(
     r"\b(by|per|each|every|which|across|among|between|breakdown|broken down|split|"
@@ -463,6 +482,20 @@ def resolve_config(
             requested_unit = parsed_unit if parsed_unit in ("days", "weeks", "months") else None
             # The count goes with the unit: "next 3 months" is 3, not 1.
             parsed_count = count if requested_unit else None
+        # A bucket word ("which month", "monthly") decides the bucket size even
+        # when the span is stated in a coarser unit ("next year").
+        from prediction.time_resolution import granularity_from_question
+        bucket = granularity_from_question(question)
+        span_unit = requested_unit          # the unit the horizon is stated in
+        if bucket:
+            if requested_unit is None:
+                # The span may be in a coarser unit than the bucket ("next year").
+                from prediction.series_validation import normalize_frequency as _nf
+                span_count, raw_span_unit = _parse_span(question)
+                span_unit = _nf(raw_span_unit) if raw_span_unit else None
+                if span_count and parsed_count is None:
+                    parsed_count = span_count
+            requested_unit = bucket
         frequency, freq_notes = resolve_frequency(
             requested_unit if requested_unit in (
                 "days", "weeks", "months", "quarters", "years") else None,
@@ -493,7 +526,9 @@ def resolve_config(
         horizon = resolve_horizon(
             question, frequency, selected.max_date,
             requested_periods=stated_count,
-            requested_unit=requested_unit,
+            # The horizon is measured in the span's unit; the bucket only sets
+            # the resolution it is expressed at.
+            requested_unit=span_unit if bucket else requested_unit,
             # A follow-up that says nothing about timing is still asking about
             # the same period as the question before it.
             default_periods=inherited_horizon or 6,
@@ -626,6 +661,11 @@ def resolve_config(
         operations.append(cfg.OP_FINAL_PERIOD)
         if cfg.OP_RANK not in operations:
             operations.append(cfg.OP_RANK)
+
+    # "Which month will be highest?" ranks time periods, not groups.
+    if _PERIOD_RANK.search(question):
+        operations.append(cfg.OP_RANK_PERIODS)
+        config.rank_direction = "ascending" if _LOW_WORDS.search(question) else "descending"
 
     top_n = interpretation.get("top_n")
     if top_n is None:

@@ -309,6 +309,41 @@ def resolve_frequency(
 # Horizon
 # ──────────────────────────────────────────────────────────
 
+#: Words that name a bucket size rather than a span: "which month", "monthly",
+#: "per week", "each quarter", "by day", "month-wise".
+_GRANULARITY_FORMS = {
+    "days": ("day", "daily"),
+    "weeks": ("week", "weekly"),
+    "months": ("month", "monthly"),
+    "quarters": ("quarter", "quarterly"),
+}
+
+
+def granularity_from_question(text: str) -> str | None:
+    """
+    The reporting bucket a question asks for, separate from its horizon.
+
+    "Which month next year will be highest?" asks for *monthly* buckets over a
+    *one-year* span. Reading "year" as the bucket size forecast four quarters
+    and could not answer "which month" at all. Only a unit used as a bucket -
+    "which/each/every/per/by <unit>", "<unit>ly", "<unit>-wise" - counts; a
+    unit inside a span ("next 3 months") is left to the horizon parser.
+    """
+    if not text:
+        return None
+    lowered = text.lower()
+    for freq, (noun, adjective) in _GRANULARITY_FORMS.items():
+        if re.search(rf"\b{adjective}\b", lowered):
+            return freq
+        if re.search(rf"\b(?:which|what|each|every|per|by|a)\s+{noun}s?\b", lowered):
+            return freq
+        if re.search(rf"\b{noun}[- ]?wise\b", lowered):
+            return freq
+        if re.search(rf"\b{noun}s?\s+(?:of|in)\s+(?:the\s+)?(?:next|coming|following)\b", lowered):
+            return freq
+    return None
+
+
 def parse_horizon_phrase(text: str) -> tuple[int | None, str | None]:
     """
     Extract a count and unit from natural language, without a phrase table.

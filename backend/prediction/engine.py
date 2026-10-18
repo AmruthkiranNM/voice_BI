@@ -62,6 +62,8 @@ class PredictionResult:
     top_rows: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     growth_rows: list[dict[str, Any]] = dataclasses.field(default_factory=list)
     comparison: dict[str, Any] | None = None
+    #: Forecast periods ranked ("which month will be highest?").
+    period_ranking: dict[str, Any] = dataclasses.field(default_factory=dict)
     row_predictions: list[dict[str, Any]] = dataclasses.field(default_factory=list)
 
     model_metadata: dict[str, Any] = dataclasses.field(default_factory=dict)
@@ -670,6 +672,50 @@ def _comparison_details(result: PredictionResult, config: PredictionConfig, comp
     return details
 
 
+def rank_periods(result: PredictionResult, config: PredictionConfig) -> dict:
+    """
+    Rank the forecast time periods ("which month next year will be highest?").
+
+    Grouped forecasts are summed per period first, so the question is answered
+    for the whole of what was forecast. The answer carries the leader's 95%
+    range and whether its lead over the runner-up is larger than the forecast
+    uncertainty - a period that wins by less than its own error band is not a
+    confident answer, and the evidence says so.
+    """
+    totals: dict[str, dict] = {}
+    for row in result.forecast_rows:
+        if row.get("value") is None:
+            continue
+        # Adding groups' 95% bounds does not give a 95% range for their sum,
+        # so a grouped total carries no range rather than a wrong one.
+        t = totals.setdefault(str(row["period"]), {"value": 0.0, "lower": 0.0, "upper": 0.0,
+                                                   "has_band": not config.is_grouped})
+        t["value"] += float(row["value"])
+        if row.get("lower") is None or row.get("upper") is None:
+            t["has_band"] = False
+        else:
+            t["lower"] += float(row["lower"])
+            t["upper"] += float(row["upper"])
+    if not totals:
+        return {}
+
+    descending = config.rank_direction != "ascending"
+    ranked = sorted(totals.items(), key=lambda kv: kv[1]["value"], reverse=descending)
+    rows = [{"rank": i, "period": p, "value": v["value"],
+             "lower": v["lower"] if v["has_band"] else None,
+             "upper": v["upper"] if v["has_band"] else None}
+            for i, (p, v) in enumerate(ranked, start=1)]
+
+    out = {"direction": "highest" if descending else "lowest", "frequency": config.time_frequency,
+           "ranking": rows, "grouped": config.is_grouped}
+    if len(rows) >= 2 and rows[0]["lower"] is not None:
+        lead = abs(rows[0]["value"] - rows[1]["value"])
+        half_width = (rows[0]["upper"] - rows[0]["lower"]) / 2
+        out["lead"] = lead
+        out["lead_within_uncertainty"] = lead < half_width
+    return out
+
+
 def rank_final_period(result: PredictionResult) -> list[dict]:
     """
     Rank entities by their value in the LAST forecast period.
@@ -732,6 +778,9 @@ def _apply_operations(result: PredictionResult, config: PredictionConfig) -> Non
 
     if config.wants(cfg.OP_COMPARE):
         result.comparison = compare_historical_future(result, config)
+
+    if config.wants(cfg.OP_RANK_PERIODS):
+        result.period_ranking = rank_periods(result, config)
 
     if config.wants(cfg.OP_TOP_N) and config.top_n:
         # A view over the full ranking. `ranking_rows` keeps every entity that

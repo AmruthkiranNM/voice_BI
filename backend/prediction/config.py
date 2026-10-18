@@ -43,6 +43,8 @@ OP_AGGREGATE = "aggregate"
 #: Rank on the LAST forecast period rather than on the horizon total. "In the
 #: final month" is a different question from "over the next six months".
 OP_FINAL_PERIOD = "final_period"
+#: Rank the forecast *time periods* ("which month will be highest?").
+OP_RANK_PERIODS = "rank_periods"
 
 # ── Result statuses ──
 STATUS_OK = "ok"
@@ -108,6 +110,7 @@ class PredictionConfig:
     operations: list[str] = dataclasses.field(default_factory=list)
     top_n: int | None = None
     ranking_metric: str = "sum"            # sum | growth
+    rank_direction: str = "descending"     # for period ranking: highest or lowest first
     growth_baseline_periods: int | None = None   # defaults to the horizon
     compare_against: str | None = None     # "history" for current-vs-future
 
