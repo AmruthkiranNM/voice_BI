@@ -353,6 +353,8 @@ def _run_forecasting(config: PredictionConfig) -> PredictionResult:
     from prediction.service import _load_table
 
     result = PredictionResult(config=config.to_dict())
+    if config.series_source:
+        return _run_from_built_series(config, result)
     df = _apply_filters(_load_table(config.table), config)
 
     if df.empty:
@@ -422,6 +424,68 @@ def _run_forecasting(config: PredictionConfig) -> PredictionResult:
         total = _sum([r["value"] for r in result.forecast_rows])
         result.aggregated_rows = [{"group": None, "group_values": {}, "value": total}]
 
+    _apply_operations(result, config)
+    _attach_visualization(result, config)
+    return result
+
+
+def _run_from_built_series(config: PredictionConfig, result: PredictionResult) -> PredictionResult:
+    """
+    Forecast per-group series that were built through SQL (see
+    agents/series_builder.py). Each series goes through exactly the same
+    validation, model selection and intervals as any other; the output has the
+    same shape as a grouped forecast, so ranking, comparison, charts and
+    follow-ups work unchanged.
+    """
+    from types import SimpleNamespace
+
+    from agents.series_builder import series_by_group
+    from prediction import predictor
+
+    source = config.series_source
+    series_map, notes = series_by_group(source, config.time_frequency,
+                                        config.history_start, config.history_end)
+    result.warnings.extend(notes)
+    result.dataset_context = {
+        "table": config.table, "rows": len(source.get("rows") or []),
+        "time_column": source["period_col"], "built_with_sql": source.get("sql"),
+        "frequency": config.time_frequency,
+    }
+
+    predictions, excluded = [], []
+    for group, series in series_map.items():
+        hist = [{"date": str(d), "value": float(v) if pd.notna(v) else None}
+                for d, v in series.items()]
+        gdict = {source["group_col"]: group}
+        try:
+            diag, meta, fc, ci = predictor.run_series_forecast(
+                series, steps=config.horizon, frequency=config.time_frequency)
+        except Exception as exc:
+            excluded.append({"group": group, "group_dict": gdict, "status": "error",
+                             "reason": str(exc)})
+            continue
+        entry = {"group": group, "group_dict": gdict, "historical": hist, "forecast": [],
+                 "final_value": None, "status": diag.status, "reason": diag.reason,
+                 "diagnostics": dataclasses.asdict(diag), "model": dataclasses.asdict(meta)}
+        if fc.empty:
+            excluded.append({"group": group, "group_dict": gdict, "status": diag.status,
+                             "reason": diag.reason or "No forecast could be produced."})
+            predictions.append(entry)
+            continue
+        entry["forecast"] = [
+            {"date": str(d), "value": float(v),
+             **({"lower": float(ci.loc[d, "lower"]), "upper": float(ci.loc[d, "upper"])}
+                if ci is not None and d in ci.index else {})}
+            for d, v in fc.items()]
+        entry["final_value"] = predictor._ranking_value(hist, entry["forecast"], config.horizon,
+                                                        config.ranking_metric)
+        predictions.append(entry)
+
+    predictions.sort(key=predictor._rank_sort_key)
+    _absorb_grouped(result, SimpleNamespace(raw_forecast_results=predictions,
+                                            excluded_groups=excluded), config)
+    if not result.ok:
+        return result
     _apply_operations(result, config)
     _attach_visualization(result, config)
     return result

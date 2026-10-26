@@ -47,6 +47,26 @@ Benchmarks: `audit/benchmark_forecasters.py`, `audit/benchmark_pipeline_designs.
   plus explanation sentences quoting: the trend models' score, the
   "repeat ups and downs" score, and on which side the real months fell.
 
+## Breakdowns across several tables (Chinook: "revenue by genre")
+
+- Genre is 3 joins from invoice (invoice → invoice_line → track → genre) and
+  revenue there is unit_price × quantity. The engine's resolver joins one
+  step, so it used to **silently forecast the total** — a wrong answer that
+  looked right.
+- Now an explicitly asked breakdown ("by X", "per X", "for each X") that no
+  direct join reaches is recorded (`config.unresolved_dimensions`) and built
+  by `agents/series_builder.py`: the SQL pipeline returns "<measure> by <X>
+  per <period>" (database does the arithmetic), the shape is checked, gaps
+  stay empty, part-covered edge periods are dropped, then each series is
+  forecast by the normal engine (`engine._run_from_built_series`). If that
+  fails the answer says it couldn't — it never falls back to a total.
+- Follow-ups choose a table **with dates** from the previous SQL (else the
+  source's dated fact table) and carry a computed measure / cross-table
+  breakdown forward, so "Top 3 genres by revenue" → "will it be the same in
+  the next 6 months" works.
+- One-off spike adjustment is capped (≤ 1 in 20 periods): bursty series like
+  Chinook's Metal keep their bursts.
+
 ## "Which month next year will have the highest sales?"
 
 - **Bucket vs span:** `time_resolution.granularity_from_question` reads bucket
@@ -155,7 +175,7 @@ Changes:
 ## Testing
 
 - Backend: `cd backend && venv\Scripts\python.exe -m pytest tests -q`
-  (497 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
+  (504 passing). Afterwards run `git checkout -- backend/data/ml_models/` —
   tests regenerate those cached `.pkl` files.
 - Frontend needs Node ≥ 20 (`npm run dev`); Node 18 cannot run Vite.
 - The Groq free tier has a 200k tokens/day limit; long manual test runs can

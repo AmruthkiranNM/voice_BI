@@ -111,6 +111,11 @@ class PredictionConfig:
     top_n: int | None = None
     ranking_metric: str = "sum"            # sum | growth
     rank_direction: str = "descending"     # for period ranking: highest or lowest first
+    #: Breakdowns the question asked for that no direct join reaches.
+    unresolved_dimensions: list[str] = dataclasses.field(default_factory=list)
+    #: Pre-aggregated series built through SQL for such a breakdown:
+    #: {"sql", "period_col", "group_col", "value_col", "rows"}.
+    series_source: dict[str, Any] = dataclasses.field(default_factory=dict)
     growth_baseline_periods: int | None = None   # defaults to the horizon
     compare_against: str | None = None     # "history" for current-vs-future
 
@@ -192,6 +197,9 @@ class PredictionConfig:
             "top_n": self.top_n,
             "compare_against": self.compare_against,
             "final_period": OP_FINAL_PERIOD in self.operations,
+            "rank_direction": self.rank_direction,
+            # A SQL-built series is different data from the base table's.
+            "series_sql": (self.series_source or {}).get("sql"),
         }
         blob = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(blob.encode()).hexdigest()[:24]

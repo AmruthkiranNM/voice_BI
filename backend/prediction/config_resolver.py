@@ -134,6 +134,22 @@ def _parse_span(question: str):
     return parse_horizon_phrase(question)
 
 
+_NOT_A_BREAKDOWN = {"month", "months", "quarter", "quarters", "week", "weeks", "day", "days",
+                    "year", "years", "period", "periods", "the", "a", "an", "next", "this",
+                    "last", "value", "amount", "total", "count", "number", "far", "how"}
+
+
+def _asked_breakdowns(question: str) -> list[str]:
+    """Nouns the question explicitly breaks the result down by: 'by genre', 'per store'."""
+    found = []
+    for m in re.finditer(r"\b(?:by|per|for each|for every|across)\s+([a-z][a-z_]+)",
+                         (question or "").lower()):
+        word = m.group(1)
+        if word not in _NOT_A_BREAKDOWN:
+            found.append(word)
+    return found
+
+
 _TIME_NOUN = r"(?:month|quarter|week|day|year)s?"
 #: The ranked thing is a time period: "which month ... highest", "busiest
 #: quarter", "peak week", "the lowest month".
@@ -600,13 +616,24 @@ def resolve_config(
     config.group_dimensions, config.dimension_specs = names, specs
     for problem in problems:
         config.warnings.append(f"Dimension not resolved: {problem}")
-    if requested_dims and not names:
-        config.status = cfg.STATUS_INVALID_CONFIG
-        config.errors.append(
-            f"None of the requested groupings ({', '.join(requested_dims)}) could be "
-            f"matched to a column joinable to '{config.table}'."
-        )
-        return config
+
+    # A breakdown the question asked for but that no direct join reaches
+    # (genre is three tables away from invoice) must never be dropped: the
+    # forecast would silently become a total that reads as the breakdown.
+    # It is recorded so the caller can build the series through SQL, or say
+    # plainly that it could not.
+    unresolved = [d for d in requested_dims if d not in names] if requested_dims else []
+    if config.prediction_type == cfg.FORECASTING and not names:
+        target_words = set(re.findall(r"[a-z0-9]+", (config.target or "").lower())) | set(
+            re.findall(r"[a-z0-9]+", (interpretation.get("target_phrase") or "").lower()))
+        for word in _asked_breakdowns(question):
+            if word not in target_words and word not in unresolved:
+                unresolved.append(word)
+    if unresolved and not names:
+        config.unresolved_dimensions = unresolved
+        config.warnings.append(
+            f"The breakdown by {', '.join(unresolved)} is not directly joinable to "
+            f"'{config.table}'; it has to be built across tables.")
 
     # ── 7. Filters ──
     for raw in interpretation.get("filters") or []:
@@ -820,6 +847,10 @@ def _inherit(config: PredictionConfig, previous: PredictionConfig) -> Prediction
     config.confidence_level = previous.confidence_level
     config.source_entities = list(previous.source_entities)
     config.source_leader = previous.source_leader
+    # A cross-table breakdown and a computed measure carry over too.
+    config.unresolved_dimensions = list(getattr(previous, "unresolved_dimensions", []) or [])
+    if getattr(previous, "target_request", None):
+        config.target_request = previous.target_request
     return config
 
 

@@ -208,14 +208,27 @@ def seed_from_bi_result(
         # them — the resolver can, from the column's values.
         dimensions = _resolve_dimensions(label_cols, table, dimension_names)
 
-    if not target and not dimensions:
+    # What the previous answer was about, even when it is not a plain column:
+    # "revenue" computed as unit_price x quantity, grouped by a genre three
+    # joins away. Dropping them left the follow-up asking which measure to use.
+    measure_alias = numeric_cols[0] if numeric_cols else None
+    unresolved_dims = [c for c in label_cols if c not in dimensions] if not dimensions else []
+    if not target and measure_names and (unresolved_dims or measure_alias):
+        if len(measure_names) == 1:
+            target = measure_names[0]          # the dated table's only measure
+
+    if not target and not dimensions and not unresolved_dims:
         return None
 
     seed = PredictionConfig(table=table)
     if target:
         seed.target = target
+    if measure_alias:
+        seed.target_request = measure_alias.replace("_", " ")
     if dimensions:
         seed.group_dimensions = dimensions
+    elif unresolved_dims:
+        seed.unresolved_dimensions = unresolved_dims
 
     # Entities and the current leader, so "will *it* remain the leader" has
     # something concrete to refer to.
@@ -302,15 +315,27 @@ def _table_from_sql(sql: str | None) -> str | None:
         return None
 
     try:
+        from prediction.profiler import build_profile
         from services.database import get_all_table_names, get_table_row_count
         real = {t.lower(): t for t in get_all_table_names()}
         sized = []
         for name in referenced:
             actual = real.get(name.lower())
             if actual:
-                sized.append((get_table_row_count(actual), actual))
-        if sized:
-            return max(sized)[1]
+                try:
+                    timed = bool(build_profile(actual).time_columns)
+                except Exception:
+                    timed = False
+                sized.append((timed, get_table_row_count(actual), actual))
+        # A follow-up about the future needs a time axis: the largest table
+        # with one wins. "Top 3 genres by revenue" touched invoice_line, track
+        # and genre - none dated - and picking the largest (track) left a
+        # forecast with no dates and no revenue column. With no dated table
+        # here, the caller falls back to the source's dated fact table.
+        timed = [s for s in sized if s[0]]
+        if timed:
+            return max(timed)[2]
+        return None
     except Exception as exc:
         logger.debug("[ConversationState] Could not size SQL tables: %s", exc)
     return None

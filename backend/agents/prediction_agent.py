@@ -81,6 +81,29 @@ def run(
     if not config.is_executable:
         return _error_response(config, "; ".join(config.errors))
 
+    # A breakdown no direct join reaches ("by genre" over invoices) is built
+    # as per-period series through the SQL pipeline, which handles multi-table
+    # joins and derived measures; the database does the arithmetic. If that
+    # fails too, say so - never forecast the total in its place.
+    if config.unresolved_dimensions:
+        from agents.series_builder import build_series_through_sql
+        built = build_series_through_sql(config, query, table_names)
+        if not built:
+            dims = ", ".join(config.unresolved_dimensions)
+            return _error_response(
+                config,
+                f"I couldn't link '{dims}' to the dates of '{config.target}' in this data, "
+                f"so I can't forecast it by {dims}. Forecasting the overall total instead "
+                f"would look like a breakdown it isn't. Try asking for the total, or for a "
+                f"breakdown that sits on the same table as the dates.")
+        config.series_source = built
+        config.group_dimensions = [built["group_col"]]
+        config.dimension_specs = []
+        config.warnings.append(
+            f"Series for each {built['group_col']} were built across tables with SQL "
+            f"(the database computed every value); each series was then forecast "
+            f"separately.")
+
     result = engine.execute(config)
 
     if not result.ok:

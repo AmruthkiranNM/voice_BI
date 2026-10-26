@@ -118,11 +118,18 @@ def adjust_isolated_spikes(train: pd.Series) -> tuple[pd.Series, list[str]]:
     z = 0.6745 * (values - median) / mad
     extreme = np.abs(z) > SPIKE_Z
 
+    candidates = [i for i in range(1, len(values) - 1)
+                  if extreme[i] and not extreme[i - 1] and not extreme[i + 1]]
+    # A one-off has to be rare. A series that bursts every few periods (a
+    # product sold in occasional large orders) has its bursts as part of its
+    # normal pattern; flattening six of them in Chinook's Metal genre cut its
+    # forecast to under a third of its usual level.
+    if len(candidates) > max(1, len(values) // 20):
+        return s, []
     adjusted, periods = s.copy(), []
-    for i in range(1, len(values) - 1):
-        if extreme[i] and not extreme[i - 1] and not extreme[i + 1]:
-            adjusted.iloc[i] = (values[i - 1] + values[i + 1]) / 2.0
-            periods.append(str(s.index[i]))
+    for i in candidates:
+        adjusted.iloc[i] = (values[i - 1] + values[i + 1]) / 2.0
+        periods.append(str(s.index[i]))
     return adjusted, periods
 
 

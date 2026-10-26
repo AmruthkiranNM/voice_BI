@@ -34,6 +34,13 @@ def test_level_shift_is_not_a_spike():
     assert spikes == []
 
 
+def test_frequent_bursts_are_not_one_offs():
+    # Bursty series: large months recur, so none of them is a "one-off".
+    s = monthly([2, 2, 20, 2, 2, 2, 18, 2, 2, 2, 22, 2, 2, 2, 19, 2, 2, 2, 21, 2, 2])
+    _, spikes = adjust_isolated_spikes(s)
+    assert spikes == []
+
+
 def test_last_point_is_never_adjusted():
     s = monthly([10, 11, 9, 10, 11, 40])
     _, spikes = adjust_isolated_spikes(s)

@@ -1,203 +1,260 @@
-# Voice BI — AI Business Analysis for Owners
+# Voice BI — Ask Your Business Data Questions, by Voice or Text
 
-A privacy-first tool that helps **business owners** understand their own data. Upload a CSV from your sales, customers, inventory, or finances, then ask questions by **typing or speaking**. A multi-agent AI pipeline analyzes your data locally and returns charts, tables, plain-English insights — and you can keep the conversation going with follow-up questions.
+Voice BI lets a business owner **ask questions about their own data in plain English** — typed or spoken — and get back charts, tables and a clear answer. It answers two kinds of question:
 
-> **No API keys. No cloud. Your data never leaves your machine.**
+| Kind | Example | What you get |
+|---|---|---|
+| **Descriptive** — what happened | "What is the total revenue by country?" | SQL is generated, run on your data, and explained |
+| **Predictive** — what will happen | "Forecast revenue by region for the next 6 months" | A validated forecast with a 95% range and an explanation of its shape |
 
----
+You can keep the conversation going with **follow-ups** ("which one is the lowest?", "will it be the same next 6 months?").
 
+> **Ground rules the system follows:** the AI never calculates numbers (all figures are computed in code), missing data is never treated as zero, and nothing is hard-coded to a particular dataset or question.
 
-## How It Works
-
-```
-1. Upload your business CSV          → data quality check + auto table creation
-2. Ask a question (type or voice)    → multi-agent pipeline turns it into SQL
-3. Get charts, tables, and an answer → ask follow-ups about the same result
-```
-
-### Architecture
-
-```mermaid
-flowchart LR
-    U[Business Owner] -->|CSV upload| API[FastAPI Backend]
-    U -->|voice / text question| API
-
-    subgraph Pipeline["Agent Pipeline (agents/orchestrator.py)"]
-        direction LR
-        P[Planner] --> R[RAG Retriever] --> S[SQL Generator] --> V[Validator] --> E[Execution] --> I[Insight]
-    end
-
-    API --> Pipeline
-    Pipeline --> DB[(SQLite)]
-    Pipeline --> LLM[Ollama — local LLM]
-    Pipeline --> VEC[(FAISS schema index)]
-
-    API --> CHAT[Chat Agent — follow-ups]
-    CHAT --> LLM
-
-    Pipeline --> FE[React Frontend]
-    CHAT --> FE
-```
-
-Each step in the pipeline is logged with timing and surfaced in the UI as a **pipeline trace** so you can see exactly what the system did to answer a question.
+For a full history of changes and the reasons behind them, see **[context.md](context.md)**.
 
 ---
 
-## Key Features
-
-- **CSV upload** — tables created automatically, plus an instant **data quality report** (missing values, duplicates, inconsistent types, constant columns) computed directly from the data, no LLM involved
-- **Voice input/output** — ask by microphone with a live transcript, hear answers read back (Web Speech API)
-- **Conversational follow-ups** — after a result, keep asking ("how can I improve this?") without re-running the full SQL pipeline; the thread persists across questions in a session
-- **Hands-free conversation mode** — speak a follow-up, hear the answer, and the mic re-opens automatically for the next question — a true end-to-end voice loop over your data
-- **Data-grounded callouts** — period-over-period change, outliers, and correlation hints computed straight from the result rows, so they're never hallucinated
-- **Rich visualization** — bar/line/horizontal/doughnut/cumulative charts, trendline overlay, PNG export, sortable & filterable result table, CSV export
-- **Forecasting** — for time-series results, project the next few periods with a least-squares linear trend, drawn as a dashed extension on the line chart (client-side, no LLM, no added latency)
-- **Hybrid domain detection** — identifies the business type (restaurant, retail, HR, healthcare, …) from both column names *and* sampled cell values; keyword scoring decides clear cases, and an embedding-based semantic classifier (reusing the RAG sentence-transformer) rescues datasets whose vocabulary isn't in the keyword lists. Near-ties abstain to an honest label rather than guessing.
-- **Pipeline trace** — visualizes which agent ran, in what order, and how long each step took
-- **Printable report export** — one click to a clean, chart-included PDF via the browser's print dialog
-- **Cache & fast mode** — instant repeat queries, optional speed optimizations for slower hardware
-- **100% local** — powered by [Ollama](https://ollama.com/), tuned to keep embeddings on CPU so a small GPU (e.g. 4GB) is reserved for the LLM
+## Contents
+1. [Quick start](#quick-start)
+2. [Using the app](#using-the-app)
+3. [Example questions](#example-questions)
+4. [How predictions work](#how-predictions-work)
+5. [Testing](#testing)
+6. [Troubleshooting](#troubleshooting)
+7. [Project structure](#project-structure)
+8. [API endpoints](#api-endpoints)
+9. [Tech stack](#tech-stack)
 
 ---
 
-## Setup
+## Quick start
 
-### Option A — Docker Compose (recommended)
+### Requirements
+- **Python 3.10+**
+- **Node.js 20 or newer** (Vite does not run on Node 18)
+- An AI provider — either:
+  - **Groq** (free cloud API, fastest to set up) — get a key at [console.groq.com](https://console.groq.com), or
+  - **Ollama** (fully local) — install from [ollama.com](https://ollama.com) and run `ollama pull qwen2.5-coder:3b`
 
-Requires [Docker](https://www.docker.com/) and a locally running [Ollama](https://ollama.com/) with your model pulled:
-
-```bash
-ollama pull qwen2.5-coder:3b
-docker compose up --build
-```
-
-- App: http://localhost:5173
-- API docs: http://localhost:8000/docs
-
-The backend container reaches Ollama on the host via `host.docker.internal` — see [docker-compose.yml](docker-compose.yml) for details. Ollama itself isn't containerized (GPU passthrough into containers is awkward to set up reliably), so install and run it natively.
-
-### Option B — Manual
-
-**Prerequisites:** Python 3.10+, Node.js 18+, [Ollama](https://ollama.com/) installed and running.
-
-```bash
-ollama pull qwen2.5-coder:3b
-```
-
+### 1. Backend
 ```bash
 cd backend
 python -m venv venv
-venv\Scripts\activate        # Windows
+venv\Scripts\activate            # Windows  (macOS/Linux: source venv/bin/activate)
 pip install -r requirements.txt
-vvx3
+uvicorn main:app --reload --port 8000 
 ```
 
+Create a file **`backend/.env`** with your settings:
+```env
+# Choose ONE provider
+LLM_PROVIDER=groq                # or: ollama
+GROQ_API_KEY=your-groq-key       # only for groq
+# OLLAMA_MODEL=qwen2.5-coder:3b  # only for ollama
+
+# Required for login tokens — use any long random string
+JWT_SECRET=change-me-to-a-long-random-string
+```
+> Never commit `.env` — it holds your keys.
+
+Start the server:
+```bash
+uvicorn main:app --reload --port 8000
+```
+API docs: http://localhost:8000/docs
+
+### 2. Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+Open **http://localhost:5173**.
 
-Open **http://localhost:5173**, upload a CSV, and start asking questions.
-
----
-
-## API Endpoints
-
-| Method | Endpoint        | Description                              |
-|--------|-----------------|-------------------------------------------|
-| POST   | `/api/upload`   | Upload a business CSV, get a quality report |
-| GET    | `/api/datasets` | List uploaded data + suggestions          |
-| POST   | `/api/query`    | Ask a business question (full pipeline)   |
-| POST   | `/api/chat`     | Ask a follow-up about an existing result  |
-| DELETE | `/api/cache`    | Clear query cache                         |
-| GET    | `/api/health`   | Health check                              |
-| GET    | `/api/models`   | List installed local Ollama models        |
+### Optional: Docker
+`docker compose up --build` starts both parts (app on :5173, API on :8000). It expects a local Ollama on the host — see [docker-compose.yml](docker-compose.yml).
 
 ---
 
-## Project Structure
+## Using the app
+
+1. **Sign up / log in.**
+2. **Connect data** — either:
+   - **Upload a CSV** (you get an instant data-quality report: missing values, duplicates, mixed types), or
+   - **Connect a PostgreSQL database** (e.g. Supabase) by pasting its connection URL:
+     ```
+     postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+     ```
+     In Supabase: **Connect → URI → Transaction pooler**. Encode special characters in the password (`@` → `%40`, `#` → `%23`).
+3. **Pick the tables** to ask about (or leave on *Auto*).
+4. **Ask a question** — type it or press the mic.
+5. **Read the result** — chart, table, written answer. Change chart type, go fullscreen, export.
+6. **Ask follow-ups** in the chat panel under the result. Asking a new main question clears the follow-up chat.
+
+---
+
+## Example questions
+
+### Descriptive
+| Question | Follow-up |
+|---|---|
+| What is the total revenue by country? | which one is the lowest |
+| Show monthly revenue for 2022 | Now compare it with 2021 |
+| Top 5 products by boxes shipped | What about by revenue? |
+| Revenue for After Nines by month | Only for India |
+| Share of revenue by category | — |
+
+### Predictive
+| Question | Follow-up |
+|---|---|
+| Forecast total revenue for the next 6 months | How reliable is this? |
+| Forecast revenue by region for the next 6 months | Will APAC remain the highest? |
+| Top 5 products by boxes shipped | will it be same in the next 6 months |
+| Which month next year will have the highest sales? | — |
+| Predict boxes for each sale | which factors matter most |
+| Which customers are likely to leave? *(churn dataset)* | What drives churn the most? |
+
+### The system should refuse or explain (not invent)
+| Question | Expected |
+|---|---|
+| Revenue in 2030 | "No data for that period", with the data's date range |
+| Predict revenue for Germany | "Germany doesn't appear in the data" |
+| Churn rate by country *(sales data with no churn column)* | "No information on churn" — never a made-up 0 |
+| Delete all sales from India | Refused — the app only reads data |
+
+> **Tip:** forecasting needs history. With ~15 months the system can't learn a yearly pattern (needs 24+). Use a dataset with 2–4 years (e.g. Superstore) to see seasonal forecasts.
+
+---
+
+## How predictions work
 
 ```
-voice_BI/
-├── docker-compose.yml
-├── backend/
-│   ├── Dockerfile
-│   ├── agents/           # Multi-agent pipeline: planner, rag_agent, sql_agent,
-│   │                      # validator, execution, insight, chat (follow-ups)
-│   ├── routes/            # API endpoints (query, upload, chat, datasets)
-│   ├── services/           # DB, cache, embeddings, LLM client, data_quality
-│   ├── scripts/benchmark.py # SQL-accuracy eval harness (needs Ollama running)
-│   ├── tests/              # pytest suite
-│   └── data/                # SQLite (created at runtime from uploads)
-└── frontend/
-    ├── Dockerfile, nginx.conf
-    └── src/
-        ├── components/  # UI panels (charts, table, chat, pipeline trace, ...)
-        ├── hooks/        # Voice input & speech output
-        └── utils/        # Client-side result analytics (no LLM calls)
+Question → Task router (descriptive or predictive?)
+         → Config resolver (what to forecast, by what, how far, at what bucket size)
+         → Prediction engine (per series):
+              1. Aggregate to the bucket (month/quarter/...) — gaps stay empty, never 0
+              2. Check the series (length, gaps, one-off spikes, trend, seasonality)
+              3. Backtest candidate models on months they haven't seen
+              4. Choose the method, fit it, build the 95% range from its real errors
+         → Evidence (all numbers computed) → short written answer
 ```
 
----
+**Which method is used — and why** (measured in `audit/benchmark_*.py`, all on months the models had not seen):
 
-## Tech Stack
+| Situation in the data | Method | Forecast shape |
+|---|---|---|
+| Real trend (passes a 5% significance test) | Best trend model from backtesting | Straight / flattening slope |
+| 2+ full seasonal cycles (e.g. 24+ months) | Best seasonal model (e.g. Holt-Winters, Seasonal Naive) | Repeats the yearly ups and downs |
+| Neither (short, noisy data) | **Combination** of mean, SES, 3-month average, last value, **with mean reversion** | Curves from the recent level back toward normal, at the rate the data shows; level if the data shows no carry-over |
 
-| Layer      | Technology                          |
-|------------|--------------------------------------|
-| Backend    | Python, FastAPI, SQLite              |
-| LLM        | Ollama (local)                       |
-| Embeddings | sentence-transformers + FAISS (CPU)  |
-| Frontend   | React, Vite, TailwindCSS, Chart.js   |
-| Voice      | Web Speech API + Speech Synthesis    |
+**Why is a forecast sometimes a flat line?** Because the past ups and downs were random. On this project's data, forecasts that copied the history's ups and downs were less accurate on 24 of 26 series. The swings are shown as the **shaded 95% range** instead. Every forecast chart has a **"Why does the forecast look like this?"** box with the measured reasons, and a grey dotted **"Tested on past periods"** line showing the method predicting real past months it never saw.
+
+**Reliability labels** (same everywhere — chart and text):
+- **Validated** — MASE below 1 and beats the naive baseline
+- **Weak (indicative)** — beats naive, but MASE ≥ 1
+- **Baseline only** — nothing beat "same as last period"
+- **Not validated** — too little history to test
 
 ---
 
 ## Testing
 
-Unit/integration tests (fast, no LLM required — agents are mocked where needed):
-
+### Automated tests (no AI calls needed)
 ```bash
 cd backend
-pip install -r requirements.txt
-pytest tests/ -q
+venv\Scripts\python.exe -m pytest tests -q
 ```
-
-### SQL accuracy benchmark
-
-Measures whether the pipeline returns the *correct answer* (not exact SQL text match) for a hand-labeled set of questions spanning three datasets (sales, HR, restaurant) and five query categories. Requires a running local Ollama:
-
+Expect about **500 passing**. The tests regenerate some cached model files — restore them afterwards:
 ```bash
-cd backend
-python -m scripts.benchmark           # fast mode (heuristic planner)
-python -m scripts.benchmark --no-fast # full pipeline (LLM planner)
+git checkout -- data/ml_models/
 ```
 
-Latest measured result on this machine (`qwen2.5-coder:3b`, fast mode):
-
+### Forecast audits (real data, no AI calls)
+Run from `backend/`:
+```bash
+venv\Scripts\python.exe ..\audit\benchmark_forecasters.py
 ```
-Overall accuracy: 22/22 (100%)
-Avg time per query: 9.0s
+Other audits in `audit/`: `benchmark_pipeline_designs.py`, `benchmark_mean_reversion.py`, `audit_real_forecasts.py`, `audit_spike_adjustment.py`, `analyze_monthly_structure.py`.
 
-Per-category:
-  aggregation  8/8  (100%)
-  filter       4/4  (100%)
-  grouping     6/6  (100%)
-  ranking      4/4  (100%)
-```
-
-An earlier run scored 21/22: "how many sales are there in total?" generated `SUM(amount)` instead of `COUNT(*)` — a count-vs-sum phrasing ambiguity. This was fixed by adding explicit count/sum/average disambiguation to the SQL-generation prompt, demonstrating how the benchmark drives targeted prompt improvements. The benchmark also reports how many queries were rescued by the SQL self-correction retry loop.
+### Manual testing
+Restart the backend first (answers are cached), then work through [Example questions](#example-questions) in one chat.
 
 ---
 
-## Hardware notes
+## Troubleshooting
 
-Tuned for modest local hardware (developed/tested on a GTX 1650, 4GB VRAM):
-- Embeddings run on CPU (`EMBEDDING_DEVICE=cpu`) so the LLM keeps the GPU's VRAM.
-- Ollama call timeout is configurable (`OLLAMA_TIMEOUT_SECONDS`, default 90s) and fails fast with a clear message instead of hanging.
-- `requirements.txt` pins a CPU-only torch wheel to avoid an unnecessary multi-GB CUDA install.
+| Problem | Fix |
+|---|---|
+| `npm run dev` fails / Vite error | Upgrade to **Node 20+** |
+| An old answer keeps coming back | Restart the backend (results are cached), or call `DELETE /api/cache` |
+| "The AI service's daily usage limit has been reached" | Groq free tier ≈ 200k tokens/day — wait, or switch `LLM_PROVIDER=ollama` |
+| Postgres import: `date/time field value out of range: "16/06/2017"` | Dates are day/month/year — import the column as text, then `ALTER TABLE t ALTER COLUMN "Order Date" TYPE date USING to_date("Order Date", 'DD/MM/YYYY');` |
+| Postgres import: `duplicate key value violates unique constraint` | The chosen primary key repeats (e.g. one order has many rows) — use a unique column like `Row ID` |
+| Connection URL rejected | Encode special characters in the password (`@` → `%40`) |
+| Forecast says "needs 24 months… this series has 15" | Expected — the dataset is too short for seasonality |
+
+---
+
+## Project structure
+
+```
+voice_BI/
+├── README.md, context.md        # this guide; detailed change log
+├── audit/                       # forecast benchmarks and audits (real data)
+├── backend/
+│   ├── main.py                  # FastAPI app
+│   ├── config.py                # settings (read from .env)
+│   ├── agents/                  # orchestrator, planner, SQL agent, validator, insight,
+│   │                            # task router, prediction agent, follow-ups
+│   ├── prediction/              # forecasting engine: models, selection, intervals,
+│   │                            # time resolution, config resolver
+│   ├── services/                # database, cache, LLM client, time coverage,
+│   │                            # computed result facts, entity checks
+│   ├── routes/                  # API endpoints
+│   └── tests/                   # pytest suite
+└── frontend/
+    └── src/
+        ├── components/          # results dashboard, charts, prediction panel, chat
+        ├── hooks/               # voice input / speech output
+        └── utils/               # chart builders, palette
+```
+
+---
+
+## API endpoints
+
+All endpoints except `/api/auth/*` require a login token.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/api/auth/register`, `/api/auth/login` | Create account / log in |
+| GET | `/api/auth/me` | Current user |
+| POST | `/api/upload` | Upload a CSV (returns a data-quality report) |
+| POST | `/api/connections/test`, `/api/connections/import` | Test / import a PostgreSQL database |
+| GET | `/api/datasets` | List data sources and tables |
+| GET | `/api/datasets/{table}/preview` | Preview a table |
+| DELETE | `/api/datasets/{table}`, `/api/sources/{id}` | Remove a table / source |
+| POST | `/api/query` | Ask a question (descriptive or predictive) |
+| POST | `/api/chat` | Ask a follow-up about a result |
+| POST | `/api/investigate` | Dig deeper into an answered question (multi-step root-cause drill-down) |
+| DELETE | `/api/cache` | Clear cached answers |
+| GET | `/api/health`, `/api/models` | Health check / available models |
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python, FastAPI, SQLite (+ PostgreSQL import) |
+| AI | Groq (cloud) or Ollama (local) — wording and SQL only, never numbers |
+| Forecasting | statsmodels, scikit-learn, NumPy/pandas |
+| Schema search | sentence-transformers + FAISS (CPU) |
+| Frontend | React, Vite, Tailwind CSS, ECharts |
+| Voice | Web Speech API + Speech Synthesis |
 
 ---
 
 ## License
-
-Educational and demonstration purposes.
+Educational and demonstration purposes (major project).
