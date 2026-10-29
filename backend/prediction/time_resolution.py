@@ -457,6 +457,5 @@ def resolve_horizon(
 
 
 def _offset_for(frequency: str) -> str:
-    return {
-        "days": "D", "weeks": "W", "months": "M", "quarters": "Q", "years": "Y",
-    }.get(normalize_frequency(frequency), "M")
+    from prediction.series_validation import frequency_rule
+    return frequency_rule(frequency)  # pandas-version-aware ("ME" vs "M")

@@ -317,11 +317,10 @@ class TestEngineExecution:
         assert result.status == cfg.STATUS_INSUFFICIENT_DATA
         assert result.errors and not result.forecast_rows
 
-    def test_minimal_history_uses_a_labelled_fallback(self, clinic_db):
+    def test_minimal_history_is_a_labelled_curved_guess(self, clinic_db):
         """
-        Two or three observations are too few to validate a model, but not
-        nothing. A naive fallback is allowed there — provided the result says
-        so rather than presenting it as a validated forecast.
+        Two or three observations are too few to validate a model; the engine
+        still gives a rough estimate, labels it, and never draws a straight line.
         """
         import sqlite3
         conn = sqlite3.connect(clinic_db)
@@ -334,10 +333,11 @@ class TestEngineExecution:
 
         result = engine.execute(make_config(table="small", horizon=3), use_cache=False)
         assert result.ok
-        assert result.model_metadata["selection_method"] == "fallback_no_validation"
-        assert result.model_metadata["selected_model_key"] == "naive"
         assert result.series_diagnostics["status"] == "fallback"
         assert result.series_diagnostics["reason"]
+        values = [r["value"] for r in result.forecast_rows]
+        assert len(set(round(v, 6) for v in values)) > 1
+        assert len(set(round(b - a, 6) for a, b in zip(values, values[1:]))) > 1
 
     def test_filters_narrow_the_source_rows(self, clinic_db):
         unfiltered = engine.execute(make_config(horizon=3), use_cache=False)

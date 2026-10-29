@@ -11,7 +11,7 @@ import Timeline from './Timeline';
 import BIInsightsPanel from './BIInsightsPanel';
 import InvestigationTrail from './InvestigationTrail';
 import PredictionPanel from './PredictionPanel';
-import { resolveVisualizationSpec } from '../utils/semanticClassifier';
+import { resolveVisualizationSpec, isCodeColumn } from '../utils/semanticClassifier';
 import { showToast } from '../utils/toast';
 import { investigateQuery } from '../services/api';
 
@@ -34,7 +34,15 @@ export default function ResultsDashboard({
   const warnings = metadata?.validation_warnings || [];
   const intent = plan?.intent || null;
   const pipelineTime = fakePipelineSeconds ?? metadata?.pipeline_time_seconds;
-  const hasChart = result?.rows?.length > 0 && result?.columns?.length > 0;
+  // "Show me the details of every employee" is a lookup, not an analysis:
+  // the table is the answer. Charts, trend/outlier callouts and "investigate
+  // why" are meaningless on raw records (e.g. a "trend" in ID numbers).
+  // The same applies to any result with no real amount to analyse — only
+  // names, places, dates or codes (IDs, phone extensions, postcodes).
+  const hasMeasure = (result?.columns || []).some(c => !isCodeColumn(c)
+    && (result?.rows || []).some(r => r[c] != null && r[c] !== '' && !Number.isNaN(Number(r[c]))));
+  const isListing = intent === 'detail' || !hasMeasure;
+  const hasChart = !isListing && result?.rows?.length > 0 && result?.columns?.length > 0;
 
   // Row-click drill-through: turn a clicked table row into a follow-up
   // question for the AI Data Analyst chat below, instead of re-running the
@@ -167,7 +175,7 @@ export default function ResultsDashboard({
               autoSpeak={settings.speakInsight && !settings.skipInsight}
             />
           )}
-          {insight && !investigation && !isInvestigating && (
+          {insight && !isListing && !investigation && !isInvestigating && (
             <button
               type="button"
               onClick={handleInvestigate}
@@ -180,11 +188,11 @@ export default function ResultsDashboard({
           {(isInvestigating || investigation) && (
             <InvestigationTrail investigation={investigation} isLoading={isInvestigating} />
           )}
-          <AnomalyCallouts result={result} />
+          {!isListing && <AnomalyCallouts result={result} />}
         </div>
 
         {/* Insights panel (right, 40%) */}
-        {intent !== 'detail' && (
+        {!isListing && (
           <div className="bi-insights-col">
             <BIInsightsPanel result={result} intent={intent} query={query} />
           </div>
@@ -216,16 +224,18 @@ export default function ResultsDashboard({
       )}
 
       {/* ── Secondary row: Dataset Summary + Stats ─────────── */}
-      <div className="bi-secondary-row">
-        <div className="bi-dataset-col" style={{ minWidth: 0 }}>
-          <DatasetSummary datasetInfo={datasetInfo} />
-        </div>
-        {result?.rows?.length > 0 && intent !== 'detail' && (
-          <div className="bi-stats-col" style={{ minWidth: 0 }}>
-            <SecondaryChartOrStats result={result} intent={intent} query={query} plan={plan} />
+      {!isListing && (
+        <div className="bi-secondary-row">
+          <div className="bi-dataset-col" style={{ minWidth: 0 }}>
+            <DatasetSummary datasetInfo={datasetInfo} />
           </div>
-        )}
-      </div>
+          {result?.rows?.length > 0 && (
+            <div className="bi-stats-col" style={{ minWidth: 0 }}>
+              <SecondaryChartOrStats result={result} intent={intent} query={query} plan={plan} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Data Table (full width) ────────────────────────── */}
       <ResultTable
@@ -272,7 +282,7 @@ function FooterTrace({ agentLogs, pipelineTime }) {
 function SecondaryChartOrStats({ result, intent, query, plan }) {
   const { columns = [], rows = [] } = result || {};
   const spec = resolveVisualizationSpec(result, intent, query, plan);
-  let numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c]))));
+  let numericCols = columns.filter(c => !isCodeColumn(c) && rows.some(r => !Number.isNaN(Number(r[c]))));
 
   if (spec && spec.excludedFields) {
     numericCols = numericCols.filter(c => !spec.excludedFields.includes(c));

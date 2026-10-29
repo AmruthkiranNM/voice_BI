@@ -169,7 +169,9 @@ def prepare_inference_data(
 
 def _period_freq(rule: str) -> str | None:
     """Map a resample rule onto the pandas Period alias used to test completeness."""
-    return {"W": "W", "M": "M", "Q": "Q", "Y": "Y"}.get(rule)
+    # Period aliases stay "M"/"Q"/"Y" on every pandas version; the resample
+    # rule may be either spelling depending on the installed pandas.
+    return {"W": "W", "M": "M", "ME": "M", "Q": "Q", "QE": "Q", "Y": "Y", "YE": "Y"}.get(rule)
 
 
 def _trim_partial_edges(

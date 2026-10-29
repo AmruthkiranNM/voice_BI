@@ -11,6 +11,17 @@ import { recommendChartType } from './chartRecommender';
 const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const ID_PATTERNS = /^(id|key|code|uuid|guid|ref|reference|index|row|no|number)$|id$|_id$|^id_|key$/i;
+
+// Columns made of digits that are labels, not quantities: summing or charting
+// them is meaningless (a phone extension, a postcode, a manager's employee id).
+// Only the LAST word decides, so "postal_code" / "phone_number" / "employee_id"
+// are codes but "ticket_price", "account_balance", "number_of_orders" are not.
+const CODE_COLUMN = /(^|[_\s])(id|ids|code|codes|zip|zipcode|postal|postcode|pin|pincode|phone|mobile|fax|extension|ext|ticket|sku|serial|iban|isbn|ref|reference|number|no|num)$|^reports_?to$|^id_/i;
+
+/** True when a column holds identifiers/codes rather than amounts. */
+export function isCodeColumn(name) {
+  return CODE_COLUMN.test(String(name || ''));
+}
 const MEASURE_PATTERNS = /amount|revenue|sales|profit|salary|wage|cost|price|income|earning|spend|fee|budget|qty|quantity|count|total|sum|avg|min|max|rate|percent|pct|margin/i;
 const DATE_PATTERNS = /date|month|year|week|quarter|period|time|day|timestamp/i;
 const DATE_FORMAT = /^\d{4}[-/]\d{1,2}([-/]\d{1,2})?$|^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i;
@@ -58,7 +69,7 @@ export function classifyColumns(result, intent = '', query = '') {
     const colRaw = String(col).toLowerCase();
 
     // 1. Evaluate Identifier Score
-    if (ID_PATTERNS.test(colNorm) || ID_PATTERNS.test(colRaw)) {
+    if (ID_PATTERNS.test(colNorm) || ID_PATTERNS.test(colRaw) || isCodeColumn(colRaw)) {
       identifierScore += 0.6;
     }
     // High uniqueness in a non-single-row result often indicates an ID

@@ -1111,7 +1111,18 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
       },
       // The series buttons above already act as the legend.
       legend: { show: false },
-      grid: { left: '2%', right: '2%', bottom: '5%', top: '8%', containLabel: true },
+      grid: { left: '2%', right: 56, bottom: '5%', top: '8%', containLabel: true },
+      // One large series (e.g. UK) flattens every other group near zero.
+      // Zooming the value axis — mouse wheel / drag on the chart, or the
+      // slider on the right — rescales to show the smaller groups.
+      dataZoom: [
+        { type: 'inside', yAxisIndex: 0, filterMode: 'none',
+          zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        { type: 'slider', yAxisIndex: 0, filterMode: 'none', right: 8, width: 18,
+          showDataShadow: false, brushSelect: false,
+          labelFormatter: v => (isCurrency ? '$' : '') + formatCurrencyNum(v),
+          textStyle: { color: '#a1a1aa', fontSize: 10 } },
+      ],
       xAxis: {
         type: 'category',
         data: allDates,
@@ -1151,6 +1162,7 @@ function GroupedForecastChart({ chart, targetColumn = 'Value' }) {
             <div>
                <h2 className="text-lg md:text-xl font-bold text-zinc-100 uppercase tracking-wide">{humanTitle}</h2>
                <p className="text-zinc-400 text-sm mt-1">Expected {metricLabel.toLowerCase()} for the next {fcCount} months</p>
+               <p className="text-zinc-500 text-xs mt-1">Scroll on the chart or drag the slider on the right to zoom into smaller groups.</p>
             </div>
          </div>
          {focusBar}

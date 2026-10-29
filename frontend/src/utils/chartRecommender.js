@@ -1,3 +1,4 @@
+import { isCodeColumn } from './semanticClassifier';
 /**
  * chartRecommender.js
  * Intelligently recommends the best chart type based on the query result
@@ -78,7 +79,7 @@ export function inspectData(result) {
   const { columns = [], rows = [] } = result || {};
   if (!columns.length || !rows.length) return null;
 
-  const numericCols = columns.filter(c =>
+  const numericCols = columns.filter(c => !isCodeColumn(c) &&
     rows.some(r => r[c] != null && r[c] !== '' && !Number.isNaN(Number(r[c]))),
   );
   const labelCols = columns.filter(c => !numericCols.includes(c));

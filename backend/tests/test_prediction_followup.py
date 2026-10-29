@@ -14,10 +14,10 @@ from agents import predictive_followup_agent
 
 def test_predictor_insufficient_history():
     df = pd.DataFrame({
-        "DATE": pd.date_range("2020-01-01", periods=10),
-        "COUNTRY": ["US", "US", "US", "UK", "UK", "US", "US", "US", "US", "US"],
-        "PRODUCT": ["A", "A", "A", "A", "A", "A", "A", "A", "A", "A"],
-        "REVENUE": [100, 110, 120, 50, None, 130, 140, 150, 160, 170]
+        "DATE": pd.date_range("2020-01-01", periods=20),
+        "COUNTRY": ["US", "US", "US", "UK", "UK"] + ["US"] * 15,
+        "PRODUCT": ["A"] * 20,
+        "REVENUE": [100, 110, 120, 50, None] + [130 + 10 * i for i in range(15)]
     })
     
     dim1 = {"dim_df": pd.DataFrame({"COUNTRY": ["US", "UK"]}), "join_key_base": "COUNTRY", "join_key_dim": "COUNTRY", "join_key_target": "COUNTRY", "group_column": "COUNTRY", "dim_name": "COUNTRY"}

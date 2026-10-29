@@ -150,12 +150,13 @@ class TestSeriesValidation:
         assert diag.status == "fallback"
         assert "naive" in diag.reason.lower()
 
-    def test_too_sparse_series_is_refused(self):
-        """The sparse group that used to produce a negative revenue forecast."""
+    def test_too_sparse_series_gets_labelled_guess(self):
+        """Too gappy to validate: a rough estimate, labelled as such."""
         series = _monthly([5000, None, None, None, 8000, None, None,
                            None, None, 3000, None, None, None, None, 6000])
         diag = series_validation.validate_series(series, requested_frequency="months", horizon=12)
-        assert diag.status == "too_sparse"
+        assert diag.status == "fallback"
+        assert "rough estimate" in diag.reason
         assert diag.missing_ratio > 0.6
 
     def test_counts_and_range_are_reported(self):

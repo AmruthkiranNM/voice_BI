@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { buildQueryTemplates, matchTemplates } from '../utils/querySuggestions';
 import { getModels, clearCache } from '../services/api';
 import { useVoiceInput, useSpeechOutput } from '../hooks/useVoice';
 import { TbMicrophone, TbMicrophoneOff, TbSend, TbSettings, TbHistory, TbX, TbSparkles, TbHeadset, TbStar, TbStarFilled, TbVolume, TbDots, TbCheck } from 'react-icons/tb';
@@ -24,6 +25,7 @@ export default function QueryInput({
   onRemoveHistory,
   pinned = [],
   onTogglePin,
+  tables = [],
 }) {
   const [query, setQuery] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -37,6 +39,20 @@ export default function QueryInput({
   // (charts, table, KPIs) as a typed question, not a separate dead-end page.
   const [conversationMode, setConversationMode] = useState(false);
   const spokenInsightRef = useRef(null);
+  const templates = useMemo(() => buildQueryTemplates(tables), [tables]);
+  const [showTypeahead, setShowTypeahead] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const typeahead = useMemo(() => matchTemplates(templates, query), [templates, query]);
+  // Chips under the box follow what's being typed; static ideas when empty.
+  const chips = query.trim() ? typeahead : suggestions;
+  const pickSuggestion = (s) => { setQuery(s); setShowTypeahead(false); setActiveIdx(-1); };
+  const onInputKey = (e) => {
+    if (!showTypeahead || !typeahead.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => (i + 1) % typeahead.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => (i <= 0 ? typeahead.length - 1 : i - 1)); }
+    else if ((e.key === 'Enter' || e.key === 'Tab') && activeIdx >= 0) { e.preventDefault(); pickSuggestion(typeahead[activeIdx]); }
+    else if (e.key === 'Escape') setShowTypeahead(false);
+  };
 
   const handleVoiceResult = useCallback((transcript) => {
     setVoiceError(null);
@@ -83,6 +99,7 @@ export default function QueryInput({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setShowTypeahead(false);
     if (query.trim() && !isLoading) onSubmit(query.trim());
   };
 
@@ -151,7 +168,10 @@ export default function QueryInput({
             id="query-input"
             type="text"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { setQuery(e.target.value); setShowTypeahead(true); setActiveIdx(-1); }}
+            onKeyDown={onInputKey}
+            onBlur={() => setTimeout(() => setShowTypeahead(false), 150)}
+            autoComplete="off"
             placeholder={
               isListening ? 'Listening...'
               : conversationMode ? 'Conversation mode — speak your question…'
@@ -175,6 +195,23 @@ export default function QueryInput({
             </button>
           </div>
         </div>
+        {showTypeahead && typeahead.length > 0 && !isLoading && (
+          <ul className="absolute left-0 right-0 top-full mt-2 surface-card shadow-2xl py-1.5 z-40 animate-in">
+            <li className="px-4 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-zinc-500">Suggested phrasing for accurate results</li>
+            {typeahead.map((s, i) => (
+              <li key={s}>
+                <button
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); pickSuggestion(s); }}
+                  className={`w-full text-left px-4 py-2 text-sm flex items-center gap-2 transition-colors ${i === activeIdx ? 'bg-[#9C4A2A]/10 text-[#9C4A2A]' : 'text-zinc-300 hover:bg-black/5'}`}
+                >
+                  <TbSparkles className="w-3.5 h-3.5 shrink-0 text-[#9C4A2A]/70" />
+                  {s}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </form>
 
       {conversationMode && (
@@ -216,9 +253,9 @@ export default function QueryInput({
               ))}
             </div>
           )}
-          {suggestions.length > 0 && (
+          {chips.length > 0 && (
             <div className="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
-              {suggestions.map(s => (
+              {chips.map(s => (
                 <button
                   key={s}
                   type="button"

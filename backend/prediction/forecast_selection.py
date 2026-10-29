@@ -586,6 +586,23 @@ def select_and_fit(
         and not _series_has_significant_trend(series)
         and not diagnostics.seasonal_estimate_supported
     )
+    # Loosened: a series a few periods short of two full cycles (e.g. a small
+    # market with a couple of months without sales — gaps are interpolated for
+    # fitting) still gets its seasonal pattern when a seasonal model *clearly*
+    # won the backtest (>= 10% lower error than the combination). Otherwise
+    # the flat combination stands.
+    m = diagnostics.seasonal_periods or 0
+    winner_score = winner.mase if use_mase else winner.mae
+    combo_value = combo_score.mase if use_mase else combo_score.mae
+    if (use_combination and m and winner.model_key in _SEASONAL_KEYS
+            and diagnostics.n_observed >= 2 * m - 3
+            and winner_score is not None and combo_value
+            and winner_score <= 0.9 * combo_value):
+        use_combination = False
+        meta.notes.append(
+            f"{diagnostics.n_observed} of {2 * m} periods for two full cycles; "
+            f"{winner.model_label} kept because it beat the level combination clearly on "
+            f"validation ({winner_score:.2f} vs {combo_value:.2f}).")
     combination_rule = False
     if use_combination and winner.model_key != combo_score.model_key:
         meta.notes.append(
@@ -600,6 +617,23 @@ def select_and_fit(
         combination_rule = True
     elif use_combination:
         combination_rule = True
+
+    # Tie-break toward seasonality: with two full cycles of history, a seasonal
+    # model scoring within 5% of a flat winner is as accurate on validation and
+    # also carries the real shape of the year, so it is preferred.
+    if (not combination_rule and diagnostics.seasonal_estimate_supported
+            and winner.model_key in _FLAT_MODEL_KEYS | {"naive"}):
+        win_val = winner.mase if use_mase else winner.mae
+        seasonal = [s for s in eligible if s.model_key in _SEASONAL_KEYS]
+        if seasonal and win_val:
+            best_seasonal = seasonal[0]
+            s_val = best_seasonal.mase if use_mase else best_seasonal.mae
+            if s_val is not None and s_val <= 1.05 * win_val:
+                meta.notes.append(
+                    f"{best_seasonal.model_label} ({s_val:.2f}) preferred over "
+                    f"{winner.model_label} ({win_val:.2f}): within 5% on validation, and it "
+                    "keeps the seasonal pattern seen in two full cycles of history.")
+                winner = best_seasonal
 
     naive_score = next((s for s in eligible if s.model_key == "naive"), None)
     if naive_score is not None:

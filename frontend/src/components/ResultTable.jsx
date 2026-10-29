@@ -1,3 +1,4 @@
+import { isCodeColumn } from '../utils/semanticClassifier';
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { TbSearch, TbX, TbChevronDown, TbChevronRight, TbDownload, TbCalendar, TbInbox } from 'react-icons/tb';
 import { showToast } from '../utils/toast';
@@ -62,7 +63,7 @@ export default function ResultTable({ result, sql, fullWidth = false, intent, on
   }, [page, sort.column, sort.dir, filter, sql, isServerSide]);
 
   const numericCols = useMemo(() =>
-    columns.filter(c => initialRows.some(r => r[c] != null && !Number.isNaN(Number(r[c])))),
+    columns.filter(c => !isCodeColumn(c) && initialRows.some(r => r[c] != null && !Number.isNaN(Number(r[c])))),
     [columns, initialRows],
   );
 

@@ -3,6 +3,7 @@ import { TbTrophy, TbAlertTriangle } from 'react-icons/tb';
 import ReactECharts from 'echarts-for-react';
 import { analyzeResult, formatStatValue, periodComparison } from '../utils/resultAnalytics';
 import { hexToRgba, BI_COLORS } from '../utils/biPalette';
+import { isCodeColumn } from '../utils/semanticClassifier';
 
 /* eslint-disable react-refresh/only-export-components */
 export function detectKpiMetrics(result) {
@@ -16,7 +17,7 @@ export function detectKpiMetrics(result) {
     if (kpis.length >= 1 && kpis.length <= 8) return kpis;
   }
   if (rows.length <= 3 && columns.length === 2) {
-    const numericCol = columns.find(c => rows.every(r => !Number.isNaN(Number(r[c]))));
+    const numericCol = columns.find(c => !isCodeColumn(c) && rows.every(r => !Number.isNaN(Number(r[c]))));
     const labelCol = columns.find(c => c !== numericCol);
     if (numericCol && labelCol && rows.length === 1) {
       return [{ label: String(rows[0][labelCol]), value: Number(rows[0][numericCol]), raw: rows[0][numericCol] }];

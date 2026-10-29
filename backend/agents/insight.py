@@ -288,6 +288,14 @@ def run(
         intent, requires_aggregation, requires_comparison, row_count, is_truncated_by_limit,
     )
 
+    # A lookup ("details of every employee") is answered by the table itself;
+    # an LLM paragraph just restates the column names and costs tokens.
+    if intent == "detail":
+        cols = len(rows[0]) if rows else 0
+        capped = " (the safety limit — there may be more)" if is_truncated_by_limit else ""
+        return (f"Found **{row_count:,}** record{'s' if row_count != 1 else ''}{capped} "
+                f"with {cols} detail{'s' if cols != 1 else ''} each — see the table below.")
+
     # ── Choose how many rows to include in the prompt ──
     # For detail queries we include more rows so the LLM can describe the
     # scope accurately.  For aggregation/comparison the result is usually

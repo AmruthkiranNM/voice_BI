@@ -57,15 +57,27 @@ _FREQ_BY_DAYS = [
     (365.25, "years"),
 ]
 
-# Pandas offset alias per supported frequency. "ME"/"QE"/"YE" are the
-# non-deprecated period-end aliases.
+# Pandas offset alias per supported frequency. pandas >= 2.2 renamed the
+# period-end offsets to "ME"/"QE"/"YE" (pandas 3 rejects "M"), while older
+# pandas only knows "M"/"Q"/"Y" — pick whichever this install accepts so the
+# code runs on every team member's machine.
+def _offset_aliases() -> tuple[str, str, str]:
+    try:
+        pd.tseries.frequencies.to_offset("ME")
+        return "ME", "QE", "YE"
+    except ValueError:
+        return "M", "Q", "Y"
+
+
+_M, _Q, _Y = _offset_aliases()
+
 FREQ_TO_RULE = {
     "days": "D", "day": "D",
     "weeks": "W", "week": "W",
-    "months": "M", "month": "M",
-    "quarters": "Q", "quarter": "Q",
-    "years": "Y", "year": "Y",
-    "periods": "M", "period": "M",
+    "months": _M, "month": _M,
+    "quarters": _Q, "quarter": _Q,
+    "years": _Y, "year": _Y,
+    "periods": _M, "period": _M,
 }
 
 # Number of buckets in one seasonal cycle, per frequency.
@@ -100,7 +112,7 @@ def normalize_frequency(frequency: str | None) -> str:
 
 def frequency_rule(frequency: str | None) -> str:
     """Return the pandas resample rule for a frequency name."""
-    return FREQ_TO_RULE.get(normalize_frequency(frequency), "M")
+    return FREQ_TO_RULE.get(normalize_frequency(frequency), _M)
 
 
 def median_step_days(timestamps: pd.Series | pd.DatetimeIndex) -> float:
@@ -334,11 +346,11 @@ def validate_series(
         return diag
 
     if diag.missing_ratio > max_missing_ratio:
-        diag.status = "too_sparse"
+        # Too gappy to validate a model, but still worth a labelled guess.
+        diag.status = "fallback"
         diag.reason = (
-            f"{diag.missing_ratio:.0%} of periods have no data (limit "
-            f"{max_missing_ratio:.0%}); the history is too intermittent to forecast "
-            "at this granularity."
+            f"{diag.missing_ratio:.0%} of periods have no data, so this is a rough "
+            "estimate from the periods that do, not a validated forecast."
         )
         return diag
 

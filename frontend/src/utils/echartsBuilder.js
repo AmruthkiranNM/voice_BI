@@ -1,3 +1,4 @@
+import { isCodeColumn } from './semanticClassifier';
 /**
  * echartsBuilder.js
  * Builds complete ECharts `option` objects for all supported chart types.
@@ -621,10 +622,10 @@ export function prepareChartData(result, spec = null, effectiveType = 'bar') {
     if (spec.secondaryMeasures) numericCols.push(...spec.secondaryMeasures);
     // If somehow there are no measures in spec, fallback to checking columns
     if (numericCols.length === 0) {
-      numericCols = columns.filter(c => c !== labelCol && rows.some(r => r[c] != null && !Number.isNaN(Number(r[c]))));
+      numericCols = columns.filter(c => c !== labelCol && !isCodeColumn(c) && rows.some(r => r[c] != null && !Number.isNaN(Number(r[c]))));
     }
   } else {
-    numericCols = columns.filter(c =>
+    numericCols = columns.filter(c => !isCodeColumn(c) &&
       rows.some(r => r[c] != null && r[c] !== '' && !Number.isNaN(Number(r[c]))),
     );
     const labelCols = columns.filter(c => !numericCols.includes(c));

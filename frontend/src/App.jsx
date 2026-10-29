@@ -417,6 +417,7 @@ export default function App() {
                 {/* Ask bar */}
                 {hasData ? (
                   <QueryInput
+                    tables={activeTables}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
                     insight={response?.insight}

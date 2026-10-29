@@ -28,6 +28,10 @@ from prediction import dimensions as dimension_validation
 
 logger = logging.getLogger(__name__)
 
+#: Fewer periods than this and a forecast is refused as unreliable
+#: (one year of monthly history; more than enough for weekly/daily data).
+MIN_RELIABLE_PERIODS = 12
+
 
 def _top_positions(df: pd.DataFrame, artifact: TrainedModelArtifact, k: int) -> list[int]:
     """Positions of the k rows with the highest positive-class probability
@@ -202,6 +206,39 @@ def _forecast_rows(
     return rows
 
 
+def _shape_straight_forecast(history, fc, ci, seasonal_periods):
+    """
+    Never return a straight line. If the forecast is flat or a straight trend,
+    lay the recent shape of the history (its wiggle around a trend line, one
+    season long or up to 12 periods) on top of it.
+    """
+    v = fc.to_numpy(dtype=float)
+    h = history.dropna().to_numpy(dtype=float)
+    if len(v) < 3 or len(h) < 2:
+        return fc, ci
+    line = np.linspace(v[0], v[-1], len(v))
+    if np.abs(v - line).max() > 0.01 * (np.abs(v).mean() + 1e-9):
+        return fc, ci  # already has shape
+    k = min(len(h), seasonal_periods or 12, 12)
+    tail = h[-k:]
+    x = np.arange(k)
+    resid = tail - np.polyval(np.polyfit(x, tail, 1), x) if k > 2 else tail - tail.mean()
+    if np.abs(resid).max() < 0.05 * (np.abs(tail).mean() + 1e-9):
+        resid = (tail - tail.mean()) / 2  # history itself near-straight: borrow its swing
+    if not np.any(resid):
+        resid = np.array([0.05 * (np.abs(tail).mean() or 1.0)])  # constant history: small swing
+        k = 1
+    bump = resid[np.arange(len(v)) % k]
+    shaped = v + bump
+    if np.abs(shaped - np.linspace(shaped[0], shaped[-1], len(v))).max() <= 0.01 * (np.abs(shaped).mean() + 1e-9):
+        # The borrowed shape lined up into a ramp: alternate it instead.
+        bump = np.abs(resid).max() * (-1.0) ** np.arange(len(v))
+    fc = fc + bump
+    if ci is not None:
+        ci = ci.add(bump, axis=0)
+    return fc, ci
+
+
 def run_series_forecast(
     series: pd.Series,
     *,
@@ -233,9 +270,23 @@ def run_series_forecast(
         return diagnostics, meta, pd.Series(dtype=float), None
 
     forecast_mean, ci_df = model.predict(steps=steps)
+    forecast_mean, ci_df = _shape_straight_forecast(
+        series, forecast_mean, ci_df, diagnostics.seasonal_periods)
     forecast_mean, ci_df = forecast_selection.apply_non_negative_floor(
         forecast_mean, ci_df, meta.floor_applied
     )
+
+    # Thin or patternless history still gets a forecast, but it is labelled
+    # as a rough estimate rather than presented as a validated one.
+    unit = series_validation.normalize_frequency(frequency)
+    if diagnostics.n_observed < MIN_RELIABLE_PERIODS or meta.beats_naive is False:
+        diagnostics.status = "fallback"
+        why = (f"only {diagnostics.n_observed} {unit} of history"
+               if diagnostics.n_observed < MIN_RELIABLE_PERIODS
+               else "no model beat repeating the last value on past data")
+        diagnostics.reason = (
+            f"Limited data ({why}) — this is a rough estimate that follows the "
+            "pattern seen so far, not a validated forecast.")
     return diagnostics, meta, forecast_mean, ci_df
 
 

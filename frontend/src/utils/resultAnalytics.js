@@ -1,4 +1,4 @@
-import { resolveVisualizationSpec } from './semanticClassifier';
+import { resolveVisualizationSpec, isCodeColumn } from './semanticClassifier';
 
 /** Compute summary statistics from a query result for the results dashboard. */
 export function analyzeResult(result, intent = '', query = '') {
@@ -8,7 +8,7 @@ export function analyzeResult(result, intent = '', query = '') {
   const { columns, rows } = result;
   
   // Filter out non-numeric columns, and strictly exclude identifiers based on spec
-  let numericCols = columns.filter(col =>
+  let numericCols = columns.filter(col => !isCodeColumn(col) &&
     rows.some(r => {
       const v = r[col];
       return v != null && v !== '' && !Number.isNaN(Number(v));
@@ -84,7 +84,7 @@ export function detectDateColumn(columns, rows) {
 export function periodComparison(result) {
   if (!result?.rows?.length || !result?.columns?.length) return null;
   const { columns, rows } = result;
-  const numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
+  const numericCols = columns.filter(c => !isCodeColumn(c) && rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
   const dateCol = detectDateColumn(columns, rows);
   if (!dateCol || !numericCols.length) return null;
 
@@ -251,7 +251,7 @@ export function thresholdProjection(result) {
   const dateCol = detectDateColumn(columns, rows);
   if (!dateCol) return null;
 
-  const numericCols = columns.filter(c => c !== dateCol && rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
+  const numericCols = columns.filter(c => c !== dateCol && !isCodeColumn(c) && rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
   if (!numericCols.length) return null;
   const valueCol = numericCols[0];
 
@@ -294,7 +294,7 @@ export function recencyRisk(result, maxResults = 5) {
   const dateCol = detectDateColumn(columns, rows);
   if (!dateCol) return [];
 
-  const numericCols = columns.filter(c => rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
+  const numericCols = columns.filter(c => !isCodeColumn(c) && rows.some(r => !Number.isNaN(Number(r[c])) && r[c] !== ''));
   const valueCol = numericCols.find(c => c !== dateCol) || null;
 
   // Pick the non-numeric, non-date column with the most repeat structure —
